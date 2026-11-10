@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Part 6 - Manager dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body>
+<h1>Part 6 - Manager dashboard</h1>
+<p>Placeholder. Owner replaces this page. Data: <code>GET /api/state</code></p>
+<pre id="out"></pre>
+<script>
+async function poll() {
+  const r = await fetch("/api/state");
+  document.getElementById("out").textContent = JSON.stringify(await r.json(), null, 2);
+}
+poll(); setInterval(poll, 1000);
+</script>
+</body></html>

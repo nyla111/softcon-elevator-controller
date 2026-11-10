@@ -1,0 +1,17 @@
+name: Contract change request
+description: Ask the tech lead for a new event, field or interface method
+title: "Contract: "
+labels: ["contract"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What to add or change (file, name, fields)
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why (which requirement needs it) and who else is affected
+    validations:
+      required: true

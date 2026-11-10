@@ -1,0 +1,86 @@
+part,id,title
+1,SIM-SETUP,Simulator: cars doors load timing (Appendix B physics)
+1,SIM-TRAFFIC,Traffic generator: 5 profiles exponential arrivals seeds 1-10
+1,SIM-DEVICES,Mock ACS camera fire panel power room notifier inbox
+1,FR-104,Controller heartbeat lost 3 s -> Disconnected
+1,FR-107,Dispatch continues without DB; buffer 24 h; alert 80% disk
+1,NFR-R2,Simulated hot-standby failover within 10 s
+1,FR-54,Controllers fall back to built-in group logic when EMS fails
+1,DEMO-BUILDING,Building animation page
+1,DEMO-RUNNER,Scenario runner page (pick SIM, run, pass/fail)
+2,FR-01,Accept hall and car calls
+2,FR-02,Assign each hall call to exactly one car under active mode
+2,FR-03,Show and announce assigned car at the panel
+2,FR-04,Re-assign waiting calls when car unavailable; keep wait clock
+2,FR-05,Stop assigning to cars at or above 80% load
+2,FR-06,Dispatch engine as replaceable plug-in
+2,FR-10,Rush / Balanced / Eco modes
+2,FR-11,Mode schedule weekday / weekend / holiday
+2,FR-12,Manual mode switch until set time or next change
+2,FR-13,Wait ceiling: request Standby at 90%; alert and log breaches
+2,FR-14,Eco auto step-up to Balanced
+2,FR-15,Mode change lets cars finish current trips
+2,FR-18,No queue priority other than accessible / medical / VIP
+2,FR-100,Overload: step-out message naming next car; re-assign
+2,FR-101,Never assign more passengers than rated persons
+2,FR-105,Built-in nearest-car rule if plug-in fails or >1 s
+3,FR-40,Offer and accept only allowed + public floors
+3,FR-41,Visitor QR passes for own floors and time window
+3,FR-42,Security lockdown of chosen floors
+3,FR-43,Log every credential use and refusal (security only 90 days)
+3,FR-44,Public floors by time of day; lobby always public
+3,FR-45,Default floor called at once; Other floor replaces within 5 s
+3,FR-46,Refusal message without revealing floors or reason
+3,FR-48,Service car: secured floor needs card tap within 10 s
+3,FR-49,ACS outage: cache <=24 h else public floors; alert security
+3,FR-85,Courier passes: lobby / loading dock / service car only
+3,FR-126,Group QR pass up to 20; spread over cars
+3,BR-07,Way down to lobby and exits always open
+3,NFR-SE6,Revocation always wins over cache
+3,DEMO-PANEL,Lobby panel page (screens 1-4 of Figure 3)
+4,BR-06,Car state machine and precedence (only writer of car state)
+4,FR-50,Fire alarm: stop dispatch; cancel IS and VIP; send no commands
+4,FR-51,Firefighter service: status only
+4,FR-52,Generator: limited cars; park others one at a time
+4,FR-53,Passenger alarm -> top-priority alert
+4,FR-55,Resume only when healthy cars normal + FM confirms
+4,NFR-SF3,Lost fire I/O signal treated as fire alarm
+4,FR-110,Mains loss: pause; POSSIBLE ENTRAPMENT alert by 60 s
+4,FR-111,Resume only after 2 min stable mains
+4,FR-112,Entrapment alert + contractor call-out on fault with load
+4,FR-113,3 faults in 30 days -> FM review notice
+4,FR-120,Excess car calls: cancel only proven duplicates
+4,FR-121,Per-credential rate limit (6th action in 60 s)
+4,FR-122,No-show hall call cancelled after one door cycle
+4,FR-125,Spam limits never block accessible / alarm / medical / fire
+5,FR-08,Accessible calls: free capacity; 10 s doors; voice
+5,FR-30,Fault alerts to contractor and FM
+5,FR-31,Usage counters and service reminders
+5,FR-32,Technician maintenance mode in / out
+5,FR-33,Second car out in Rush needs FM approval (10 min timeout)
+5,FR-36,Free independent-service periods; not in Rush
+5,FR-70,VIP role grants and quotas
+5,FR-71,VIP car selection (empty within 30 s else fastest)
+5,FR-72,VIP caps: 1 car per group; 6 per hour; ceiling check
+5,FR-76,Priority order medical > accessible > VIP > others
+5,FR-80,House-rule item limits shown on panels
+5,FR-81,Goods-move request in tenant portal; FM approval
+5,FR-82,Service car answers only that move's credentials
+5,FR-127,Medical priority express (above VIP)
+5,FR-128,Send car with collapsed person to lobby doors open
+6,FR-20,Dashboard: every car position direction doors load state
+6,FR-21,Trip records without person IDs
+6,FR-22,KPIs: avg and p95 wait; ride; run time; energy
+6,FR-23,Monthly owner report: wait and run time side by side
+6,FR-84,Bulky item: voice redirect to service car + flag
+6,FR-90,Accept configurable camera event types
+6,FR-91,Link events only to trip credentials; never face recognition
+6,FR-92,Security-only review queue; confirm / dismiss
+6,FR-93,Never apply penalties automatically
+6,FR-94,Safety events skip queue -> immediate alert
+6,FR-96,Clip retention 30 days / confirmed <=1 year
+6,FR-60,Role-based access
+6,FR-61,Audit log of every human change
+6,FR-62,Building configuration without code change
+6,DATA-RETENTION,Section 6 retention purges with test clock
+6,DEMO-DASHBOARD,Manager dashboard page

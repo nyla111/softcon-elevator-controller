@@ -1,0 +1,22 @@
+name: Requirement
+description: One SRS requirement to implement
+title: "FR-__ short title"
+labels: ["requirement"]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part
+      options: ["1 Simulator", "2 Dispatch", "3 Access", "4 Safety", "5 Priority", "6 Monitor"]
+    validations:
+      required: true
+  - type: textarea
+    id: text
+    attributes:
+      label: Requirement text (paraphrase from SRS)
+    validations:
+      required: true
+  - type: input
+    id: test
+    attributes:
+      label: Verified by (SIM-/VER- or unit test)

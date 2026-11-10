@@ -1,0 +1,25 @@
+[project]
+name = "ems"
+version = "0.1.0"
+description = "Elevator Management System, Release 1 (implementation of Team 3's SRS v0.13)"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.110", "uvicorn>=0.29"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.5"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ems*"]
+
+[tool.setuptools.package-data]
+"ems.web" = ["static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

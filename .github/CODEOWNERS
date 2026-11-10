@@ -1,0 +1,13 @@
+# Replace @usernames with real GitHub handles. Owners must approve PRs touching their folder.
+/ems/contracts/   @TECH_LEAD
+/ems/core/        @TECH_LEAD
+/ems/web/server.py @TECH_LEAD
+/.github/         @TECH_LEAD
+/ems/sim/         @TECH_LEAD
+/ems/dispatch/    @PART2
+/ems/access/      @PART3
+/ems/safety/      @PART4
+/ems/priority/    @PART5
+/ems/monitor/     @PART6
+/ems/web/static/panel/      @PART3
+/ems/web/static/dashboard/  @PART6
