@@ -38,6 +38,17 @@ class AccessRefused(Event):          # FR-46; credential id goes to security log
     credential_id: Optional[CredentialId]
     reason: str
 
+@dataclass
+class PassengerArrived(Event):       # pub: Part 1 Simulator; Part 3 turns it into CallRequested
+    passenger_id: str
+    panel_id: str
+    origin: Floor
+    destination: Floor
+    group: GroupId
+    credential_id: Optional[CredentialId]
+    accessible: bool
+    vip: bool
+
 
 # ---------- Dispatch (pub: Part 2 Dispatch & modes) ----------
 @dataclass
