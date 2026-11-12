@@ -13,13 +13,15 @@ Car states come from the car_states service (Part 4); this file never computes t
 """
 from __future__ import annotations
 
+import json
 import threading
 from collections import Counter
 from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -34,6 +36,8 @@ EVENT_LINES = 30
 app = FastAPI(title="Elevator Management System")
 app.state.ctx = build(seed=1)
 app.state.lock = threading.RLock()
+app.state.build_lock = threading.Lock()     # one snapshot build at a time
+app.state.snapshot = None                   # ((ctx, t, events), pre-serialised JSON)
 app.state.live = None                     # {"profile", "rate", "seed"} after /api/live/start
 
 
@@ -110,42 +114,72 @@ def _active_faults(ctx, sim) -> list[str]:
     return out
 
 
-@app.get("/api/state")
-def state() -> dict:
-    with app.state.lock:
-        ctx = app.state.ctx
-        sim = ctx.get("controllers")
-        cars = []
-        for s in sim.all_status():
-            car = sim.cars[s.car_id]
-            cars.append(asdict(s) | {
-                "state": ctx.get("car_states").state(s.car_id).name,
-                "capacity": car.capacity,
-                "link_lost": car.link_lost,
-            })
-        guard = ctx.services.get("dispatch_guard")
-        alerts = _alerts(ctx)
-        return {
-            "t": ctx.clock.now(),
-            "time": ctx.clock.now_dt().isoformat(),
-            "modes": {g: ctx.get("dispatcher").current_mode(g).value for g in ctx.get("building").group_names},
-            "cars": cars,
-            "alerts": [asdict(a) for a in alerts[-20:]],
-            # ---- fields added by Part 1 (building page) ----
-            "alerts_total": len(alerts),
-            "waiting": _waiting(sim, ctx.get("building").group_names),
-            "active_faults": _active_faults(ctx, sim),
-            "ems": {"status": "down" if sim.ems_down else "up",
-                    "controllers_fallback": sim.fallback_active},
-            "dispatch_fallback_active": bool(guard and guard.in_outage),
-            "dispatch_guard": ({"calls": guard.calls, "fallbacks": guard.fallbacks}
-                               if guard else None),
-            "events": _recent_events(ctx),
-            "live": app.state.live,
-        }
+def _build_state(ctx) -> dict:
+    """The state dict for one simulation instant. Call it with app.state.lock held."""
+    sim = ctx.get("controllers")
+    cars = []
+    for s in sim.all_status():
+        car = sim.cars[s.car_id]
+        cars.append(asdict(s) | {
+            "state": ctx.get("car_states").state(s.car_id).name,
+            "capacity": car.capacity,
+            "link_lost": car.link_lost,
+        })
+    guard = ctx.services.get("dispatch_guard")
+    alerts = _alerts(ctx)
+    return {
+        "t": ctx.clock.now(),
+        "time": ctx.clock.now_dt().isoformat(),
+        "modes": {g: ctx.get("dispatcher").current_mode(g).value for g in ctx.get("building").group_names},
+        "cars": cars,
+        "alerts": [asdict(a) for a in alerts[-20:]],
+        # ---- fields added by Part 1 (building page) ----
+        "alerts_total": len(alerts),
+        "waiting": _waiting(sim, ctx.get("building").group_names),
+        "active_faults": _active_faults(ctx, sim),
+        "ems": {"status": "down" if sim.ems_down else "up",
+                "controllers_fallback": sim.fallback_active},
+        "dispatch_fallback_active": bool(guard and guard.in_outage),
+        "dispatch_guard": ({"calls": guard.calls, "fallbacks": guard.fallbacks}
+                           if guard else None),
+        "events": _recent_events(ctx),
+        "live": app.state.live,
+    }
 
 
 # ---------------------------------------------------------------- time and live control
+
+def _snapshot() -> bytes:
+    """Pre-serialised /api/state JSON, built once per simulation advance.
+
+    The cache key is (context object, sim time, number of events): it changes whenever the simulation
+    advances or anything is published. A request that finds the cache fresh takes no lock at all.
+    On a miss ONE request builds the dict under the simulation lock (that is the only moment the
+    state is read), the JSON is serialised outside that lock, and every other request that
+    arrived meanwhile waits on the build lock and then reuses the result."""
+    ctx = app.state.ctx
+    key = (ctx, ctx.clock.now(), len(ctx.bus.log))
+    snap = app.state.snapshot
+    if snap is not None and snap[0] == key:
+        return snap[1]
+    with app.state.build_lock:
+        ctx = app.state.ctx
+        with app.state.lock:
+            key = (ctx, ctx.clock.now(), len(ctx.bus.log))
+            snap = app.state.snapshot
+            if snap is not None and snap[0] == key:
+                return snap[1]
+            data = _build_state(ctx)
+        payload = json.dumps(jsonable_encoder(data)).encode()
+        app.state.snapshot = (key, payload)
+        return payload
+
+
+@app.get("/api/state")
+def state() -> Response:
+    return Response(_snapshot(), media_type="application/json")
+
+
 @app.post("/api/advance")
 def advance(seconds: float = 1.0) -> dict:
     """Advance simulated time (the building page drives this)."""
