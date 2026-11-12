@@ -55,7 +55,7 @@ def test_fault_notes_only_where_appendix_b_gives_them():
 SETUP = {
     "SIM-01": [("up_peak", "fixed")], "SIM-02": [("lunch", "fixed"), ("evening", "fixed")],
     "SIM-03": [("balanced", "fixed")],
-    "SIM-04": [("eco_quiet", "fixed"), ("balanced", "fixed"), ("up_peak", "fixed")],
+    "SIM-04": [("eco_quiet", "fixed"), ("eco_quiet", "fixed"), ("up_peak", "fixed")],
     "SIM-05": [("weekday", "weekday")],
     "SIM-06": [("up_peak", "fixed")], "SIM-07": [("up_peak", "fixed")],
     "SIM-08": [("up_peak", "fixed")], "SIM-09": [("up_peak", "fixed")],
@@ -85,7 +85,10 @@ def test_sim_10_has_a_design_limit_setup():
 
 def test_sim_04_pair_and_surge():
     eco, bal, surge = SCENARIOS["SIM-04"].runs
-    assert eco.profile_name == "eco_quiet"
+    assert eco.profile_name == bal.profile_name == "eco_quiet"
+    assert (eco.requested_mode, bal.requested_mode) == ("eco", "balanced") and surge.requested_mode is None
+    assert eco.rate == bal.rate and eco.warmup_profile == bal.warmup_profile
+    assert eco.faults == bal.faults and eco.workload == bal.workload
     assert eco.pair == bal.pair == "quiet" and surge.pair is None
     assert {eco.start_hhmm, bal.start_hhmm, surge.start_hhmm} == {"21:00"}
     assert surge.warmup_profile == "eco_quiet" and surge.warmup_s == 600.0

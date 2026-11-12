@@ -118,3 +118,43 @@ def test_scenarios_list_has_runs_with_start_times(client):
     assert rows["SIM-08"]["runs"][0]["start_hhmm"] == "16:30"
     assert rows["SIM-10"]["runs"][0]["rate"] == 400.0 and rows["SIM-10"]["waiting_for"] == "Part 2 check"
     assert [r["label"] for r in rows["SIM-04"]["runs"]] == ["quiet eco", "quiet balanced", "surge"]
+
+
+def test_state_snapshot_is_cached_and_refreshed_on_change(client):
+    from ems.web import server
+    client.post("/api/live/start", json={"profile": "balanced", "seed": 1})
+    first = client.get("/api/state")
+    assert client.get("/api/state").content == first.content          # same pre-serialised bytes
+    client.post("/api/advance?seconds=10")
+    assert client.get("/api/state").json()["t"] == 10.0
+    client.post("/api/live/fault", json={"kind": "fire_alarm"})        # same sim time, new events
+    assert "fire alarm" in client.get("/api/state").json()["active_faults"]
+    assert server.app.state.snapshot is not None
+
+
+def test_50_concurrent_state_requests_return_within_1_s(client):
+    import threading
+    import time
+
+    from fastapi.testclient import TestClient
+
+    from ems.web import server
+    client.post("/api/live/start", json={"profile": "up_peak", "rate": 35, "seed": 1})
+    client.post("/api/advance?seconds=600")
+    times, bad = [], []
+    barrier = threading.Barrier(50)
+
+    def user():
+        c = TestClient(server.app)
+        barrier.wait()
+        for _ in range(3):
+            t0 = time.perf_counter()
+            r = c.get("/api/state")
+            times.append(time.perf_counter() - t0)
+            if r.status_code != 200 or "cars" not in r.json():
+                bad.append(r.status_code)
+    threads = [threading.Thread(target=user) for _ in range(50)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert not bad and len(times) == 150
+    assert max(times) < 1.0, max(times)

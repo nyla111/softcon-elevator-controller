@@ -17,7 +17,9 @@ Traffic setup (Part 1's job) is `runs`: a list of RunSetup, one per simulator ru
 is executable. Each run starts at `start_hhmm` (time of day, via build(start=...); Part 2 reads it
 with ctx.clock.now_dt()). Most scenarios have one run (up-peak ones start at 07:00, balanced ones at
 13:30). SIM-02 has two (lunch from 11:30, evening from 17:00). SIM-04 has three, all from 21:00
-(Eco block, same seed): eco_quiet and balanced as a pair, and a separate surge (10 min of
+(Eco block, same seed): the Eco/Balanced pair ("same initial state, seed, quiet arrivals and
+configuration": both runs use eco_quiet traffic at 2/min, only `requested_mode` differs, "eco" vs
+"balanced", for Part 2 to apply), and a separate surge (10 min of
 eco_quiet, then 75/min up_peak mix for 15 min, up to 30 min to clear; outside the normal
 envelope, DECISIONS D-01). SIM-05 is mode "weekday": 24 h from 00:00 following the weekday
 schedule, with per-block metrics in RunResult.blocks. SIM-08 starts at 16:30 so the fire alarm
@@ -67,6 +69,7 @@ class RunSetup:
     warmup_profile: object = None               # traffic during the warm-up only (SIM-04 surge)
     building: Optional[str] = None              # "design_limit" (default: reference building)
     workload: Optional[dict] = None             # SIM-10 load hooks (workload.py)
+    requested_mode: Optional[str] = None        # mode Part 2 must apply for this run ("eco", "balanced")
     envelope_note: Optional[str] = None         # set when the run is outside the normal envelope
 
     def __post_init__(self) -> None:
@@ -210,8 +213,9 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
     _todo("SIM-02", 'Lunch and evening peaks', 2, "lunch", 'As SIM-01', 'NFR-P3', runs=[RunSetup("lunch", "lunch"), RunSetup("evening", "evening")]),
     _todo("SIM-03", 'Office hours, inter-floor traffic (Balanced)', 2, "balanced", 'Average 30 s or less, none over 90 s', 'NFR-P3'),
     _todo("SIM-04", 'Eco quiet paired with Balanced; separate surge phase', 2, "eco_quiet", 'At least 15% run-time saving in every quiet pair; Eco mean <=45 s and ceiling <=120 s; surge switches under FR-14', 'FR-14, NFR-E1, NFR-P3', runs=[
-        RunSetup("quiet eco", "eco_quiet", pair="quiet", start_hhmm="21:00"),
-        RunSetup("quiet balanced", "balanced", pair="quiet", start_hhmm="21:00"),
+        RunSetup("quiet eco", "eco_quiet", pair="quiet", start_hhmm="21:00", requested_mode="eco"),
+        RunSetup("quiet balanced", "eco_quiet", pair="quiet", start_hhmm="21:00",
+                 requested_mode="balanced"),
         RunSetup("surge", "up_peak", SRS_ORIGINAL_PEAK_RATE, start_hhmm="21:00",
                  warmup_s=600.0, measure_s=900.0, clear_s=1800.0, warmup_profile="eco_quiet",
                  envelope_note="Eco surge at 75/min for 15 min is outside the normal envelope "
