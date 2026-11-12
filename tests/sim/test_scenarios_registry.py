@@ -33,3 +33,18 @@ def test_describe_resolves_the_default_rate():
     d = describe(SCENARIOS["SIM-09"])
     assert d["rate"] == 35 and d["owner_part"] == 1 and d["faults"] == ["ems_crash at 1800 s"]
     assert describe(SCENARIOS["SIM-04"])["rate"] == 20
+
+
+def test_every_scenario_has_title_criteria_and_requirement_ids():
+    for s in SCENARIOS.values():
+        assert s.title and s.srs_criteria and s.verifies, s.id
+        d = describe(s)
+        assert d["srs_criteria"] == s.srs_criteria and d["verifies"] == s.verifies
+    assert SCENARIOS["SIM-01"].title == "Morning up-peak, all passengers with cards"
+    assert SCENARIOS["SIM-09"].verifies == "FR-54, NFR-R2"
+    assert SCENARIOS["SIM-16"].srs_criteria.startswith("Car marked Disconnected in 3 s")
+
+
+def test_fault_notes_only_where_appendix_b_gives_them():
+    with_notes = sorted(s.id for s in SCENARIOS.values() if s.notes)
+    assert with_notes == ["SIM-07", "SIM-08", "SIM-12", "SIM-13", "SIM-14", "SIM-18"]

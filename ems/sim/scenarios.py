@@ -10,8 +10,9 @@ HOW A PART ADDS ITS SCENARIO: edit the entry in SCENARIOS (below), set `faults`,
 and set check=..., ready=True, waiting_for=None. Nothing else changes: tests/scenarios and the
 runner page pick it up. Part 1 only runs the scenarios; it does not write the other criteria.
 
-Titles of the scenarios other than SIM-09 and SIM-16 are working titles: the repo does not contain
-Appendix B, so each owner should correct the title when adding the check.
+Titles, `srs_criteria` (the SRS pass criteria, shown in the runner table) and `verifies` (the
+requirement ids) are the Appendix B texts. `notes` carries the Appendix B fault-injection notes.
+Default: faults start 20 min into the measured window and are held 5 min, unless a note says so.
 rate=None means "the profile's default rate" (D-01). A check gets the RunResult and the finished
 Context (bus log, services).
 """
@@ -47,6 +48,9 @@ class Scenario:
     check: Optional[Callable] = None            # check(result, ctx) -> criteria or None
     ready: bool = False
     waiting_for: Optional[str] = None
+    srs_criteria: str = ""                      # SRS pass criteria (text only, not checked here)
+    verifies: str = ""                          # requirement ids
+    notes: str = ""                             # Appendix B fault-injection notes
 
 
 def _setup_with_recorder(ctx) -> None:
@@ -135,33 +139,37 @@ def check_sim_16(result: RunResult, ctx) -> Criteria:
 
 
 # ---------------------------------------------------------------- the registry
-def _todo(sid: str, title: str, part: int, profile: str) -> Scenario:
-    return Scenario(sid, title, part, profile, waiting_for=f"Part {part} check")
+def _todo(sid: str, title: str, part: int, profile: str, srs: str, verifies: str,
+          notes: str = "") -> Scenario:
+    return Scenario(sid, title, part, profile, waiting_for=f"Part {part} check",
+                    srs_criteria=srs, verifies=verifies, notes=notes)
 
 
 SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
-    _todo("SIM-01", "Up-peak traffic", 2, "up_peak"),
-    _todo("SIM-02", "Lunch peak traffic", 2, "lunch"),
-    _todo("SIM-03", "Evening down-peak traffic", 2, "evening"),
-    _todo("SIM-04", "Balanced traffic", 2, "balanced"),
-    _todo("SIM-05", "Eco quiet period", 2, "eco"),
-    _todo("SIM-06", "VIP trips under load", 5, "balanced"),
-    _todo("SIM-07", "ACS outage", 3, "balanced"),
-    _todo("SIM-08", "Fire alarm recall", 4, "balanced"),
-    Scenario("SIM-09", "EMS server failover", 1, "up_peak", faults=[
+    _todo("SIM-01", 'Morning up-peak, all passengers with cards', 2, "up_peak", 'Average wait 25 s or less, none over 60 s; car shown within 1.5 s', 'NFR-P3, NFR-P5'),
+    _todo("SIM-02", 'Lunch and evening peaks', 2, "lunch", 'As SIM-01', 'NFR-P3'),
+    _todo("SIM-03", 'Office hours, inter-floor traffic (Balanced)', 2, "evening", 'Average 30 s or less, none over 90 s', 'NFR-P3'),
+    _todo("SIM-04", 'Eco quiet paired with Balanced; separate surge phase', 2, "balanced", 'At least 15% run-time saving in every quiet pair; Eco mean <=45 s and ceiling <=120 s; surge switches under FR-14', 'FR-14, NFR-E1, NFR-P3'),
+    _todo("SIM-05", 'Full weekday on the default schedule', 2, "eco", 'Each mode meets targets; no one stranded at mode changes', 'FR-11, FR-15'),
+    _todo("SIM-06", 'Car fault at up-peak, then a second removal requested', 5, "balanced", 'Waiting calls retained/reassigned; faulted car not moved; second removal needs FM approval; degraded waits logged', 'FR-04, FR-33'),
+    _todo("SIM-07", 'ACS outage for 15 minutes at up-peak', 3, "balanced", 'Fresh cached permissions used, stale/missing cache restricted to public floors; security alerted; outage waits reported separately', 'FR-49, NFR-SE5, NFR-SE6', notes='ACS outage lasts 15 min (not 5), starting 20 min into the measured window.'),
+    _todo("SIM-08", 'Fire alarm at Rush transition with active goods move; optional lockdown variant', 4, "balanced", 'No controller command after alarm; goods move cancelled; healthy-car recovery requires FM confirmation; isolated cars remain excluded', 'FR-50, FR-55, NFR-SF1', notes='Goods move is enabled before the alarm; the fire alarm is raised at a Rush transition.'),
+    Scenario("SIM-09", 'EMS server failure at up-peak', 1, "up_peak", faults=[
         ems_server_crash(CRASH_AT, TAKEOVER_S)], setup=_setup_with_recorder,
-        check=check_sim_09, ready=True),
-    _todo("SIM-10", "Mode schedule over a day", 2, "balanced"),
-    _todo("SIM-11", "Medical priority express", 5, "balanced"),
-    _todo("SIM-12", "Goods move with the service car", 5, "balanced"),
-    _todo("SIM-13", "Mains loss and rescue", 4, "balanced"),
-    _todo("SIM-14", "Car fault with passengers inside", 4, "balanced"),
-    _todo("SIM-15", "Excess calls and spam limits", 4, "balanced"),
-    Scenario("SIM-16", "Link loss and dispatch plug-in crash", 1, "up_peak", faults=[
+        check=check_sim_09, ready=True,
+        srs_criteria='Failover within 10 s; service continues on controller logic', verifies='FR-54, NFR-R2'),
+    _todo("SIM-10", 'Design-limit configuration and concurrent workload', 2, "balanced", 'At least 99% of calls assigned <=1 s; all dashboard changes <=1 s; at least 95% of credential responses <=1.5 s', 'NFR-P1, NFR-P2, NFR-P5, NFR-S2'),
+    _todo("SIM-11", 'Accessible calls mixed into up-peak', 5, "balanced", 'Priority below medical and above VIP; free assigned capacity; >=10 s door request; voice feedback; mode wait targets hold', 'FR-08, BR-10'),
+    _todo("SIM-12", 'Ten VIP calls during up-peak in one group', 5, "balanced", 'At most one exclusive car; at most six exclusive starts per rolling hour; other calls remain within 60 s normal-service ceiling', 'FR-71, FR-72, FR-76', notes='Ten ordinary arrivals in one group are replaced by VIP arrivals at minutes 20-29.'),
+    _todo("SIM-13", 'Overload bursts at the lobby, and a bulky item boarded twice', 4, "balanced", 'Step-out message within 1 s; calls re-assigned; bulky item flagged', 'FR-100, FR-84', notes='Three overloads within 5 min, plus bulky-item and crowd-only camera events.'),
+    _todo("SIM-14", 'Total power loss with a failed generator; one rescue device fails', 4, "balanced", 'Entrapment alert for that car within 60 s; resume only after 2 min stable mains and FM confirmation', 'FR-110, FR-111', notes='Mains lost at minute 20, with one rescue-device report missing.'),
+    _todo("SIM-15", 'Brake fault with passengers between floors at up-peak', 4, "balanced", 'Entrapment alert within 10 s; calls re-assigned; no EMS command to the car', 'FR-112, NFR-R4'),
+    Scenario("SIM-16", 'Controller link lost; dispatch plug-in crash', 1, "up_peak", faults=[
         link_loss(LINK_CAR, LINK_AT, LINK_S), plugin_crash(CRASH_PLUGIN_AT, CRASH_PLUGIN_S)],
-        setup=install_dispatch_standin, check=check_sim_16, ready=True),
-    _todo("SIM-17", "Lost fire signal and generator limits", 4, "balanced"),
-    _todo("SIM-18", "Send car to a collapsed person", 5, "balanced"),
+        setup=install_dispatch_standin, check=check_sim_16, ready=True,
+        srs_criteria='Car marked Disconnected in 3 s; fallback rule assigns all calls', verifies='FR-104, FR-105'),
+    _todo("SIM-17", 'Conditional: duplicate/uncertain calls and 20 card actions', 4, "balanced", 'Only proven duplicates/cancelled calls removed; uncertain calls retained; sixth ordinary action starts limit; exits and assistance exempt', 'FR-120, FR-121, FR-125, BR-07'),
+    _todo("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "balanced", 'VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', 'FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
 ]}
 
 
@@ -175,6 +183,7 @@ def describe(s: Scenario) -> dict:
     rate = s.rate if s.rate is not None else PROFILES[s.profile].rate_per_min
     return {"id": s.id, "title": s.title, "owner_part": s.owner_part, "profile": s.profile,
             "rate": rate, "ready": s.ready, "waiting_for": s.waiting_for,
+            "srs_criteria": s.srs_criteria, "verifies": s.verifies, "notes": s.notes,
             "faults": [f"{f.kind} at {f.at_s:.0f} s" for f in s.faults]}
 
 
