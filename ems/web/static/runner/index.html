@@ -50,6 +50,11 @@ const $ = id => document.getElementById(id);
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const f1 = x => (x == null ? "-" : Number(x).toFixed(1));
 
+const runText = r => esc(r.label) + ": " + (r.mode === "weekday" ? "24 h weekday schedule" :
+  `${r.profile} @ ${r.rate}/min, ${Math.round(r.measure_s / 60)} min`) +
+  (r.faults.length ? " + " + esc(r.faults.join(", ")) : "") + (r.pair ? ` (pair ${esc(r.pair)})` : "") +
+  (r.day_start_hhmm ? ` (starts ${r.day_start_hhmm})` : "");
+
 async function load() {
   scenarios = await (await fetch("/api/scenarios")).json();
   const body = $("rows"); body.replaceChildren();
@@ -57,7 +62,7 @@ async function load() {
     const tr = document.createElement("tr"); tr.id = "row-" + s.id;
     tr.innerHTML = `<td><b>${s.id}</b></td><td>${esc(s.title)}</td><td class="crit">${esc(s.srs_criteria)}${s.notes ? `<br><i>Fault notes: ${esc(s.notes)}</i>` : ""}</td><td>${esc(s.verifies)}</td><td>Part ${s.owner_part}</td>` +
       (s.ready ? `<td class="ready">ready</td>` : `<td class="wait">waiting for ${s.waiting_for}</td>`) +
-      `<td>${s.profile} @ ${s.rate}/min${s.faults.length ? " + " + s.faults.join(", ") : ""}</td><td></td>`;
+      `<td>${s.runs.length ? s.runs.map(runText).join("<br>") : "not supported yet"}</td><td></td>`;
     if (s.ready) {
       const b = document.createElement("button"); b.textContent = "Run seeds 1-10";
       b.onclick = () => runAll(s); tr.lastChild.appendChild(b);
@@ -74,7 +79,7 @@ async function runAll(s) {
   $("detail").hidden = false; $("dtitle").textContent = s.id + "  " + s.title;
   $("verdict").textContent = "running..."; $("verdict").className = "";
   $("seeds").replaceChildren(); $("fill").style.width = "0";
-  const live = new URLSearchParams({ profile: s.profile, rate: s.rate, seed: 1, autostart: 1 });
+  const live = new URLSearchParams({ profile: s.runs[0].profile, rate: s.runs[0].rate, seed: 1, autostart: 1 });
   $("live").innerHTML = `<a href="/building/?${live}">Open live in building view</a> (same profile, rate, seed 1)`;
   let allPass = true;
   for (let seed = 1; seed <= 10; seed++) {
