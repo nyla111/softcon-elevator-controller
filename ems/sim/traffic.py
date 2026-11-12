@@ -2,13 +2,15 @@
 
 Each arrival publishes PassengerArrived. All randomness comes from ctx.rng.
 Passengers use tenant floors only (the lobby L1 is the origin of "up" trips).
-Every passenger is an employee drawn from the Population (population.py): the employee who
-works on the trip's tenant floor (destination of "up", origin of "down" and inter-floor trips).
-The employee supplies credential_id, accessible and vip.
+Every passenger is an employee drawn from the Population (population.py), who works on the
+trip's tenant floor (destination of "up", origin of "down" and inter-floor trips). The employee
+supplies accessible and vip. credential_id is the employee's card, or, for visits to another
+tenant, a visitor QR pass issued through ctx.services["acs"] (valid that day, that floor only).
+Employees can make several trips in one run.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ems.contracts import config
 from ems.contracts.events import PassengerArrived
@@ -37,6 +39,12 @@ PROFILES = {p.name: p for p in [
     Profile("balanced", 20, 0.40, 0.40, 0.20),
     Profile("eco", 2, 0.40, 0.40, 0.20),            # quiet, balanced mix
 ]}
+
+
+def with_rate(profile: Profile | str, rate_per_min: float) -> Profile:
+    """Same mix, different rate (the defaults in PROFILES are never changed)."""
+    base = PROFILES[profile] if isinstance(profile, str) else profile
+    return replace(base, name=f"{base.name}_{rate_per_min:g}", rate_per_min=rate_per_min)
 
 
 def profile_for_block(start_hhmm: str, mode: Mode) -> Profile:
@@ -103,28 +111,42 @@ class TrafficGenerator:
             t = seg.end
 
     def _arrive(self, seg: Segment) -> None:
-        rng = self.ctx.rng
-        origin, destination, owner_floor = self._pick_trip(seg.profile)
-        person = rng.choice(self.population.on_floor(owner_floor))
+        origin, destination, person, credential = self._pick_trip(seg.profile)
         self.count += 1
         self.ctx.bus.publish(PassengerArrived(
             t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-L{origin}",
             origin=origin, destination=destination, group=GROUP_OF_FLOOR[max(origin, destination)],
-            credential_id=person.credential_id, accessible=person.accessible,
-            vip=person.vip))
+            credential_id=credential, accessible=person.accessible, vip=person.vip))
         self._schedule_next(self.ctx.clock.now())
 
-    def _pick_trip(self, prof: Profile) -> tuple[int, int, int]:
-        """(origin, destination, tenant floor of the person making the trip)"""
+    def _pick_trip(self, prof: Profile):
+        """(origin, destination, person, credential id)
+
+        The tenant floor is drawn uniformly over all tenant floors, then a person who works
+        there. Up/down trips use that person's card. Inter-floor trips: if the person's tenant
+        has another floor, half of them go there (card); all the others visit a floor of
+        another tenant in the same group with a visitor QR pass issued by the host tenant.
+        """
         rng = self.ctx.rng
+        pop = self.population
         kind = rng.random()
-        floor = rng.choice(ALL_TENANT_FLOORS)         # uniform over tenant floors
+        floor = rng.choice(ALL_TENANT_FLOORS)
+        person = rng.choice(pop.on_floor(floor))
         if kind < prof.up:
-            return LOBBY, floor, floor
+            return LOBBY, floor, person, person.credential_id
         if kind < prof.up + prof.down:
-            return floor, LOBBY, floor
-        others = [f for f in TENANT_FLOORS[GROUP_OF_FLOOR[floor]] if f != floor]
-        return floor, rng.choice(others), floor               # same group as the first floor
+            return floor, LOBBY, person, person.credential_id
+        own_floors = pop.tenants[person.tenant_id]
+        own_others = [f for f in own_floors if f != floor]
+        if own_others and rng.random() < 0.5:
+            return floor, rng.choice(own_others), person, person.credential_id
+        others = [f for f in TENANT_FLOORS[GROUP_OF_FLOOR[floor]] if f not in own_floors]
+        destination = rng.choice(others)
+        now = self.ctx.clock.now()
+        day_start = now // 86400 * 86400
+        qr = self.ctx.services["acs"].issue_visitor_pass(
+            pop.tenant_of_floor[destination], {destination}, day_start, day_start + 86400)
+        return floor, destination, person, qr
 
 
 def _seconds(hhmm: str) -> float:
