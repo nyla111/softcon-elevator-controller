@@ -111,3 +111,10 @@ def test_pages_are_served(client):
     for path in ("/", "/building/", "/runner/"):
         assert client.get(path).status_code == 200
     assert "tower" in client.get("/building/").text and "SIM-" not in client.get("/runner/").text
+
+
+def test_scenarios_list_has_runs_with_start_times(client):
+    rows = {s["id"]: s for s in client.get("/api/scenarios").json()}
+    assert rows["SIM-08"]["runs"][0]["start_hhmm"] == "16:30"
+    assert rows["SIM-10"]["runs"][0]["rate"] == 400.0 and rows["SIM-10"]["waiting_for"] == "Part 2 check"
+    assert [r["label"] for r in rows["SIM-04"]["runs"]] == ["quiet eco", "quiet balanced", "surge"]

@@ -22,12 +22,15 @@ from dataclasses import dataclass
 from ems.contracts import config
 from ems.contracts.types import CredentialId, Floor
 
+from .building import BuildingSpec
+
 PUBLIC_FLOORS = frozenset({config.LOBBY})
-PASSENGER_GROUPS = ("LOW", "HIGH")
-# Tenant floors of each passenger group (everything except the lobby).
-TENANT_FLOORS = {g: [f for f in config.GROUPS[g]["floors"] if f != config.LOBBY]
-                 for g in PASSENGER_GROUPS}
-ALL_TENANT_FLOORS = [f for g in PASSENGER_GROUPS for f in TENANT_FLOORS[g]]
+# Constants of the REFERENCE building (kept for the capacity check and older tests). Runs read
+# the layout from ctx.services["building"] / Population.building instead.
+_REF = BuildingSpec.reference()
+PASSENGER_GROUPS = tuple(_REF.passenger_groups)
+TENANT_FLOORS = _REF.tenant_floors
+ALL_TENANT_FLOORS = _REF.all_tenant_floors
 LOW_TOP, HIGH_BOTTOM = max(TENANT_FLOORS["LOW"]), min(TENANT_FLOORS["HIGH"])   # 15, 16
 
 
@@ -42,52 +45,79 @@ class Employee:
     vip: bool
 
 
-def _layout_tenants(rng, n_tenants: int, n_double: int) -> list[list[Floor]]:
-    """Floors of each tenant, in floor order. Redraw until no tenant spans L15/L16."""
-    if n_tenants + n_double != len(ALL_TENANT_FLOORS):
+def _layout_tenants(rng, building: BuildingSpec, n_tenants: int,
+                    n_double: int) -> list[list[Floor]]:
+    """Floors of each tenant, in floor order. Redraw until no tenant spans two groups.
+    More tenants than floors: tenant i takes floor i mod n (floors are shared, no rng)."""
+    all_floors = building.all_tenant_floors
+    if n_tenants > len(all_floors) and n_double == 0:
+        return [[all_floors[i % len(all_floors)]] for i in range(n_tenants)]
+    if n_tenants + n_double != len(all_floors):
         raise ValueError("tenants + 2-floor tenants must equal the number of tenant floors")
+    group_of = building.group_of_floor
     while True:
         doubles = set(rng.sample(range(n_tenants), n_double))
-        floors = iter(ALL_TENANT_FLOORS)
+        floors = iter(all_floors)
         tenants = [[next(floors) for _ in range(2 if i in doubles else 1)]
                    for i in range(n_tenants)]
-        if not any(LOW_TOP in t and HIGH_BOTTOM in t for t in tenants):
+        if not any(len({group_of[f] for f in t}) > 1 for t in tenants):
             return tenants
 
 
 class Population:
     def __init__(self, employees: list[Employee], tenants: dict[str, list[Floor]],
-                 params: dict) -> None:
+                 params: dict, building: BuildingSpec | None = None) -> None:
+        self.building = building or _REF
         self.employees = employees
         self.tenants = tenants                       # tenant id -> its floors
         self.params = params                         # recorded in the run manifest
-        self.tenant_of_floor = {f: t for t, fl in tenants.items() for f in fl}
+        self.tenant_of_floor = {}                    # first tenant of a (shared) floor
+        for t, fl in tenants.items():
+            for f in fl:
+                self.tenant_of_floor.setdefault(f, t)
         self._by_floor: dict[Floor, list[Employee]] = {}
         self._by_card = {e.credential_id: e for e in employees}
         for e in employees:
             self._by_floor.setdefault(e.home_floor, []).append(e)
 
     @classmethod
-    def build(cls, rng, total_employees: int = 2500, n_tenants: int = 25, n_double: int = 4,
-              accessible_share: float = 0.05, vip_share: float = 0.01) -> "Population":
-        layout = _layout_tenants(rng, n_tenants, n_double)
+    def build(cls, rng, total_employees: int | None = None, n_tenants: int | None = None,
+              n_double: int | None = None, accessible_share: float | None = None,
+              vip_share: float | None = None,
+              building: BuildingSpec | None = None) -> "Population":
+        """Counts default to the building's (reference: 2,500 / 25 / 4 / 5% / 1%)."""
+        building = building or _REF
+        total_employees = building.total_employees if total_employees is None else total_employees
+        n_tenants = building.n_tenants if n_tenants is None else n_tenants
+        n_double = building.n_double if n_double is None else n_double
+        accessible_share = building.accessible_share if accessible_share is None else accessible_share
+        vip_share = building.vip_share if vip_share is None else vip_share
+        all_floors = building.all_tenant_floors
+        layout = _layout_tenants(rng, building, n_tenants, n_double)
         tenants = {f"T{i + 1:02d}": floors for i, floors in enumerate(layout)}
-        tenant_of = {f: t for t, fl in tenants.items() for f in fl}
+        on_floor: dict[Floor, list[str]] = {}               # tenants present on each floor
+        for t, fl in tenants.items():
+            for f in fl:
+                on_floor.setdefault(f, []).append(t)
 
-        per_floor, extra = divmod(total_employees, len(ALL_TENANT_FLOORS))
-        bonus = set(rng.sample(ALL_TENANT_FLOORS, extra))
-        homes = [(floor, n) for floor in ALL_TENANT_FLOORS
+        per_floor, extra = divmod(total_employees, len(all_floors))
+        bonus = set(rng.sample(all_floors, extra))
+        homes = [(floor, n) for floor in all_floors
                  for n in range(1, per_floor + (floor in bonus) + 1)]
         total = len(homes)
         accessible = set(rng.sample(range(total), round(accessible_share * total)))
         vip = set(rng.sample(range(total), round(vip_share * total)))
-        people = [Employee(f"card-L{floor}-{n:03d}", floor, floor, tenant_of[floor],
-                           frozenset(tenants[tenant_of[floor]]) | PUBLIC_FLOORS,
-                           i in accessible, i in vip)
-                  for i, (floor, n) in enumerate(homes)]
+        people = []
+        for i, (floor, n) in enumerate(homes):
+            here = on_floor[floor]
+            tenant = here[(n - 1) % len(here)]
+            people.append(Employee(f"card-L{floor}-{n:03d}", floor, floor, tenant,
+                                   frozenset(tenants[tenant]) | PUBLIC_FLOORS,
+                                   i in accessible, i in vip))
         params = {"total_employees": total, "n_tenants": n_tenants, "n_double": n_double,
-                  "accessible_share": accessible_share, "vip_share": vip_share}
-        return cls(people, tenants, params)
+                  "accessible_share": accessible_share, "vip_share": vip_share,
+                  "building": building.name}
+        return cls(people, tenants, params, building)
 
     def on_floor(self, floor: Floor) -> list[Employee]:
         """Employees whose home floor is this floor."""

@@ -13,20 +13,24 @@ runner page pick it up. Part 1 only runs the scenarios; it does not write the ot
 Titles, `srs_criteria` (the SRS pass criteria, shown in the runner table) and `verifies` (the
 requirement ids) are the Appendix B texts. `notes` carries the Appendix B fault-injection notes.
 Default: faults start 20 min into the measured window and are held 5 min, unless a note says so.
-Traffic setup (Part 1's job) is `runs`: a list of RunSetup, one per simulator run. Most scenarios
-have one run; SIM-02 has two (lunch, then evening) and SIM-04 has three (eco_quiet and balanced as a
-pair on the same seed and the same empty start state, plus a separate 15 min surge at 75/min).
-SIM-05 is mode "weekday" (24 h, config.WEEKDAY_SCHEDULE); SIM-08 carries `day_start_hhmm` so that its
-fire alarm falls on the 17:00 Rush transition. The harness only executes mode "fixed" runs so far;
-run_scenario says so clearly for the others. SIM-10 (design-limit configuration and concurrent
-workload) is not supported by the simulator yet: it has no run setup (profile None) and waits for
-"Part 1 design-limit setup + Part 2 check".
+Traffic setup (Part 1's job) is `runs`: a list of RunSetup, one per simulator run; every run type
+is executable. Each run starts at `start_hhmm` (time of day, via build(start=...); Part 2 reads it
+with ctx.clock.now_dt()). Most scenarios have one run (up-peak ones start at 07:00, balanced ones at
+13:30). SIM-02 has two (lunch from 11:30, evening from 17:00). SIM-04 has three, all from 21:00
+(Eco block, same seed): eco_quiet and balanced as a pair, and a separate surge (10 min of
+eco_quiet, then 75/min up_peak mix for 15 min, up to 30 min to clear; outside the normal
+envelope, DECISIONS D-01). SIM-05 is mode "weekday": 24 h from 00:00 following the weekday
+schedule, with per-block metrics in RunResult.blocks. SIM-08 starts at 16:30 so the fire alarm
+(measured minute 20) falls on the 17:00 Rush transition. SIM-10 is the design-limit run: building
+"design_limit" (64 cars, 8 groups, 128 stops, 200 tenants, 20,000 people), 400 calls/min,
+400 lookups/min, 2,000 camera events/day, 50 dashboard users; latency hooks only. Its checks
+are Part 2's ("Part 2 check").
 rate=None means "the profile's default rate" (D-01). A check gets the RunResult and the finished
 Context (bus log, services).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarStatusUpdated,
@@ -34,11 +38,16 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarS
                                   PassengerAlighted)
 
 from .baseline import install_dispatch_standin
+from .building import BUILDINGS
 from .faults import Fault, ems_server_crash, fire_alarm, link_loss, measured, plugin_crash
 from .harness import CLEAR_S, MEASURE_S, WARMUP_S, RunResult, run
 from .traffic import PROFILES, SRS_ORIGINAL_PEAK_RATE, with_rate
 
 Criteria = list  # of (criterion, passed, detail)
+
+
+START_BY_PROFILE = {"up_peak": "07:00", "lunch": "11:30", "evening": "17:00",
+                    "balanced": "13:30", "weekday": "00:00"}
 
 
 @dataclass
@@ -54,14 +63,21 @@ class RunSetup:
     clear_s: float = CLEAR_S
     setup: Optional[Callable] = None            # runs after build(), before traffic starts
     pair: Optional[str] = None                  # runs with the same pair id share seed and start state
-    day_start_hhmm: Optional[str] = None        # time of day at run time 0 (schedule-driven modes)
+    start_hhmm: Optional[str] = None            # time of day at run time 0 (default 00:00)
+    warmup_profile: object = None               # traffic during the warm-up only (SIM-04 surge)
+    building: Optional[str] = None              # "design_limit" (default: reference building)
+    workload: Optional[dict] = None             # SIM-10 load hooks (workload.py)
+    envelope_note: Optional[str] = None         # set when the run is outside the normal envelope
+
+    def __post_init__(self) -> None:
+        if self.start_hhmm is None:                 # a start that puts the run in its own period
+            self.start_hhmm = START_BY_PROFILE.get(self.profile_name, "00:00")
 
     @property
     def profile_name(self) -> str:
         return getattr(self.profile, "name", self.profile)
 
 
-ECO_QUIET = replace(PROFILES["eco"], name="eco_quiet")   # quiet traffic for the Eco/Balanced pair
 
 
 @dataclass
@@ -177,6 +193,12 @@ def check_sim_16(result: RunResult, ctx) -> Criteria:
 
 
 # ---------------------------------------------------------------- the registry
+DESIGN_CALLS_PER_MIN = 400.0
+DESIGN_MEASURE_S = 3600.0
+DESIGN_SHORT_REASON = "60 measured minutes took longer than about 5 min of wall time"
+DESIGN_WORKLOAD = {"lookups_per_min": 400.0, "camera_per_day": 2000.0,
+                   "dashboard_users": 50, "dashboard_requests": 5}
+
 def _todo(sid: str, title: str, part: int, profile: Optional[str], srs: str, verifies: str,
           notes: str = "", waiting_for: Optional[str] = None, **kw) -> Scenario:
     return Scenario(sid, title, part, profile, waiting_for=waiting_for or f"Part {part} check",
@@ -188,19 +210,27 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
     _todo("SIM-02", 'Lunch and evening peaks', 2, "lunch", 'As SIM-01', 'NFR-P3', runs=[RunSetup("lunch", "lunch"), RunSetup("evening", "evening")]),
     _todo("SIM-03", 'Office hours, inter-floor traffic (Balanced)', 2, "balanced", 'Average 30 s or less, none over 90 s', 'NFR-P3'),
     _todo("SIM-04", 'Eco quiet paired with Balanced; separate surge phase', 2, "eco_quiet", 'At least 15% run-time saving in every quiet pair; Eco mean <=45 s and ceiling <=120 s; surge switches under FR-14', 'FR-14, NFR-E1, NFR-P3', runs=[
-        RunSetup("quiet eco", ECO_QUIET, pair="quiet"), RunSetup("quiet balanced", "balanced", pair="quiet"),
-        RunSetup("surge", "up_peak", SRS_ORIGINAL_PEAK_RATE, warmup_s=0.0, measure_s=900.0)]),
+        RunSetup("quiet eco", "eco_quiet", pair="quiet", start_hhmm="21:00"),
+        RunSetup("quiet balanced", "balanced", pair="quiet", start_hhmm="21:00"),
+        RunSetup("surge", "up_peak", SRS_ORIGINAL_PEAK_RATE, start_hhmm="21:00",
+                 warmup_s=600.0, measure_s=900.0, clear_s=1800.0, warmup_profile="eco_quiet",
+                 envelope_note="Eco surge at 75/min for 15 min is outside the normal envelope "
+                               "(D-01: the carryable peak rate is about 35/min)")]),
     _todo("SIM-05", 'Full weekday on the default schedule', 2, "weekday", 'Each mode meets targets; no one stranded at mode changes', 'FR-11, FR-15', runs=[RunSetup("weekday 24 h", "weekday", mode="weekday", warmup_s=0.0,
                                   measure_s=86400.0)]),
     _todo("SIM-06", 'Car fault at up-peak, then a second removal requested', 5, "up_peak", 'Waiting calls retained/reassigned; faulted car not moved; second removal needs FM approval; degraded waits logged', 'FR-04, FR-33'),
     _todo("SIM-07", 'ACS outage for 15 minutes at up-peak', 3, "up_peak", 'Fresh cached permissions used, stale/missing cache restricted to public floors; security alerted; outage waits reported separately', 'FR-49, NFR-SE5, NFR-SE6', notes='ACS outage lasts 15 min (not 5), starting 20 min into the measured window.'),
-    _todo("SIM-08", 'Fire alarm at Rush transition with active goods move; optional lockdown variant', 4, "up_peak", 'No controller command after alarm; goods move cancelled; healthy-car recovery requires FM confirmation; isolated cars remain excluded', 'FR-50, FR-55, NFR-SF1', notes='Goods move is enabled before the alarm; the fire alarm is raised at a Rush transition.', runs=[RunSetup("alarm at 17:00 Rush transition", "up_peak", day_start_hhmm="16:30",
+    _todo("SIM-08", 'Fire alarm at Rush transition with active goods move; optional lockdown variant', 4, "up_peak", 'No controller command after alarm; goods move cancelled; healthy-car recovery requires FM confirmation; isolated cars remain excluded', 'FR-50, FR-55, NFR-SF1', notes='Goods move is enabled before the alarm; the fire alarm is raised at a Rush transition.', runs=[RunSetup("alarm at 17:00 Rush transition", "up_peak", start_hhmm="16:30",
                                    faults=[fire_alarm(measured(20))])]),
     Scenario("SIM-09", 'EMS server failure at up-peak', 1, "up_peak", faults=[
         ems_server_crash(CRASH_AT, TAKEOVER_S)], setup=_setup_with_recorder,
         check=check_sim_09, ready=True,
         srs_criteria='Failover within 10 s; service continues on controller logic', verifies='FR-54, NFR-R2'),
-    _todo("SIM-10", 'Design-limit configuration and concurrent workload', 2, None, 'At least 99% of calls assigned <=1 s; all dashboard changes <=1 s; at least 95% of credential responses <=1.5 s', 'NFR-P1, NFR-P2, NFR-P5, NFR-S2', waiting_for="Part 1 design-limit setup + Part 2 check"),
+    _todo("SIM-10", 'Design-limit configuration and concurrent workload', 2, "balanced", 'At least 99% of calls assigned <=1 s; all dashboard changes <=1 s; at least 95% of credential responses <=1.5 s', 'NFR-P1, NFR-P2, NFR-P5, NFR-S2', runs=[RunSetup(
+        "design limit", "balanced", DESIGN_CALLS_PER_MIN, start_hhmm="10:00", building="design_limit",
+        measure_s=DESIGN_MEASURE_S, workload=DESIGN_WORKLOAD,
+        envelope_note="SIM-10 checks software latency at the SRS design limits, not passenger "
+                      "capacity; 3-year history is not preloaded (D-03)")]),
     _todo("SIM-11", 'Accessible calls mixed into up-peak', 5, "up_peak", 'Priority below medical and above VIP; free assigned capacity; >=10 s door request; voice feedback; mode wait targets hold', 'FR-08, BR-10'),
     _todo("SIM-12", 'Ten VIP calls during up-peak in one group', 5, "up_peak", 'At most one exclusive car; at most six exclusive starts per rolling hour; other calls remain within 60 s normal-service ceiling', 'FR-71, FR-72, FR-76', notes='Ten ordinary arrivals in one group are replaced by VIP arrivals at minutes 20-29.'),
     _todo("SIM-13", 'Overload bursts at the lobby, and a bulky item boarded twice', 4, "up_peak", 'Step-out message within 1 s; calls re-assigned; bulky item flagged', 'FR-100, FR-84', notes='Three overloads within 5 min, plus bulky-item and crowd-only camera events.'),
@@ -232,7 +262,7 @@ def describe(s: Scenario) -> dict:
     """Plain data for the web API."""
     runs = [{"label": r.label, "profile": r.profile_name, "rate": _run_rate(r), "mode": r.mode,
              "warmup_s": r.warmup_s, "measure_s": r.measure_s, "pair": r.pair,
-             "day_start_hhmm": r.day_start_hhmm,
+             "start_hhmm": r.start_hhmm,
              "faults": [f"{f.kind} at {f.at_s:.0f} s" for f in r.faults]} for r in s.runs]
     first = runs[0] if runs else None
     return {"id": s.id, "title": s.title, "owner_part": s.owner_part, "profile": s.profile,
@@ -242,22 +272,46 @@ def describe(s: Scenario) -> dict:
             "faults": first["faults"] if first else []}
 
 
-def run_scenario(scenario_id: str, seed: int, out_dir=None) -> dict:
+def run_setup(r: RunSetup, seed: int, out_dir=None) -> RunResult:
+    """Execute one run of a scenario (every run type: fixed, weekday, surge, design limit)."""
+    profile = with_rate(r.profile, r.rate) if r.rate is not None else r.profile
+    building = BUILDINGS[r.building]() if r.building else None
+    extra = {"outside_normal_envelope": r.envelope_note} if r.envelope_note else {}
+    if r.building:
+        extra["measured_minutes"] = r.measure_s / 60.0
+        if r.measure_s < 3600.0:
+            extra["measured_minutes_reason"] = DESIGN_SHORT_REASON
+    return run(profile, seed, r.faults, warmup_s=r.warmup_s, measure_s=r.measure_s,
+               clear_s=r.clear_s, setup=r.setup or install_dispatch_standin, out_dir=out_dir,
+               keep_ctx=True, start_hhmm=r.start_hhmm, traffic=r.mode,
+               warmup_profile=r.warmup_profile, building=building, workload=r.workload,
+               manifest_extra=extra)
+
+
+def _run_summary(r: RunSetup, result: RunResult) -> dict:
+    return {"label": r.label, "profile": result.profile, "start": result.start,
+            "metrics": result.metrics, "blocks": result.blocks, "latency": result.latency,
+            "event_digest": result.event_digest}
+
+
+def run_scenario(scenario_id: str, seed: int, out_dir=None, metrics_only: bool = False) -> dict:
     """Run ONE seed headless (every run of the scenario). Returns plain data: metrics + criteria,
-    or 'not ready'. One run: check(result, ctx). Several runs: check(results, ctxs), in run order."""
+    or 'not ready'. One run: check(result, ctx). Several runs: check(results, ctxs), in run order.
+    metrics_only=True runs the setup of a scenario whose check is still an empty slot and returns
+    the metrics (per-block, latency, ...) with no pass/fail."""
     s = get(scenario_id)
     base = {"id": s.id, "title": s.title, "seed": seed, "owner_part": s.owner_part,
             "profile": s.profile}
-    if not s.ready or s.check is None:
+    not_ready = s.check is None or not s.ready
+    if not_ready and not (metrics_only and s.runs):
         return base | {"ready": False, "passed": None, "metrics": None, "criteria": [],
-                       "message": f"not ready: waiting for {s.waiting_for}"}
-    results = []
-    for r in s.runs:
-        if r.mode != "fixed":
-            raise NotImplementedError(f"{s.id}: run mode {r.mode!r} is not supported by the harness yet")
-        profile = with_rate(r.profile, r.rate) if r.rate is not None else r.profile
-        results.append(run(profile, seed, r.faults, warmup_s=r.warmup_s, measure_s=r.measure_s,
-                           clear_s=r.clear_s, setup=r.setup, out_dir=out_dir, keep_ctx=True))
+                       "runs": [], "message": f"not ready: waiting for {s.waiting_for}"}
+    results = [run_setup(r, seed, out_dir) for r in s.runs]
+    runs = [_run_summary(r, x) for r, x in zip(s.runs, results)]
+    if not_ready:
+        return base | {"ready": False, "passed": None, "metrics": results[0].metrics,
+                       "criteria": [], "runs": runs, "metrics_only": True,
+                       "message": f"metrics only: waiting for {s.waiting_for}"}
     if len(results) == 1:
         raw = s.check(results[0], results[0].ctx)
     else:
@@ -265,7 +319,7 @@ def run_scenario(scenario_id: str, seed: int, out_dir=None) -> dict:
     criteria = [{"criterion": c, "passed": bool(ok), "detail": str(d)} for c, ok, d in (raw or [])]
     passed = bool(criteria) and all(c["passed"] for c in criteria)
     return base | {"ready": True, "passed": passed, "metrics": results[0].metrics,
-                   "criteria": criteria, "message": "PASS" if passed else "FAIL"}
+                   "criteria": criteria, "runs": runs, "message": "PASS" if passed else "FAIL"}
 
 
 def run_all_seeds(scenario_id: str, seeds=range(1, 11), out_dir=None) -> list[dict]:

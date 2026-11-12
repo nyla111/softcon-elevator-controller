@@ -1,10 +1,10 @@
 """Part 1 Simulator & integration (Tech lead).
 
 Scope: Simulated cars/doors/load, traffic generator, mock ACS, camera, fire panel, power room, notifier test inbox, heartbeat (FR-104), DB buffering (FR-107), failover (NFR-R2).
-Provides ctx.services key(s): controllers, acs, notifier
+Provides ctx.services key(s): controllers, acs, notifier, building (layout of this run)
 
 Modules: cars, traffic, population, harness, baseline, bridge (temporary), devices (mock ACS,
-notifier, fire panel, power room, camera), faults, heartbeat, database, failover, dispatch_guard (FR-105), scenarios (registry), live (demo server helpers).
+notifier, fire panel, power room, camera), faults, heartbeat, database, failover, building (BuildingSpec), workload (SIM-10 load hooks), dashboard_load, dispatch_guard (FR-105), scenarios (registry), live (demo server helpers).
 Passenger arrivals are produced by TrafficGenerator (traffic.py), started by the harness.
 """
 from __future__ import annotations
@@ -20,8 +20,13 @@ def register(ctx) -> None:
     from .heartbeat import HeartbeatMonitor
     from .population import Population
 
+    from .building import BuildingSpec, SpecCarStates
+
+    building = ctx.services.setdefault("building", BuildingSpec.reference())
+    if building.name != "reference":              # the contracts stub only knows config.GROUPS
+        ctx.services.setdefault("car_states", SpecCarStates(building))
     sim = Simulator(ctx)
-    population = Population.build(ctx.rng)
+    population = Population.build(ctx.rng, building=building)
     db = TripDatabase(ctx)
     ctx.services["controllers"] = sim
     ctx.services["population"] = population      # the people the ACS knows

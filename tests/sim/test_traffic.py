@@ -30,7 +30,7 @@ def shares(arrivals):
 def test_profile_table():
     # D-01: peak profiles default to 35/min; the SRS value is kept as a constant
     assert {k: v.rate_per_min for k, v in PROFILES.items()} == {
-        "up_peak": 35, "lunch": 35, "evening": 35, "balanced": 20, "eco": 2}
+        "up_peak": 35, "lunch": 35, "evening": 35, "balanced": 20, "eco": 2, "eco_quiet": 2}
     assert SRS_ORIGINAL_PEAK_RATE == 75
     assert with_rate("up_peak", 75).rate_per_min == 75 and PROFILES["up_peak"].rate_per_min == 35
 
@@ -101,7 +101,7 @@ def test_every_passenger_has_a_card_or_a_visitor_pass():
 def test_weekday_schedule_segments():
     ctx = build(seed=1, parts=["sim"])
     gen = TrafficGenerator.weekday(ctx)
-    expected = ["eco", "up_peak", "balanced", "lunch", "balanced", "evening", "balanced", "eco"]
+    expected = ["eco_quiet", "up_peak", "balanced", "lunch", "balanced", "evening", "balanced", "eco_quiet"]
     assert [s.profile.name for s in gen.segments] == expected
     assert gen.segments[0].start == 0 and gen.segments[-1].end == 24 * HOUR
     assert [s.start for s in gen.segments][1] == 7 * HOUR

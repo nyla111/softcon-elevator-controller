@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import random
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -33,9 +34,16 @@ class Context:
         return self.services[name]           # look up lazily, inside handlers
 
 
-def build(seed: int = 1, parts: list[str] | None = None) -> Context:
-    """Create a context and register the given parts (default: all)."""
-    ctx = Context(clock=SimClock(), bus=EventBus(), rng=random.Random(seed))
+def build(seed: int = 1, parts: list[str] | None = None, start: datetime | None = None,
+          services: dict[str, Any] | None = None) -> Context:
+    """Create a context and register the given parts (default: all).
+
+    start    -- simulated date and time at t=0 (default: Monday 2026-11-16 00:00)
+    services -- entries put into ctx.services BEFORE the parts register (e.g. "building")
+    """
+    clock = SimClock() if start is None else SimClock(start)
+    ctx = Context(clock=clock, bus=EventBus(), rng=random.Random(seed))
+    ctx.services.update(services or {})
     for name in (PARTS if parts is None else parts):
         importlib.import_module(f"ems.{name}").register(ctx)
     for key, cls in STUBS.items():

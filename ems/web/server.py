@@ -24,7 +24,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ems.contracts.config import GROUPS
 from ems.contracts.events import AlertRaised, CarStatusUpdated
 from ems.core.app import build
 from ems.sim import live, scenarios
@@ -65,9 +64,22 @@ def _recent_events(ctx, n: int = EVENT_LINES) -> list[str]:
     return lines[::-1]
 
 
-def _waiting(sim) -> dict:
+def _alerts(ctx) -> list:
+    """All AlertRaised events so far. The bus log can hold millions of events (SIM-10), so only
+    the part added since the last call is scanned."""
+    cache = getattr(app.state, "alert_cache", None)
+    if cache is None or cache[0] is not ctx or cache[1] > len(ctx.bus.log):
+        cache = [ctx, 0, []]
+    log = ctx.bus.log
+    cache[2].extend(e for e in log[cache[1]:] if isinstance(e, AlertRaised))
+    cache[1] = len(log)
+    app.state.alert_cache = cache
+    return cache[2]
+
+
+def _waiting(sim, groups) -> dict:
     """{group: {floor: count}} of passengers waiting for a car."""
-    per_group: dict[str, Counter] = {g: Counter() for g in GROUPS}
+    per_group: dict[str, Counter] = {g: Counter() for g in groups}
     for p in sim.waiting.values():
         per_group.setdefault(p.group, Counter())[p.origin] += 1
     return {g: {str(f): c for f, c in sorted(cnt.items())} for g, cnt in per_group.items()}
@@ -112,15 +124,16 @@ def state() -> dict:
                 "link_lost": car.link_lost,
             })
         guard = ctx.services.get("dispatch_guard")
+        alerts = _alerts(ctx)
         return {
             "t": ctx.clock.now(),
             "time": ctx.clock.now_dt().isoformat(),
-            "modes": {g: ctx.get("dispatcher").current_mode(g).value for g in GROUPS},
+            "modes": {g: ctx.get("dispatcher").current_mode(g).value for g in ctx.get("building").group_names},
             "cars": cars,
-            "alerts": [asdict(a) for a in ctx.bus.of_type(AlertRaised)[-20:]],
+            "alerts": [asdict(a) for a in alerts[-20:]],
             # ---- fields added by Part 1 (building page) ----
-            "alerts_total": len(ctx.bus.of_type(AlertRaised)),
-            "waiting": _waiting(sim),
+            "alerts_total": len(alerts),
+            "waiting": _waiting(sim, ctx.get("building").group_names),
             "active_faults": _active_faults(ctx, sim),
             "ems": {"status": "down" if sim.ems_down else "up",
                     "controllers_fallback": sim.fallback_active},
@@ -191,11 +204,11 @@ def scenario_list() -> list[dict]:
 
 
 @app.post("/api/scenarios/{scenario_id}/run")
-def scenario_run(scenario_id: str, seed: int = 1) -> dict:
+def scenario_run(scenario_id: str, seed: int = 1, metrics_only: bool = False) -> dict:
     """Run ONE seed headless on its own context (the live view is not touched)."""
     if scenario_id not in scenarios.SCENARIOS:
         raise HTTPException(404, f"unknown scenario {scenario_id}")
-    return scenarios.run_scenario(scenario_id, seed)
+    return scenarios.run_scenario(scenario_id, seed, metrics_only=metrics_only)
 
 
 for page in ("dashboard", "panel", "building", "runner"):
