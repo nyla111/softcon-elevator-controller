@@ -1,93 +1,119 @@
-TASK: "Part 1, Session D": make every Appendix B scenario setup executable
-(time of day, 24 h weekday runs, Eco surge, design-limit SIM-10) in the EMS repo.
-Sessions A-C are merged into main.
+# Release 1 decision log
 
-SCOPE RULE: you implement ONLY Part 1 (simulator, scenario setup, integration). Do not
-write dispatch, access, safety, priority or reporting logic, and no pass checks except
-SIM-09/SIM-16 (already done). Other parts' checks stay empty slots.
+Decisions Team 1 made while implementing Team 3's SRS v0.13. Team 3 allowed us to revise
+the SRS and notify them. A note on the traffic rate (D-01) was sent on 2026-11-12 with
+no reply, so Team 1 decided. Every entry below will be sent to Team 3 and presented to the
+course staff.
 
-SETUP: git checkout main && git pull && pip install -e ".[dev]" && pytest -q (green).
-Read docs/CONTRACT.md, docs/DECISIONS.md (D-01, D-03), ems/core/, ems/sim/ first.
-If this brief disagrees with the repo, the repo wins; tell me.
+| ID | Decision | Status |
+|---|---|---|
+| D-01 | Peak traffic rate 75 to 35 persons/min | Decided 2026-11-12 |
+| D-02 | Redundant requirements not built in Release 1 | Decided 2026-11-10 |
+| D-03 | Infrastructure simplified for a simulator release | Decided 2026-11-10 |
+| D-04 | Synthetic population and inter-floor trips | Decided 2026-11-12 |
+| D-05 | Simulator modelling assumptions | Decided 2026-11-12 |
+| D-06 | Architecture: one Python app, event bus, simulated clock | Decided 2026-11-10 |
 
-=== REPO RULES (mandatory) ===
-- Branch part1/scenario-setup from main; never commit to main; push when done (I open
-  the PR in the web UI; title "SIM-SETUP time of day, weekday runs, SIM-10 setup").
-- NO AI attribution anywhere (no Co-Authored-By, no "Generated with/by" in commits,
-  comments, docs). Commit as the configured git user only.
-- No data dumps, large files, caches, venvs, tokens, keys, passwords. runs/ gitignored.
-- Allowed paths: ems/sim/, ems/core/app.py (build() signature only), ems/web/server.py,
-  ems/web/static/runner/, ems/web/static/building/, tests/sim/, tests/scenarios/,
-  tests/web/, docs/CONTRACT.md (services table + changelog), README.md (milestones).
-  Not: ems/contracts/, other parts' folders, dashboard/ or panel/ pages.
-- ctx.clock / ctx.rng only (the existing perf_counter in dispatch_guard is the only
-  exception). Deterministic per seed. pytest -q green; mark slow tests; keep the default
-  suite under ~3 minutes.
+---
 
-=== 1. TIME OF DAY ===
-- build(seed=1, parts=None, start=None): pass `start` (datetime) to SimClock; default
-  stays Monday 2026-11-16 00:00. Keep backward compatible.
-- Each scenario run's start time of day is applied through this (SIM-08 starts 16:30
-  so its alarm lands on the 17:00 Rush transition).
-- Traffic and anything time-based use ctx.clock.now_dt() for time of day.
-- docs/CONTRACT.md changelog: "Time of day = ctx.clock.now_dt(); runs may start at any
-  time. Parts reading schedules must use it, never assume t=0 is midnight."
+## D-01 Peak traffic rate revised from 75 to 35 persons/min
 
-=== 2. 24 h WEEKDAY RUN (SIM-05) ===
-- Harness supports a run whose traffic follows the weekday schedule mode already in
-  traffic.py (profile per block: Rush 07:00-09:30 up_peak, 11:30-13:30 lunch,
-  17:00-18:30 evening; Balanced blocks balanced; Eco blocks eco_quiet), using the
-  D-01 peak rate (35/min).
-- RunResult gains per-block metrics (block label, start, end, profile, avg/max wait,
-  calls) so the Part 2 owner can check each mode's targets, plus "stranded" = calls
-  created before a block change and still not delivered 30 min after it.
-- Add "eco_quiet" as a real profile name in traffic.py (alias of the 2/min balanced-mix
-  profile) and use it in scenarios.py instead of the in-file rename.
-- Test (slow): seeds 1-2 complete, every block present, deterministic.
+**Applies to:** Appendix B up-peak, lunch and evening profiles. Balanced (20/min) and Eco
+quiet (2/min) are unchanged. All wait targets and pass criteria are unchanged. The SIM-04
+Eco surge phase keeps 75/min on purpose: it tests the FR-14 step-up beyond the normal
+traffic envelope, and Appendix B already logs it as degraded service.
 
-=== 3. SIM-04 ECO SURGE ===
-Appendix B: "a separate Eco surge phase at 75 arrivals/minute for 15 minutes: check
-FR-14 triggers". The building must already be in an Eco period with quiet traffic:
-start the run at 21:00 (Eco block), 10 min eco_quiet warm-up, then 75/min up_peak-mix
-for 15 min, then up to 30 min to clear. 75/min is intentional here (DECISIONS D-01:
-surge keeps 75/min). Record in the manifest that this run is outside the normal
-envelope. The Eco/Balanced pair runs also start at 21:00 with the same seed.
+**Why:**
+1. The profile contradicts the reference building (SRS 2.4: about 2,500 workers).
+   75/min for the 60-minute window is 4,500 arrivals, 1.8 times the workforce.
+2. The building cannot carry it. Using the Appendix B physics (1.5 s/floor, 2 s + 2 s
+   doors, 5 s dwell, 1 s/passenger, 21 persons), the best-case capacity with full cars
+   every trip is:
 
-=== 4. SIM-10 DESIGN-LIMIT SETUP (DECISIONS D-03) ===
-Appendix B: 64 cars, 8 groups, 128 stops, 200 tenants, 50 concurrent dashboard users,
-400 calls and 400 credential lookups per minute for 60 measured minutes, 2,000 camera
-events/day equivalent; it checks software latency, not passenger capacity.
-- Building layout must be configurable per run: add a BuildingSpec (groups -> cars,
-  floors served) in ems/sim/, default = the reference building from config.GROUPS.
-  Store the active one at ctx.services["building"]; the simulator, population, traffic
-  and nearest-car fallback read it from there instead of config.GROUPS.
-  docs/CONTRACT.md changelog: "Read the building layout from ctx.services['building'];
-  do not import config.GROUPS directly (SIM-10 uses a different layout)."
-- Design-limit spec: 8 groups x 8 cars = 64 cars, 128 stops (e.g. B2-B1, L1-L126 split
-  into 8 zones of 16 floors, every group also serving L1), 200 tenants, population
-  scaled to ~20,000 people (state your choice in the docstring).
-- Workload: 400 calls/min and 400 credential lookups/min (each call's credential lookup
-  counts; top up with extra lookups if needed), camera events at 2,000/day equivalent.
-- Measurement hooks only (no pass check, that is Part 2's): record per-call assignment
-  latency (dispatch_guard compute time per call), per-lookup ACS response time, camera
-  event count; expose them in RunResult. Dashboard load: add
-  ems/sim/dashboard_load.py that fires 50 concurrent GET /api/state requests in a loop
-  against the FastAPI app (TestClient + threads) and records response times.
-- 3-year history is NOT preloaded (D-03). If 60 measured minutes take longer than
-  ~5 min wall time, use 15 measured minutes and record "measured_minutes" and the
-  reason in the manifest; tell me the runtime either way.
-- scenarios.py: SIM-10 gets its run setup; waiting_for becomes "Part 2 check".
+   | Group | Round trip | Max capacity | Lobby demand at 75/min |
+   |---|---|---|---|
+   | Low-rise L2-L15 | ~166 s | ~30 persons/min | ~33/min |
+   | High-rise L16-L30 | ~214 s | ~23 persons/min | ~35/min |
 
-=== 5. RUNNER + TESTS + README ===
-- run_scenario executes every run type above; the runner page shows per-block results
-  for SIM-05 and the latency summaries for SIM-10 (metrics only, no pass/fail for
-  checks that are still empty).
-- Tests: time-of-day start, weekday blocks, surge starts in an Eco block, BuildingSpec
-  default equals the reference building (all existing tests still pass unchanged),
-  design-limit layout counts (64/8/128/200), latency hooks populated (short run).
-- README milestones: v0.4-scenario-setup.
+3. Measured with the simulator (nearest-car baseline dispatcher, seeds 1-3): the high-rise
+   queue starts growing between 35 and 40/min; at 75/min, across the 3 seeds, 1,770
+   high-rise and 178 low-rise arrivals were never delivered and average waits exceeded
+   900 s in both groups.
 
-=== DONE WHEN ===
-pytest -q green; branch pushed. Reply with: files changed, SIM-05 per-block metrics for
-seed 1 (baseline), SIM-04 surge summary, SIM-10 runtime and latency summary (p50/p99
-assignment, p95 lookup, dashboard max), and every change other parts must know.
+Appendix B states that if a profile proves physically infeasible, the team must revise it
+and record the change before acceptance, and must not silently relax a failed test. This
+entry is that record.
+
+**New value:** 35 persons/min (about 2,100 arrivals per hour, about 84% of the workforce).
+The final value is confirmed with the Part 2 dispatcher and written in each run's
+evidence manifest. The original 75/min stays available as a named setting for comparison.
+
+**Evidence:** `python -m ems.sim.capacity` (sweep 30-75/min); `ems/sim/capacity.py`.
+
+## D-02 Redundant requirements not built in Release 1
+
+Each item is already covered by another requirement that is built, so the stakeholder
+outcome is kept.
+
+| Not built | Already covered by |
+|---|---|
+| FR-07 estimated wait on panel | Panel shows the assigned car; waits are on the dashboard |
+| FR-16 FM edits mode settings | Defaults fixed in configuration (FR-62) |
+| FR-17 one-off event schedule | FM manual Rush override (FR-12) |
+| FR-24 tenant report, FR-26 PDF/CSV export | Owner report (FR-23) on the dashboard |
+| FR-25 what-if estimate | Monthly mode comparison in reports (FR-23) |
+| FR-35 contractor remote diagnostics | Fault alerts (FR-30) and the technician role |
+| FR-83 extend goods move by 15 min | FM reschedules the move (FR-36) |
+| FR-102 load vs. camera mismatch | Overload handling (FR-100, FR-84) |
+| FR-106 panel offline, FR-108 camera offline | Generic device-offline alert, same mechanism as FR-104 |
+| FR-114 degraded-car preference | Fault handling (FR-04, FR-112, FR-113) |
+| FR-115 "clear the doorway" | Camera door-held event and reminder (FR-90, FR-95) |
+| FR-116 mark fire as drill | Fire already reported as a degraded period (4.3) |
+| FR-123 repeated landing presses, FR-124 stuck button | No-show cancel (FR-122) and rate limits (FR-121) |
+| BMS interface | Holiday calendar entered by the FM (FR-11) |
+
+## D-03 Infrastructure simplified for a simulator release
+
+Release 1 runs on simulated devices (SRS 1.2, C-05); these items belong to deployment.
+
+| SRS item | Release 1 | Reason |
+|---|---|---|
+| Redundant server pair, 10 s failover (NFR-R2, SIM-09) | Primary/standby failover modelled in the simulator | Proves the failover logic; dual hardware is deployment |
+| MFA, TLS, VPN, network isolation (NFR-SE1, VER-13) | Role-based login | Belongs to the deployment network |
+| Design-limit scale (SIM-10) | Design-limit layout (64 cars, 8 groups, 128 stops, 200 tenants) and the 400 calls + 400 credential lookups/min workload, but no 3 years of preloaded history; measured window shortened only if the run is too slow, recorded in the manifest | SIM-10 checks software latency only; synthetic multi-year history adds no extra verification of latency in a simulator |
+| Usability studies (VER-12) | Scripted task walkthrough | Needs recruited users; formal study before go-live |
+| Camera video clips | Events carry a clip reference only | Cameras send events (A-11); no video in a simulator |
+
+## D-04 Synthetic population and inter-floor trips
+
+- 25 tenants on L2-L30, 4 of them on 2 floors (never crossing L15/L16); about 2,500
+  employees, about 86 per floor (SRS 2.4). 5% accessible, 1% VIP.
+- Employee access: their tenant's floors plus public floors (lobby).
+- Inter-floor trips go to "eligible" floors (Appendix B): within the employee's own tenant
+  using their card, otherwise a visit to another tenant using a visitor QR pass issued by
+  the host tenant (FR-41). Giving everyone access to the whole group would defeat floor
+  access control (4.2).
+
+## D-05 Simulator modelling assumptions
+
+- The wait clock ends when the assigned car's doors are fully open.
+- A full car leaves waiting passengers at the floor and reports overload; they are
+  re-assigned.
+- Calls not delivered within 30 minutes after the arrival window fail the run (warm-up
+  arrivals included).
+- Riders who leave a car during fire recall or power rescue are counted as evacuated,
+  reported separately from normal deliveries.
+- Rescue devices bring a car to the nearest floor 20-40 s after mains loss; a car with a
+  failed rescue device stays stopped until power returns.
+- Heartbeat loss is measured from the last status message (status every 1 s, timeout 3 s).
+- Trip records are flushed to storage every 30 s, so a server crash loses at most 30 s of
+  records (NFR-R2 allows 1 minute).
+- Server failover runs in one process: during the gap, controllers refuse EMS commands and
+  serve passengers with their built-in nearest-car logic (FR-54).
+
+## D-06 Architecture
+
+One Python application with an in-process event bus and a simulated clock. Six parts talk
+only through shared events and interfaces (`ems/contracts/`). The simulated clock makes
+every run reproducible per seed (Appendix B: seeds 1-10) and lets 24-hour and retention
+scenarios run in seconds.
