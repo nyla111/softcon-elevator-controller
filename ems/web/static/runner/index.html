@@ -1,15 +1,103 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Part 1 - Scenario runner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<html lang="en"><head><meta charset="utf-8">
+<title>Scenario runner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0a1020; --panel:#121a30; --line:#33415f; --text:#f4f7ff; --dim:#aab6d3;
+          --ok:#37d67a; --bad:#ff5d5d; --warn:#ffc233; --accent:#4cb3ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px 20px; background:var(--bg); color:var(--text);
+         font:17px/1.35 system-ui, "Segoe UI", Arial, sans-serif; }
+  h1 { margin:0 0 4px; font-size:28px; } p.sub { margin:0 0 14px; color:var(--dim); }
+  table { width:100%; border-collapse:collapse; background:var(--panel); }
+  th, td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:left; }
+  th { color:var(--dim); font-size:14px; text-transform:uppercase; letter-spacing:.05em; }
+  tr.sel td { background:#1b2646; }
+  .ready { color:var(--ok); font-weight:700; } .wait { color:var(--dim); }
+  .pass { color:var(--ok); font-weight:800; } .fail { color:var(--bad); font-weight:800; }
+  button, input { font:inherit; font-size:15px; color:var(--text); background:#1b2646;
+         border:2px solid var(--line); border-radius:6px; padding:4px 10px; }
+  button { cursor:pointer; font-weight:700; } button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.4; cursor:default; }
+  input { width:60px; }
+  #detail { margin-top:18px; background:var(--panel); padding:12px 14px; border:2px solid var(--line); }
+  #detail h2 { margin:0 0 8px; font-size:22px; }
+  #bar { height:14px; background:#070b16; border:1px solid var(--line); margin:8px 0 12px; }
+  #fill { height:100%; width:0; background:var(--accent); }
+  #verdict { font-size:26px; font-weight:800; margin:0 0 8px; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  ul.crit { margin:4px 0 4px 0; padding-left:20px; font-size:15px; } ul.crit li { margin:1px 0; }
+  a { color:var(--accent); }
+</style></head>
 <body>
-<h1>Part 1 - Scenario runner</h1>
-<p>Placeholder. Owner replaces this page. Data: <code>GET /api/state</code></p>
-<pre id="out"></pre>
+<h1>Scenario runner</h1>
+<p class="sub">Runs one seed at a time (seeds 1-10). A scenario passes only if every seed passes. <a href="/">Home</a></p>
+<table><thead><tr><th>ID</th><th>Title</th><th>Owner</th><th>Status</th><th>Profile / rate</th><th></th></tr></thead>
+<tbody id="rows"></tbody></table>
+<div id="detail" hidden>
+  <h2 id="dtitle"></h2>
+  <div id="verdict"></div>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="live"></div>
+  <table><thead><tr><th>Seed</th><th>Result</th><th>Avg wait s</th><th>Max wait s</th><th>Delivered</th>
+    <th>Not cleared</th><th>Criteria</th></tr></thead><tbody id="seeds"></tbody></table>
+</div>
 <script>
-async function poll() {
-  const r = await fetch("/api/state");
-  document.getElementById("out").textContent = JSON.stringify(await r.json(), null, 2);
+"use strict";
+let scenarios = [], running = false;
+const $ = id => document.getElementById(id);
+const f1 = x => (x == null ? "-" : Number(x).toFixed(1));
+
+async function load() {
+  scenarios = await (await fetch("/api/scenarios")).json();
+  const body = $("rows"); body.replaceChildren();
+  for (const s of scenarios) {
+    const tr = document.createElement("tr"); tr.id = "row-" + s.id;
+    tr.innerHTML = `<td><b>${s.id}</b></td><td>${s.title}</td><td>Part ${s.owner_part}</td>` +
+      (s.ready ? `<td class="ready">ready</td>` : `<td class="wait">waiting for ${s.waiting_for}</td>`) +
+      `<td>${s.profile} @ ${s.rate}/min${s.faults.length ? " + " + s.faults.join(", ") : ""}</td><td></td>`;
+    if (s.ready) {
+      const b = document.createElement("button"); b.textContent = "Run seeds 1-10";
+      b.onclick = () => runAll(s); tr.lastChild.appendChild(b);
+    }
+    body.appendChild(tr);
+  }
 }
-poll(); setInterval(poll, 1000);
-</script>
-</body></html>
+
+async function runAll(s) {
+  if (running) return; running = true;
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  document.querySelectorAll("tr").forEach(t => t.classList.remove("sel"));
+  $("row-" + s.id).classList.add("sel");
+  $("detail").hidden = false; $("dtitle").textContent = s.id + "  " + s.title;
+  $("verdict").textContent = "running..."; $("verdict").className = "";
+  $("seeds").replaceChildren(); $("fill").style.width = "0";
+  const live = new URLSearchParams({ profile: s.profile, rate: s.rate, seed: 1, autostart: 1 });
+  $("live").innerHTML = `<a href="/building/?${live}">Open live in building view</a> (same profile, rate, seed 1)`;
+  let allPass = true;
+  for (let seed = 1; seed <= 10; seed++) {
+    let r;
+    try { r = await (await fetch(`/api/scenarios/${s.id}/run?seed=${seed}`, { method:"POST" })).json(); }
+    catch (e) { r = { passed:false, criteria:[{ criterion:"request failed", passed:false, detail:String(e) }], metrics:null }; }
+    allPass = allPass && r.passed === true;
+    addSeed(seed, r);
+    $("fill").style.width = (seed * 10) + "%";
+  }
+  $("verdict").textContent = allPass ? "PASS (all 10 seeds)" : "FAIL (at least one seed failed)";
+  $("verdict").className = allPass ? "pass" : "fail";
+  document.querySelectorAll("button").forEach(b => b.disabled = false);
+  running = false;
+}
+
+function addSeed(seed, r) {
+  const m = r.metrics || {}, tr = document.createElement("tr");
+  const crit = (r.criteria || []).map(c =>
+    `<li class="${c.passed ? "pass" : "fail"}">${c.passed ? "✔" : "✘"} ${c.criterion} <span class="wait">(${c.detail})</span></li>`).join("");
+  tr.innerHTML = `<td>${seed}</td><td class="${r.passed ? "pass" : "fail"}">${r.passed ? "PASS" : "FAIL"}</td>` +
+    `<td class="num">${f1(m.avg_wait_s)}</td><td class="num">${f1(m.max_wait_s)}</td>` +
+    `<td class="num">${m.n_delivered ?? "-"}</td><td class="num">${m.calls_not_cleared ?? "-"}</td>` +
+    `<td><ul class="crit">${crit}</ul></td>`;
+  $("seeds").appendChild(tr);
+}
+load();
+</script></body></html>

@@ -40,3 +40,16 @@ scripts/       create_issues.sh + requirements.csv
 4. Open a PR titled with the requirement ID (`FR-72 VIP caps`), link the issue.
 5. CI must be green and 1 reviewer must approve; then squash-merge.
 6. Need a contract change? Open a "Contract change request" issue; don't edit `contracts/`.
+
+## Milestones (Part 1)
+- **v0.1-sim-core**: car simulator, traffic generator (5 profiles, population of about 2,500 people), scenario harness with evidence manifests.
+- **v0.2-sim-devices**: mock ACS / notifier / fire panel / power room / camera, fault injection, heartbeat (FR-104), database buffering (FR-107), server failover (NFR-R2).
+- **v0.3-demo**: building animation page, scenario runner page, FR-105 dispatch guard, scenario registry (SIM-01..SIM-18), peak rate default 35/min (decision D-01).
+
+### Run the demo
+```bash
+pip install -e ".[dev]"
+uvicorn ems.web.server:app          # offline, no build step
+```
+Open http://localhost:8000/building/ (pick a profile, press Start, then Play; speed 1x / 10x / 60x; fault buttons on the right) and http://localhost:8000/runner/ (run SIM-09 and SIM-16 over seeds 1-10; the other scenarios say which part still has to add its check in `ems/sim/scenarios.py`).
+

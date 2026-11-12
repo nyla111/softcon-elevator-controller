@@ -1,15 +1,254 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Part 1 - Building animation</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"></head>
-<body>
-<h1>Part 1 - Building animation</h1>
-<p>Placeholder. Owner replaces this page. Data: <code>GET /api/state</code></p>
-<pre id="out"></pre>
+<html lang="en"><head><meta charset="utf-8">
+<title>Building view</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0a1020; --panel:#121a30; --line:#33415f; --text:#f4f7ff; --dim:#aab6d3;
+          --ok:#37d67a; --warn:#ffc233; --bad:#ff5d5d; --accent:#4cb3ff; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+               font:16px/1.3 system-ui, "Segoe UI", Arial, sans-serif; }
+  #app { display:grid; grid-template-rows:56px 1fr 92px; height:100vh; }
+  #top { display:flex; align-items:center; gap:16px; padding:0 14px; background:var(--panel);
+         border-bottom:2px solid var(--line); white-space:nowrap; overflow:hidden; }
+  #clock { font-size:24px; font-weight:700; min-width:230px; }
+  .pill { padding:4px 12px; border-radius:14px; font-weight:700; font-size:16px; border:2px solid; }
+  .ok { color:var(--ok); border-color:var(--ok); } .bad { color:var(--bad); border-color:var(--bad); }
+  .warn { color:var(--warn); border-color:var(--warn); } .dim { color:var(--dim); border-color:var(--line); }
+  #main { display:grid; grid-template-columns:1fr 330px; min-height:0; }
+  #towerwrap { min-height:0; padding:4px 8px; }
+  svg { width:100%; height:100%; display:block; }
+  #side { background:var(--panel); border-left:2px solid var(--line); padding:10px 12px;
+          overflow:auto; }
+  #side h3 { margin:10px 0 6px; font-size:15px; color:var(--dim); text-transform:uppercase;
+             letter-spacing:.06em; }
+  #side label { font-size:14px; color:var(--dim); }
+  select, input, button { font:inherit; font-size:16px; color:var(--text); background:#1b2646;
+          border:2px solid var(--line); border-radius:6px; padding:5px 8px; }
+  input { width:80px; } select { max-width:150px; }
+  button { cursor:pointer; font-weight:700; } button:hover { border-color:var(--accent); }
+  button.on { background:var(--accent); color:#04101f; border-color:var(--accent); }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; }
+  .faults button { flex:1 1 46%; font-size:14px; padding:6px 4px; }
+  #activeFaults div { color:var(--bad); font-weight:700; font-size:15px; }
+  #alertsList div { font-size:14px; color:var(--warn); margin:2px 0; }
+  #ticker { background:#050912; border-top:2px solid var(--line); padding:6px 14px;
+            font:15px/1.35 ui-monospace, Menlo, Consolas, monospace; overflow:hidden; }
+  #ticker div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #ticker div:last-child { color:var(--text); } #ticker div { color:var(--dim); }
+  text { fill:var(--text); font-family:system-ui, Arial, sans-serif; }
+  .carlabel { font-size:12px; font-weight:800; paint-order:stroke; stroke:#000; stroke-width:2.5px; }
+</style></head>
+<body><div id="app">
+  <div id="top">
+    <div id="clock">--</div>
+    <div id="modes" class="pill dim">modes</div>
+    <div id="ems" class="pill ok">EMS server: UP</div>
+    <div id="fallback" class="pill dim" style="display:none"></div>
+    <div id="alerts" class="pill dim">alerts: 0</div>
+    <div id="sim" class="pill dim" style="margin-left:auto">no live run</div>
+  </div>
+  <div id="main">
+    <div id="towerwrap"><svg id="tower" viewBox="0 0 790 672" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div id="side">
+      <h3>Run</h3>
+      <div class="row">
+        <select id="profile"><option>up_peak</option><option>lunch</option><option>evening</option>
+          <option>balanced</option><option>eco</option></select>
+        <label>rate/min <input id="rate" placeholder="default" size="6"></label>
+        <label>seed <input id="seed" value="1" size="4"></label>
+      </div>
+      <div class="row"><button id="start">Start</button><button id="play">Play</button>
+        <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
+        <button class="spd" data-s="60">60x</button></div>
+      <h3>Faults</h3>
+      <div class="row"><label>car <select id="car">
+        <option>A</option><option>B</option><option>C</option><option>D</option>
+        <option>E</option><option>F</option><option>G</option><option>H</option><option>S</option>
+      </select></label></div>
+      <div class="row faults" id="faultBtns">
+        <button data-k="fire_alarm">Fire alarm</button><button data-k="fire_clear">Fire clear + reset</button>
+        <button data-k="mains_loss">Mains loss</button><button data-k="mains_restore">Mains restore</button>
+        <button data-k="car_fault">Car fault</button><button data-k="clear_fault">Clear fault</button>
+        <button data-k="link_loss">Link loss (5 min)</button><button data-k="acs_outage">ACS outage</button>
+        <button data-k="ems_crash">EMS server crash</button><button data-k="plugin_crash">Plug-in crash</button>
+        <button data-k="overload_burst">Overload burst</button><button data-k="bulky_item">Bulky item</button>
+      </div>
+      <h3>Active faults</h3><div id="activeFaults"><div style="color:var(--dim)">none</div></div>
+      <h3>Latest alerts</h3><div id="alertsList"></div>
+    </div>
+  </div>
+  <div id="ticker"></div>
+</div>
 <script>
-async function poll() {
-  const r = await fetch("/api/state");
-  document.getElementById("out").textContent = JSON.stringify(await r.json(), null, 2);
+"use strict";
+const NS = "http://www.w3.org/2000/svg";
+const ROW = 20, TOP = 26, ROWS = 32, CAR_W = 54;
+const GROUP_X = { A:160, B:226, C:292, D:358, E:432, F:498, G:564, H:630, S:704 };
+const LOW_FLOORS = [1,...Array.from({length:14},(_,i)=>i+2)];
+const HIGH_FLOORS = [1,...Array.from({length:15},(_,i)=>i+16)];
+const STATE_COLOR = { GROUP_SERVICE:"#2f9e5b", STANDBY:"#3b7bd6", FIRE_RECALL:"#d63b3b",
+  EMERGENCY_POWER:"#e88a1a", FAULTED:"#8a2be2", MAINTENANCE:"#7a8497",
+  INDEPENDENT_SERVICE:"#1ba5a5", VIP_EXCLUSIVE:"#c9a227" };
+const idxOf = f => f < 0 ? f : f - 1;                  // B2=-2, B1=-1, L1=0 ... L30=29
+const yOfIdx = i => TOP + (29 - i) * ROW;
+function yOfPosition(p) {                              // p = floor number, may be fractional
+  const i = p >= 1 ? p - 1 : (p <= -1 ? p : -1 + (p + 1) / 2);
+  return yOfIdx(i);
 }
-poll(); setInterval(poll, 1000);
-</script>
-</body></html>
+const label = f => f < 0 ? "B" + (-f) : "L" + f;
+function el(name, attrs, parent, text) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const svg = document.getElementById("tower");
+const waitCells = {};      // group -> floor -> text element
+const cars = {};           // car id -> {g, body, dl, dr, bar, text, stops}
+
+function buildTower() {
+  for (let i = -2; i <= 29; i++) {                     // floor rows
+    const y = yOfIdx(i), f = i < 0 ? i : i + 1;
+    el("rect", { x:0, y, width:790, height:ROW, fill: i % 2 ? "#0e1528" : "#111a30" }, svg);
+    el("text", { x:6, y:y + 15, "font-size":14, "font-weight":700 }, svg, label(f));
+  }
+  el("text", { x:50, y:16, "font-size":13, fill:"#aab6d3" }, svg, "waiting");
+  el("text", { x:50, y:TOP - 2, "font-size":12, fill:"#aab6d3" }, svg, "LOW");
+  el("text", { x:96, y:TOP - 2, "font-size":12, fill:"#aab6d3" }, svg, "HIGH");
+  waitCells.LOW = {}; waitCells.HIGH = {};
+  LOW_FLOORS.forEach(f => waitCells.LOW[f] = el("text", { x:58, y:yOfIdx(idxOf(f)) + 16,
+      "font-size":15, "font-weight":800, "text-anchor":"middle" }, svg, ""));
+  HIGH_FLOORS.forEach(f => waitCells.HIGH[f] = el("text", { x:104, y:yOfIdx(idxOf(f)) + 16,
+      "font-size":15, "font-weight":800, "text-anchor":"middle" }, svg, ""));
+  for (const [id, x] of Object.entries(GROUP_X)) {     // shafts
+    el("rect", { x:x - 2, y:TOP, width:CAR_W + 4, height:ROWS * ROW, fill:"#070b16",
+                 stroke:"#33415f", "stroke-width":1 }, svg);
+  }
+  [["LOW", 160, 418], ["HIGH", 432, 690], ["SERVICE", 704, 758]].forEach(([n, a, b]) =>
+    el("text", { x:(a + b) / 2, y:TOP - 6, "font-size":15, "font-weight":800, "text-anchor":"middle",
+                 fill:"#4cb3ff" }, svg, n));
+  for (const id of Object.keys(GROUP_X)) {             // cars
+    const g = el("g", {}, svg);
+    const stops = el("g", {}, g);
+    const body = el("rect", { x:GROUP_X[id], width:CAR_W, height:ROW - 2, rx:3, fill:"#555",
+                              stroke:"#000", "stroke-width":1 }, g);
+    const dl = el("rect", { x:GROUP_X[id] + 1, width:12, height:ROW - 4, fill:"rgba(0,0,0,.6)" }, g);
+    const dr = el("rect", { x:GROUP_X[id] + CAR_W - 13, width:12, height:ROW - 4, fill:"rgba(0,0,0,.6)" }, g);
+    const bar = el("rect", { x:GROUP_X[id], width:0, height:3, fill:"#fff" }, g);
+    const text = el("text", { x:GROUP_X[id] + CAR_W / 2, "text-anchor":"middle", class:"carlabel" }, g, id);
+    cars[id] = { g, body, dl, dr, bar, text, stops };
+  }
+}
+buildTower();
+
+function setPill(id, cls, text) {
+  const e = document.getElementById(id); e.className = "pill " + cls; e.textContent = text;
+}
+function fmtTime(iso) {
+  const d = new Date(iso + "Z");                      // simulated wall clock, shown as UTC
+  const day = d.toUTCString().slice(0, 3), hh = d.toISOString().slice(11, 19);
+  return day + " " + d.toISOString().slice(0, 10) + " " + hh;
+}
+function render(s) {
+  document.getElementById("clock").textContent = fmtTime(s.time);
+  setPill("modes", "dim", Object.entries(s.modes).map(([g, m]) => g + ": " + m).join("  |  "));
+  setPill("ems", s.ems.status === "up" ? "ok" : "bad", "EMS server: " + s.ems.status.toUpperCase());
+  const fb = document.getElementById("fallback");
+  const msgs = [];
+  if (s.ems.controllers_fallback) msgs.push("controllers' group logic");
+  if (s.dispatch_fallback_active) msgs.push("dispatch fallback (FR-105)");
+  fb.style.display = msgs.length ? "" : "none";
+  if (msgs.length) setPill("fallback", "warn", "FALLBACK: " + msgs.join(" + "));
+  setPill("alerts", s.alerts_total ? "warn" : "dim", "alerts: " + s.alerts_total);
+  setPill("sim", "dim", s.live ? s.live.profile + (s.live.rate ? " @" + s.live.rate + "/min" : "") +
+          " seed " + s.live.seed : "no live run");
+
+  for (const g of ["LOW", "HIGH"]) {                   // waiting counts
+    const counts = s.waiting[g] || {};
+    const floors = g === "LOW" ? LOW_FLOORS : HIGH_FLOORS;
+    floors.forEach(f => {
+      const n = counts[String(f)] || 0, c = waitCells[g][f];
+      c.textContent = n || "·";
+      c.setAttribute("fill", n >= 10 ? "#ff5d5d" : n > 0 ? "#ffc233" : "#445070");
+    });
+  }
+  for (const c of s.cars) {                            // cars
+    const v = cars[c.car_id]; if (!v) continue;
+    const y = yOfPosition(c.position);
+    const x = GROUP_X[c.car_id];
+    v.body.setAttribute("y", y + 1); v.body.setAttribute("fill", STATE_COLOR[c.state] || "#667");
+    const bad = c.disconnected || c.fault_code || c.link_lost;
+    v.body.setAttribute("stroke", bad ? "#ff3030" : "#000");
+    v.body.setAttribute("stroke-width", bad ? 3 : 1);
+    v.body.setAttribute("stroke-dasharray", bad ? "5 3" : "");
+    const open = { closed:12, closing:8, opening:8, open:2 }[c.doors];
+    v.dl.setAttribute("y", y + 2); v.dr.setAttribute("y", y + 2);
+    v.dl.setAttribute("width", open); v.dr.setAttribute("width", open);
+    v.dr.setAttribute("x", x + CAR_W - 1 - open);
+    v.bar.setAttribute("y", y + ROW - 4);
+    v.bar.setAttribute("width", Math.min(100, c.load_pct) / 100 * CAR_W);
+    v.bar.setAttribute("fill", c.load_pct >= 80 ? "#ff5d5d" : "#fff");
+    v.text.setAttribute("y", y + 14);
+    v.text.textContent = c.car_id + " " + Math.round(c.load_pct) + "%" + (bad ? " !" : "");
+    v.stops.replaceChildren();                         // pending stops: yellow ticks at the left
+    for (const f of c.pending_stops)
+      el("rect", { x:x - 7, y:yOfIdx(idxOf(f)) + 7, width:5, height:6, fill:"#ffc233" }, v.stops);
+  }
+  const af = document.getElementById("activeFaults");
+  af.innerHTML = s.active_faults.length ? "" : '<div style="color:var(--dim)">none</div>';
+  s.active_faults.forEach(t => { const d = document.createElement("div"); d.textContent = t; af.appendChild(d); });
+  const al = document.getElementById("alertsList"); al.replaceChildren();
+  s.alerts.slice(-4).reverse().forEach(a => { const d = document.createElement("div");
+    d.textContent = a.t.toFixed(0) + "s [" + a.severity + "] " + a.kind; al.appendChild(d); });
+  const tk = document.getElementById("ticker"); tk.replaceChildren();
+  s.events.slice(-4).forEach(line => { const d = document.createElement("div"); d.textContent = line; tk.appendChild(d); });
+}
+
+// ---------------------------------------------------------------- controls
+let playing = false, speed = 1, busy = false;
+async function post(url, body) {
+  const r = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" },
+                               body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) throw new Error(url + " -> " + r.status + " " + await r.text());
+  return r.json();
+}
+async function tick() {
+  if (busy) return; busy = true;
+  try {
+    if (playing) await post("/api/advance?seconds=" + (speed * 0.2));
+    render(await (await fetch("/api/state")).json());
+  } catch (e) { console.error(e); } finally { busy = false; }
+}
+(function loop() { tick().finally(() => setTimeout(loop, playing ? 200 : 1000)); })();
+
+function setPlaying(on) {
+  playing = on; const b = document.getElementById("play");
+  b.textContent = on ? "Pause" : "Play"; b.classList.toggle("on", on);
+}
+async function startLive(profile, rate, seed) {
+  await post("/api/live/start", { profile, rate: rate === "" || rate == null ? null : Number(rate), seed: Number(seed) });
+  setPlaying(true);
+}
+document.getElementById("start").onclick = () => startLive(
+  document.getElementById("profile").value, document.getElementById("rate").value,
+  document.getElementById("seed").value || 1);
+document.getElementById("play").onclick = () => setPlaying(!playing);
+document.querySelectorAll(".spd").forEach(b => b.onclick = () => {
+  speed = Number(b.dataset.s);
+  document.querySelectorAll(".spd").forEach(x => x.classList.toggle("on", x === b));
+});
+document.querySelectorAll("#faultBtns button").forEach(b => b.onclick = async () => {
+  try { await post("/api/live/fault", { kind: b.dataset.k, car_id: document.getElementById("car").value }); }
+  catch (e) { console.error(e); }
+});
+document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName === "BODY") { e.preventDefault(); setPlaying(!playing); } });
+
+const q = new URLSearchParams(location.search);       // ?profile=&rate=&seed=&autostart=1
+if (q.get("profile")) document.getElementById("profile").value = q.get("profile");
+if (q.get("rate")) document.getElementById("rate").value = q.get("rate");
+if (q.get("seed")) document.getElementById("seed").value = q.get("seed");
+if (q.get("autostart")) startLive(document.getElementById("profile").value,
+  document.getElementById("rate").value, document.getElementById("seed").value || 1);
+</script></body></html>
