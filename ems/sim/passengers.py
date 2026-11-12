@@ -26,6 +26,7 @@ class Passenger:
     arrived_at: float
     car_id: Optional[CarId] = None       # set by CallAssigned / CallReassigned
     state: PassengerState = PassengerState.WAITING
+    evacuated: bool = False              # left the car early (fire recall, rescue)
     boarded_at: Optional[float] = None
     alighted_at: Optional[float] = None
 

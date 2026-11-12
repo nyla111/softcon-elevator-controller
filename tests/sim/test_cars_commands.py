@@ -34,9 +34,9 @@ def test_disconnected_car_refuses_commands_and_sends_no_status():
     ctx, sim = make()
     sim.set_disconnected("B", True)
     assert not sim.register_stop("B", 2, "c")
-    ctx.clock.run_until(3)
+    ctx.clock.run_until(4)
     assert not [e for e in ctx.bus.log if getattr(getattr(e, "status", None), "car_id", "") == "B"]
-    assert sim.status("B").disconnected
+    assert sim.status("B").disconnected          # the heartbeat monitor noticed after 3 s
 
 
 def test_non_dispatchable_car_refuses_new_stops():
