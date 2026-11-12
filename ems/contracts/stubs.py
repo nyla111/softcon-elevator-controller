@@ -34,6 +34,7 @@ class StubAcs:
                           frozenset({Role.EMPLOYEE}), True, "tenant-1")
     def issue_visitor_pass(self, tenant_id, floors, valid_from, valid_to, group_size=1):
         return f"QR-{tenant_id}-{int(valid_from)}"
+    def revoke(self, credential_id) -> None: pass
 
 
 class StubAccess:
@@ -64,7 +65,16 @@ class StubNotifier:
         self.inbox.append((list(recipients), subject, body))
 
 
+class StubDatabase:
+    """In-memory, always available, writes are persisted at once."""
+    def __init__(self) -> None: self._rows: list[dict] = []
+    def write(self, record: dict) -> None: self._rows.append(dict(record))
+    def records(self) -> list[dict]: return list(self._rows)
+    def available(self) -> bool: return True
+
+
 STUBS = {
     "controllers": StubControllers, "acs": StubAcs, "notifier": StubNotifier,
     "access": StubAccess, "car_states": StubCarStates, "dispatcher": StubDispatcher,
+    "db": StubDatabase,
 }

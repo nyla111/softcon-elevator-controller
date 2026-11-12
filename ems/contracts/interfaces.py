@@ -31,6 +31,9 @@ class AcsClient(Protocol):                  # Part 1 (mock ACS device)
     def issue_visitor_pass(self, tenant_id: str, floors: set[Floor],
                            valid_from: float, valid_to: float,
                            group_size: int = 1) -> CredentialId: ...
+    def revoke(self, credential_id: CredentialId) -> None:   # NFR-SE6
+        """Revoked credentials answer valid=False from now on."""
+        ...
 
 
 class AccessService(Protocol):              # Part 3
@@ -65,6 +68,16 @@ class Dispatcher(Protocol):                 # Part 2
 
 class DispatchEngine(Protocol):             # Part 2, replaceable plug-in (FR-06)
     def choose_car(self, call: Call, cars: list[CarStatus], mode: Mode) -> Optional[CarId]: ...
+
+
+class Database(Protocol):                   # Part 1 (trip database with buffering, FR-107)
+    def write(self, record: dict) -> None:
+        """Never raises and never blocks; buffers in memory while the database is down."""
+        ...
+    def records(self) -> list[dict]:
+        """Persisted records only (not the ones still in the buffer)."""
+        ...
+    def available(self) -> bool: ...
 
 
 class Notifier(Protocol):                   # Part 1 (email/SMS test inbox)
