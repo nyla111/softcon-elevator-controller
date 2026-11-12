@@ -8,7 +8,7 @@ from ems.web.server import app
 
 
 def test_clock_and_bus_are_ordered_and_logged():
-    ctx = build(seed=1)
+    ctx = build(seed=1, parts=[])
     seen = []
 
     def on_request(e):
