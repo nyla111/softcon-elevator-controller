@@ -5,15 +5,17 @@ from ems.contracts import config
 from ems.contracts.events import PassengerArrived
 from ems.core.app import build
 from ems.sim.population import Population
-from ems.sim.traffic import PROFILES, TENANT_FLOORS, TrafficGenerator
+from ems.sim.traffic import (PROFILES, SRS_ORIGINAL_PEAK_RATE, TENANT_FLOORS, TrafficGenerator,
+                             with_rate)
 
 HOUR = 3600.0
 
 
-def generate(profile, seed=1, hours=2.0, **pop_args):
+def generate(profile, seed=1, hours=2.0, rate=None, **pop_args):
     ctx = build(seed=seed, parts=["sim"])
     pop = Population.build(ctx.rng, **pop_args) if pop_args else None
-    TrafficGenerator.fixed(ctx, PROFILES[profile], 0.0, hours * HOUR, population=pop).start()
+    prof = PROFILES[profile] if rate is None else with_rate(profile, rate)
+    TrafficGenerator.fixed(ctx, prof, 0.0, hours * HOUR, population=pop).start()
     ctx.clock.run_until(hours * HOUR)
     return ctx.bus.of_type(PassengerArrived)
 
@@ -26,13 +28,17 @@ def shares(arrivals):
 
 
 def test_profile_table():
+    # D-01: peak profiles default to 35/min; the SRS value is kept as a constant
     assert {k: v.rate_per_min for k, v in PROFILES.items()} == {
-        "up_peak": 75, "lunch": 75, "evening": 75, "balanced": 20, "eco": 2}
+        "up_peak": 35, "lunch": 35, "evening": 35, "balanced": 20, "eco": 2}
+    assert SRS_ORIGINAL_PEAK_RATE == 75
+    assert with_rate("up_peak", 75).rate_per_min == 75 and PROFILES["up_peak"].rate_per_min == 35
 
 
 def test_up_peak_rate_and_mix():
-    arrivals = generate("up_peak")
+    arrivals = generate("up_peak", rate=75)
     assert abs(len(arrivals) / 120 - 75) < 4               # per minute
+    assert abs(len(generate("up_peak")) / 120 - 35) < 3    # default rate (D-01)
     up, down, inter = shares(arrivals)
     assert abs(up - 0.90) < 0.02 and down == 0 and abs(inter - 0.10) < 0.02
 
@@ -54,7 +60,7 @@ def test_balanced_and_eco_mix():
 
 
 def test_exponential_gaps():
-    ts = [a.t for a in generate("up_peak")]
+    ts = [a.t for a in generate("up_peak", rate=75)]
     gaps = [b - a for a, b in zip(ts, ts[1:])]
     mean = sum(gaps) / len(gaps)
     assert abs(mean - 0.8) < 0.05
@@ -106,7 +112,7 @@ def test_weekday_rate_changes_with_block():
     TrafficGenerator.weekday(ctx).start()
     ctx.clock.run_until(24 * HOUR)
     per_hour = Counter(int(a.t // HOUR) for a in ctx.bus.of_type(PassengerArrived))
-    assert per_hour[3] < 400 and per_hour[8] > 3500        # eco night vs up-peak morning
+    assert per_hour[3] < 400 and 1800 < per_hour[8] < 2400  # eco night vs up-peak (35/min)
     assert 800 < per_hour[10] < 1600                       # balanced 20/min
 
 
