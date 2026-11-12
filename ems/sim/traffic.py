@@ -32,19 +32,25 @@ class Profile:
     inter: float       # tenant floor -> another floor in the same group
 
 
+# Decision D-01 (docs/DECISIONS.md): the three peak profiles default to 35 persons/min until the
+# stakeholders answer about the SRS rate of 75/min. The rate can be overridden for every run.
+SRS_ORIGINAL_PEAK_RATE = 75
+PEAK_PROFILES = ("up_peak", "lunch", "evening")
+DEFAULT_PEAK_RATE = 35
+
 PROFILES = {p.name: p for p in [
-    Profile("up_peak", 75, 0.90, 0.00, 0.10),
-    Profile("lunch", 75, 0.45, 0.45, 0.10),
-    Profile("evening", 75, 0.00, 0.90, 0.10),
+    Profile("up_peak", DEFAULT_PEAK_RATE, 0.90, 0.00, 0.10),
+    Profile("lunch", DEFAULT_PEAK_RATE, 0.45, 0.45, 0.10),
+    Profile("evening", DEFAULT_PEAK_RATE, 0.00, 0.90, 0.10),
     Profile("balanced", 20, 0.40, 0.40, 0.20),
     Profile("eco", 2, 0.40, 0.40, 0.20),            # quiet, balanced mix
 ]}
 
 
 def with_rate(profile: Profile | str, rate_per_min: float) -> Profile:
-    """Same mix, different rate (the defaults in PROFILES are never changed)."""
+    """Same mix, different rate (the defaults in PROFILES are never changed; the name stays the same)."""
     base = PROFILES[profile] if isinstance(profile, str) else profile
-    return replace(base, name=f"{base.name}_{rate_per_min:g}", rate_per_min=rate_per_min)
+    return replace(base, rate_per_min=rate_per_min)
 
 
 def profile_for_block(start_hhmm: str, mode: Mode) -> Profile:

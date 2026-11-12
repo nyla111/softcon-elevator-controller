@@ -29,6 +29,7 @@ Test your part alone with `build(seed=1, parts=["<your_part>"])`.
 | Part | Package | Service key | Implements |
 |---|---|---|---|
 | 1 Simulator & integration | `ems/sim` | controllers, acs, notifier, db | ControllerAdapter, AcsClient, Notifier, Database |
+| 1 Simulator & integration (FR-105) | `ems/sim` | dispatch_guard | `DispatchGuard.choose_car(engine, call, cars, mode) -> (car_id, used_fallback)` |
 | 2 Dispatch & modes | `ems/dispatch` | dispatcher | Dispatcher, DispatchEngine |
 | 3 Access & panels | `ems/access` | access | AccessService |
 | 4 Safety & edge cases | `ems/safety` | car_states | CarStates |
@@ -52,4 +53,7 @@ Changes made to `contracts/` after the first skeleton, newest last.
 | `EmsServerDown(node)`, `EmsServerUp(node, gap_s)` (events.py) | Part 1 (failover model) | Part 2 (stop / resume assigning), Part 4, Part 6 | The primary EMS server crashed / the standby took over (gap target <= 10 s). While down the controllers refuse EMS commands and serve passengers with their own nearest-car logic. |
 | `AcsClient.revoke(credential_id)` (interfaces.py, `StubAcs.revoke`) | Part 1 (mock ACS) | Part 3, Part 6 | NFR-SE6: a revoked credential answers `valid=False`. |
 | Extra service keys `devices`, `failover` | Part 1 | tests and the fault injector only | `devices` = fire panel, power room, camera; `failover` = crash/takeover model. Not a contract for other parts. |
-
+| `ctx.services["dispatch_guard"]` (`DispatchGuard`) | Part 1 | Part 2 | FR-105: **Part 2 must call its DispatchEngine through `ctx.services['dispatch_guard'].choose_car`**. The guard uses the plug-in's answer unless it raises, returns an invalid car, or takes more than 1 s; then the built-in nearest-car rule decides and an alert is raised (`dispatch_fallback`, then `dispatch_recovered`). |
+| Scenario registry `ems/sim/scenarios.py` | Part 1 | all parts | **Scenario owners add their check functions in `ems/sim/scenarios.py`; Part 1 runs all scenarios** (tests in `tests/scenarios/`, runner page `/runner/`). `check(result, ctx) -> [(criterion, passed, detail)]`. |
+| `/api/state` extra fields, `/api/live/*`, `/api/scenarios*` (`ems/web/server.py`) | Part 1 | building and runner pages | Only fields were added to `/api/state` (`waiting`, `active_faults`, `ems`, `dispatch_fallback_active`, `dispatch_guard`, `events`, `alerts_total`, `live`, per-car `capacity` and `link_lost`). |
+| Peak profile rate 35/min (D-01, `docs/DECISIONS.md`) | Part 1 | Part 2 (scenario inputs) | `up_peak`, `lunch`, `evening` default to 35 persons/min; `SRS_ORIGINAL_PEAK_RATE = 75`; overridable per run. |

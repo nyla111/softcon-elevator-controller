@@ -23,7 +23,7 @@ from ems.core.app import Context, build
 from .faults import Fault, schedule_fault
 from .passengers import PassengerState
 from .population import Population
-from .traffic import PROFILES, Profile, TrafficGenerator
+from .traffic import PEAK_PROFILES, PROFILES, SRS_ORIGINAL_PEAK_RATE, Profile, TrafficGenerator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS_DIR = REPO_ROOT / "runs"          # gitignored
@@ -40,6 +40,7 @@ class RunResult:
     passed: bool                         # True when every call was cleared
     metrics: dict
     params: dict
+    n_evacuated: int = 0                 # riders who left early (fire recall, power rescue)
     manifest_path: Optional[str] = None
     event_digest: str = ""
     ctx: Optional[Context] = field(default=None, repr=False)   # only if keep_ctx=True
@@ -74,7 +75,8 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
               "clear_s": clear_s, "population": pop.params, "faults": [asdict(f) for f in faults],
               "ended_at_s": ctx.clock.now()}
     result = RunResult(prof.name, seed, metrics["calls_not_cleared"] == 0, metrics, params,
-                       event_digest=_digest(ctx), ctx=ctx if keep_ctx else None)
+                       n_evacuated=metrics["n_evacuated"], event_digest=_digest(ctx),
+                       ctx=ctx if keep_ctx else None)
     if out_dir is not None:
         result.manifest_path = str(_write_manifest(result, Path(out_dir)))
     return result
@@ -88,11 +90,18 @@ def run_seeds(profile: Union[str, Profile], faults: Sequence[Fault] = (),
 
 # ---------- internals ----------
 def _metrics(sim, measure_from: float, measure_to: float) -> dict:
-    measured = [p for p in sim.passengers.values() if measure_from <= p.arrived_at < measure_to]
-    waits = [p.wait_s for p in measured if p.wait_s is not None]
-    rides = [p.ride_s for p in measured if p.ride_s is not None]
+    """Wait/ride metrics cover measured-window passengers who were delivered to their own
+    destination. Evacuated riders (fire recall, power rescue) are counted separately and are
+    excluded from wait and ride: their trip did not end where they wanted to go."""
+    everyone = list(sim.passengers.values())
+    measured = [p for p in everyone if measure_from <= p.arrived_at < measure_to]
+    served = [p for p in measured if not p.evacuated]
+    waits = [p.wait_s for p in served if p.wait_s is not None]
+    rides = [p.ride_s for p in served if p.ride_s is not None]
     return {
         "passengers_measured": len(measured),
+        "n_delivered": sum(1 for p in everyone if p.alighted_at is not None and not p.evacuated),
+        "n_evacuated": sum(1 for p in everyone if p.evacuated),
         "avg_wait_s": sum(waits) / len(waits) if waits else 0.0,
         "max_wait_s": max(waits, default=0.0),
         "avg_ride_s": sum(rides) / len(rides) if rides else 0.0,
@@ -100,8 +109,7 @@ def _metrics(sim, measure_from: float, measure_to: float) -> dict:
         "total_car_run_time_s": sum(c.run_time_s for c in sim.cars.values()),
         # every passenger still waiting/riding at the end, warm-up arrivals included
         "calls_not_cleared": sim.undelivered(),
-        "calls_cancelled": sum(1 for p in sim.passengers.values()
-                               if p.state is PassengerState.CANCELLED),
+        "calls_cancelled": sum(1 for p in everyone if p.state is PassengerState.CANCELLED),
     }
 
 
@@ -125,12 +133,17 @@ def _git(*args: str) -> str:
 def _write_manifest(result: RunResult, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     commit = _git("rev-parse", "HEAD")
+    rate = result.params["profile"]["rate_per_min"]
     manifest = {
         "profile": result.profile, "seed": result.seed, "passed": result.passed,
+        "rate_per_min": rate,
+        # D-01: peak rate differs from the SRS value of 75/min (see docs/DECISIONS.md)
+        "decision": "D-01" if result.profile in PEAK_PROFILES and rate != SRS_ORIGINAL_PEAK_RATE
+        else None,
         "git_commit": commit, "git_dirty": bool(_git("status", "--porcelain")),
         "sim_config": config.SIM, "params": result.params, "metrics": result.metrics,
         "event_digest": result.event_digest,
     }
-    path = out_dir / f"{result.profile}_seed{result.seed}_{commit[:8]}.json"
+    path = out_dir / f"{result.profile}_r{rate:g}_seed{result.seed}_{commit[:8]}.json"
     path.write_text(json.dumps(manifest, indent=2, default=str))
     return path
