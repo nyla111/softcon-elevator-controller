@@ -2,16 +2,18 @@
 
 Scope: Simulated cars/doors/load, traffic generator, mock ACS, camera, fire panel, power room, notifier test inbox, heartbeat (FR-104), DB buffering (FR-107), failover (NFR-R2).
 Provides ctx.services key(s): controllers, acs, notifier
+
+Done so far: cars (controllers), traffic generator, scenario harness.
+Passenger arrivals are produced by TrafficGenerator (traffic.py), started by the harness.
 """
 from __future__ import annotations
 
 
 def register(ctx) -> None:
-    """Subscribe to events and put your service(s) into ctx.services.
-    Until you do, stubs from ems/contracts/stubs.py are used."""
-    # Example:
-    #   from ems.contracts.events import CallRequested
-    #   service = MyService(ctx)
-    #   ctx.bus.subscribe(CallRequested, service.on_call_requested)
-    #   ctx.services["controllers"] = service
-    pass
+    from .bridge import TemporaryBridge
+    from .cars import Simulator
+    from .population import Population
+
+    ctx.services["controllers"] = Simulator(ctx)
+    ctx.services["population"] = Population.build(ctx.rng)    # same people for the ACS
+    TemporaryBridge(ctx)       # TEMPORARY until Part 3 merges (see bridge.py)
