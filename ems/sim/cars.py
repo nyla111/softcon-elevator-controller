@@ -62,6 +62,7 @@ from ems.contracts.types import (CallId, CarId, CarStatus, Direction, DoorState,
                                  GroupId)
 
 from .baseline import rank_cars
+from .building import BuildingSpec
 from .passengers import Passenger, PassengerState
 
 PHANTOM_LOAD_PCT = 110.0           # what an overload_burst makes the car report
@@ -490,10 +491,11 @@ class Simulator:
         self.generator_ready = False
         self.rescue_failed: set[CarId] = set()         # cars whose rescue device is silent
         self.rescue_stuck: set[CarId] = set()          # cars that report "stuck"
-        for group, info in config.GROUPS.items():
-            rated = config.RATED["S" if group == "SERVICE" else "passenger"]["persons"]
-            for car_id in info["cars"]:
-                self.cars[car_id] = SimCar(self, car_id, group, info["floors"], rated)
+        self.building = ctx.services.get("building") or BuildingSpec.reference()
+        self.service_groups = self.building.service_groups   # fire service / goods cars
+        for g in self.building.groups:
+            for car_id in g.cars:
+                self.cars[car_id] = SimCar(self, car_id, g.name, list(g.floors), g.rated_persons)
         ctx.bus.subscribe(PassengerArrived, self.on_arrived)
         ctx.bus.subscribe(CallAssigned, self.on_assigned)
         ctx.bus.subscribe(CallReassigned, self.on_reassigned)
@@ -580,7 +582,7 @@ class Simulator:
         self.fire_alarm_active = True
         self.fire_needs_reset = True
         for car in self.cars.values():
-            if car.group == "SERVICE":
+            if car.group in self.service_groups:
                 car.firefighter = True
                 self.ctx.bus.publish(FirefighterService(ev.t, car.car_id, True))
             else:
@@ -595,7 +597,7 @@ class Simulator:
             return False
         self.fire_needs_reset = False
         for car in self.cars.values():
-            if car.group == "SERVICE":
+            if car.group in self.service_groups:
                 car.firefighter = False
                 self.ctx.bus.publish(FirefighterService(self.ctx.clock.now(), car.car_id, False))
             else:

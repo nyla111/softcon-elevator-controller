@@ -63,12 +63,58 @@ async function load() {
     tr.innerHTML = `<td><b>${s.id}</b></td><td>${esc(s.title)}</td><td class="crit">${esc(s.srs_criteria)}${s.notes ? `<br><i>Fault notes: ${esc(s.notes)}</i>` : ""}</td><td>${esc(s.verifies)}</td><td>Part ${s.owner_part}</td>` +
       (s.ready ? `<td class="ready">ready</td>` : `<td class="wait">waiting for ${s.waiting_for}</td>`) +
       `<td>${s.runs.length ? s.runs.map(runText).join("<br>") : "not supported yet"}</td><td></td>`;
-    if (s.ready) {
-      const b = document.createElement("button"); b.textContent = "Run seeds 1-10";
-      b.onclick = () => runAll(s); tr.lastChild.appendChild(b);
+    const b = document.createElement("button");
+    if (s.ready) { b.textContent = "Run seeds 1-10"; b.onclick = () => runAll(s); tr.lastChild.appendChild(b); }
+    else if (s.runs.length) {
+      b.textContent = "Run setup, seed 1 (metrics only)"; b.onclick = () => runMetrics(s);
+      tr.lastChild.appendChild(b);
     }
     body.appendChild(tr);
   }
+}
+
+const ms = x => (x == null ? "-" : (x * 1000).toFixed(3) + " ms");
+const sec = x => (x == null ? "-" : Number(x).toFixed(2) + " s");
+
+function runDetail(run) {
+  let h = `<h3>${esc(run.label)} <span class="wait">(${esc(run.profile)}, starts ${esc(run.start)})</span></h3>`;
+  const m = run.metrics || {};
+  h += `<p>Passengers measured ${m.passengers_measured ?? "-"}, delivered ${m.n_delivered ?? "-"}, ` +
+       `avg wait ${f1(m.avg_wait_s)} s, max wait ${f1(m.max_wait_s)} s, not cleared ${m.calls_not_cleared ?? "-"}</p>`;
+  if (run.blocks && run.blocks.length) {
+    h += `<table><thead><tr><th>Block</th><th>Profile</th><th>Calls</th><th>Avg wait s</th><th>Max wait s</th>` +
+         `<th>Stranded</th></tr></thead><tbody>` + run.blocks.map(b =>
+      `<tr><td>${esc(b.label)}</td><td>${esc(b.profile)}</td><td class="num">${b.calls}</td>` +
+      `<td class="num">${f1(b.avg_wait_s)}</td><td class="num">${f1(b.max_wait_s)}</td>` +
+      `<td class="num">${b.stranded}</td></tr>`).join("") + `</tbody></table>`;
+  }
+  const L = run.latency;
+  if (L && L.assignment_s) {
+    const row = (n, v, f) => `<tr><td>${n}</td><td class="num">${v.n}</td><td class="num">${f(v.p50)}</td>` +
+      `<td class="num">${f(v.p95)}</td><td class="num">${f(v.p99)}</td><td class="num">${f(v.max)}</td></tr>`;
+    h += `<table><thead><tr><th>Latency</th><th>n</th><th>p50</th><th>p95</th><th>p99</th><th>max</th></tr></thead><tbody>` +
+      row("Call assignment (engine compute)", L.assignment_s, ms) +
+      row("Credential lookup (mock ACS model)", L.lookup_s, sec) +
+      (L.dashboard ? row(`Dashboard GET /api/state (${L.dashboard.users} users, ${L.dashboard.errors} errors)`, L.dashboard.response_s, sec) : "") +
+      `</tbody></table><p>Lookups ${L.lookups_total} (${L.lookups_topped_up} topped up), camera events ${L.camera_events}. Metrics only: no pass/fail.</p>`;
+  }
+  return h;
+}
+
+async function runMetrics(s) {
+  if (running) return; running = true;
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  $("detail").hidden = false; $("dtitle").textContent = s.id + "  " + s.title;
+  $("verdict").textContent = "running setup (no check yet: " + esc(s.waiting_for) + ")..."; $("verdict").className = "";
+  $("seeds").replaceChildren(); $("fill").style.width = "0"; $("live").textContent = "";
+  let r;
+  try { r = await (await fetch(`/api/scenarios/${s.id}/run?seed=1&metrics_only=true`, { method:"POST" })).json(); }
+  catch (e) { r = { runs: [], message: String(e) }; }
+  $("verdict").textContent = r.message || "";
+  $("live").innerHTML = (r.runs || []).map(runDetail).join("");
+  $("fill").style.width = "100%";
+  document.querySelectorAll("button").forEach(b => b.disabled = false);
+  running = false;
 }
 
 async function runAll(s) {

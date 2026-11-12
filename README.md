@@ -45,6 +45,7 @@ scripts/       create_issues.sh + requirements.csv
 - **v0.1-sim-core**: car simulator, traffic generator (5 profiles, population of about 2,500 people), scenario harness with evidence manifests.
 - **v0.2-sim-devices**: mock ACS / notifier / fire panel / power room / camera, fault injection, heartbeat (FR-104), database buffering (FR-107), server failover (NFR-R2).
 - **v0.3-demo**: building animation page, scenario runner page, FR-105 dispatch guard, scenario registry (SIM-01..SIM-18), peak rate default 35/min (decision D-01).
+- **v0.4-scenario-setup**: every Appendix B setup is executable: runs start at a time of day, 24 h weekday run with per-block metrics (SIM-05), Eco surge (SIM-04), design-limit building and latency hooks (SIM-10).
 
 ### Run the demo
 ```bash

@@ -19,9 +19,7 @@ def test_only_sim_09_and_16_are_ready():
     assert ready == ["SIM-09", "SIM-16"]
     for s in SCENARIOS.values():
         if not s.ready:
-            expected = ("Part 1 design-limit setup + Part 2 check" if s.id == "SIM-10"
-                        else f"Part {s.owner_part} check")
-            assert s.check is None and s.waiting_for == expected
+            assert s.check is None and s.waiting_for == f"Part {s.owner_part} check"
         else:
             assert s.check is not None and s.waiting_for is None
 
@@ -61,7 +59,7 @@ SETUP = {
     "SIM-05": [("weekday", "weekday")],
     "SIM-06": [("up_peak", "fixed")], "SIM-07": [("up_peak", "fixed")],
     "SIM-08": [("up_peak", "fixed")], "SIM-09": [("up_peak", "fixed")],
-    "SIM-10": [], "SIM-11": [("up_peak", "fixed")], "SIM-12": [("up_peak", "fixed")],
+    "SIM-10": [("balanced", "fixed")], "SIM-11": [("up_peak", "fixed")], "SIM-12": [("up_peak", "fixed")],
     "SIM-13": [("up_peak", "fixed")], "SIM-14": [("up_peak", "fixed")],
     "SIM-15": [("up_peak", "fixed")], "SIM-16": [("up_peak", "fixed")],
     "SIM-17": [("balanced", "fixed")], "SIM-18": [("up_peak", "fixed")],
@@ -75,17 +73,23 @@ def test_every_scenario_setup_matches_appendix_b():
         assert got == want, sid
 
 
-def test_sim_10_is_unsupported_for_now():
+def test_sim_10_has_a_design_limit_setup():
     s = SCENARIOS["SIM-10"]
-    assert s.profile is None and s.runs == [] and not s.ready
-    assert s.waiting_for == "Part 1 design-limit setup + Part 2 check"
-    d = describe(s)
-    assert d["runs"] == [] and d["rate"] is None
+    (r,) = s.runs
+    assert s.waiting_for == "Part 2 check" and not s.ready
+    assert r.building == "design_limit" and r.rate == 400.0 and r.measure_s == 3600.0
+    assert r.workload == {"lookups_per_min": 400.0, "camera_per_day": 2000.0,
+                          "dashboard_users": 50, "dashboard_requests": 5}
+    assert describe(s)["runs"][0]["rate"] == 400.0
 
 
 def test_sim_04_pair_and_surge():
     eco, bal, surge = SCENARIOS["SIM-04"].runs
+    assert eco.profile_name == "eco_quiet"
     assert eco.pair == bal.pair == "quiet" and surge.pair is None
+    assert {eco.start_hhmm, bal.start_hhmm, surge.start_hhmm} == {"21:00"}
+    assert surge.warmup_profile == "eco_quiet" and surge.warmup_s == 600.0
+    assert surge.clear_s == 1800.0 and surge.envelope_note
     assert (eco.warmup_s, eco.measure_s) == (bal.warmup_s, bal.measure_s)
     assert surge.rate == SRS_ORIGINAL_PEAK_RATE == 75 and surge.measure_s == 900.0
     assert describe(SCENARIOS["SIM-04"])["runs"][2]["rate"] == 75
@@ -96,11 +100,23 @@ def test_sim_05_is_the_24h_schedule_and_sim_08_alarm_is_at_the_rush_transition()
     assert wk.mode == "weekday" and wk.measure_s == 86400.0 and wk.warmup_s == 0.0
     (r,) = SCENARIOS["SIM-08"].runs
     alarm = [f for f in r.faults if f.kind == "fire_alarm"]
-    assert len(alarm) == 1 and r.day_start_hhmm == "16:30"
-    hh, mm = map(int, r.day_start_hhmm.split(":"))
+    assert len(alarm) == 1 and r.start_hhmm == "16:30"
+    hh, mm = map(int, r.start_hhmm.split(":"))
     assert hh * 3600 + mm * 60 + alarm[0].at_s == 17 * 3600      # 17:00 Rush begins
 
 
 def test_sim_02_runs_are_separate():
     assert [r.label for r in SCENARIOS["SIM-02"].runs] == ["lunch", "evening"]
     assert all(r.pair is None for r in SCENARIOS["SIM-02"].runs)
+
+
+START = {"SIM-01": "07:00", "SIM-03": "13:30", "SIM-05": "00:00", "SIM-06": "07:00",
+         "SIM-07": "07:00", "SIM-08": "16:30", "SIM-09": "07:00", "SIM-10": "10:00",
+         "SIM-11": "07:00", "SIM-12": "07:00", "SIM-13": "07:00", "SIM-14": "07:00",
+         "SIM-15": "07:00", "SIM-16": "07:00", "SIM-17": "13:30", "SIM-18": "07:00"}
+
+
+def test_every_run_has_a_start_time_of_day():
+    for sid, hhmm in START.items():
+        assert [r.start_hhmm for r in SCENARIOS[sid].runs] == [hhmm], sid
+    assert [r.start_hhmm for r in SCENARIOS["SIM-02"].runs] == ["11:30", "17:00"]

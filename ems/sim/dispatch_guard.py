@@ -45,6 +45,7 @@ class DispatchGuard:
         self.calls = 0
         self.fallbacks = 0
         self.log: list[tuple] = []
+        self.compute_s: list[float] = []       # real compute time of each engine call (SIM-10)
 
     def set_crashed(self, crashed: bool) -> None:
         self.crashed = crashed
@@ -75,8 +76,10 @@ class DispatchGuard:
         try:
             answer = engine.choose_car(call, cars, mode)
         except Exception as exc:               # any plug-in failure counts
+            self.compute_s.append(time.perf_counter() - started)
             return None, f"plug-in raised {type(exc).__name__}"
         elapsed = time.perf_counter() - started
+        self.compute_s.append(elapsed)
         if elapsed > self.timeout_s:
             return None, f"plug-in too slow ({elapsed:.2f} s)"
         if answer is not None and answer not in self._valid_ids(call, cars):
