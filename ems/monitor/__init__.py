@@ -1,17 +1,12 @@
-"""Part 6 Dashboard, camera & admin.
-
-Scope: Dashboard + reports 4.4, camera review queue 4.10, roles/audit 4.7, retention section 6.
-Provides ctx.services key(s): reports
-"""
+"""Part 6: dashboard, reporting, camera review and administration."""
 from __future__ import annotations
+
+from ems.contracts.events import Event
+
+from .service import MonitorService
 
 
 def register(ctx) -> None:
-    """Subscribe to events and put your service(s) into ctx.services.
-    Until you do, stubs from ems/contracts/stubs.py are used."""
-    # Example:
-    #   from ems.contracts.events import CallRequested
-    #   service = MyService(ctx)
-    #   ctx.bus.subscribe(CallRequested, service.on_call_requested)
-    #   ctx.services["reports"] = service
-    pass
+    service = MonitorService(ctx)
+    ctx.bus.subscribe(Event, service.on_event)
+    ctx.services["reports"] = service
