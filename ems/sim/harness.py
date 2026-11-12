@@ -4,6 +4,9 @@ Timeline (sim seconds): arrivals run for warm-up (10 min) + measured period (60 
 then up to 30 more minutes are allowed for every passenger to be delivered.
 Only passengers who arrive in the measured period count in the wait/ride metrics.
 If anybody is still not delivered at the end, the run FAILS (calls_not_cleared > 0).
+
+Assumption: calls_not_cleared counts EVERY passenger still waiting or riding at the end,
+including those who arrived during the warm-up.
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ from ems.contracts import config
 from ems.core.app import Context, build
 
 from .passengers import PassengerState
+from .population import Population
 from .traffic import PROFILES, Profile, TrafficGenerator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +56,8 @@ class RunResult:
 
 def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *,
         warmup_s: float = WARMUP_S, measure_s: float = MEASURE_S, clear_s: float = CLEAR_S,
-        setup: Optional[Callable[[Context], None]] = None, out_dir: Optional[Path] = RUNS_DIR,
+        setup: Optional[Callable[[Context], None]] = None,
+        population: Optional[Population] = None, out_dir: Optional[Path] = RUNS_DIR,
         keep_ctx: bool = False) -> RunResult:
     """Run one scenario. `setup(ctx)` runs after build (e.g. to install a dispatcher).
     out_dir=None skips writing the evidence manifest."""
@@ -62,7 +67,8 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
     if setup is not None:
         setup(ctx)
     arrivals_end = warmup_s + measure_s
-    TrafficGenerator.fixed(ctx, prof, 0.0, arrivals_end).start()
+    TrafficGenerator.fixed(ctx, prof, 0.0, arrivals_end, population=population).start()
+    pop = population or ctx.services["population"]
     for f in faults:
         _schedule_fault(ctx, sim, f)
 
@@ -74,7 +80,7 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
 
     metrics = _metrics(sim, warmup_s, arrivals_end)
     params = {"profile": asdict(prof), "warmup_s": warmup_s, "measure_s": measure_s,
-              "clear_s": clear_s, "faults": [asdict(f) for f in faults],
+              "clear_s": clear_s, "population": pop.params, "faults": [asdict(f) for f in faults],
               "ended_at_s": ctx.clock.now()}
     result = RunResult(prof.name, seed, metrics["calls_not_cleared"] == 0, metrics, params,
                        event_digest=_digest(ctx), ctx=ctx if keep_ctx else None)

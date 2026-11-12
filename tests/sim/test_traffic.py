@@ -4,14 +4,16 @@ from collections import Counter
 from ems.contracts import config
 from ems.contracts.events import PassengerArrived
 from ems.core.app import build
+from ems.sim.population import Population
 from ems.sim.traffic import PROFILES, TENANT_FLOORS, TrafficGenerator
 
 HOUR = 3600.0
 
 
-def generate(profile, seed=1, hours=2.0, **kw):
+def generate(profile, seed=1, hours=2.0, **pop_args):
     ctx = build(seed=seed, parts=["sim"])
-    TrafficGenerator.fixed(ctx, PROFILES[profile], 0.0, hours * HOUR, **kw).start()
+    pop = Population.build(ctx.rng, **pop_args) if pop_args else None
+    TrafficGenerator.fixed(ctx, PROFILES[profile], 0.0, hours * HOUR, population=pop).start()
     ctx.clock.run_until(hours * HOUR)
     return ctx.bus.of_type(PassengerArrived)
 
@@ -74,12 +76,19 @@ def test_floors_stay_inside_the_passengers_group():
 def test_accessible_and_vip_shares_configurable():
     arrivals = generate("up_peak", hours=4)
     n = len(arrivals)
-    assert abs(sum(a.accessible for a in arrivals) / n - 0.05) < 0.01
-    assert abs(sum(a.vip for a in arrivals) / n - 0.01) < 0.005
+    assert abs(sum(a.accessible for a in arrivals) / n - 0.05) < 0.02
+    assert abs(sum(a.vip for a in arrivals) / n - 0.01) < 0.01
     none = generate("balanced", accessible_share=0.0, vip_share=0.0)
     assert not any(a.accessible or a.vip for a in none)
     all_acc = generate("balanced", accessible_share=1.0)
     assert all(a.accessible for a in all_acc)
+
+
+def test_every_passenger_has_a_card_of_a_tenant_on_the_trip():
+    for a in generate("lunch"):
+        assert a.credential_id is not None and a.credential_id.startswith("card-L")
+        floor = int(a.credential_id.split("-")[1][1:])
+        assert floor in (a.origin, a.destination) and floor != 1
 
 
 def test_weekday_schedule_segments():

@@ -12,6 +12,8 @@ from __future__ import annotations
 def register(ctx) -> None:
     from .bridge import TemporaryBridge
     from .cars import Simulator
+    from .population import Population
 
     ctx.services["controllers"] = Simulator(ctx)
+    ctx.services["population"] = Population.build(ctx.rng)    # same people for the ACS
     TemporaryBridge(ctx)       # TEMPORARY until Part 3 merges (see bridge.py)

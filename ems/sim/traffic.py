@@ -2,6 +2,9 @@
 
 Each arrival publishes PassengerArrived. All randomness comes from ctx.rng.
 Passengers use tenant floors only (the lobby L1 is the origin of "up" trips).
+Every passenger is an employee drawn from the Population (population.py): the employee who
+works on the trip's tenant floor (destination of "up", origin of "down" and inter-floor trips).
+The employee supplies credential_id, accessible and vip.
 """
 from __future__ import annotations
 
@@ -11,12 +14,10 @@ from ems.contracts import config
 from ems.contracts.events import PassengerArrived
 from ems.contracts.types import Mode
 
+from .population import ALL_TENANT_FLOORS, PASSENGER_GROUPS, TENANT_FLOORS, Population
+
 LOBBY = config.LOBBY
-PASSENGER_GROUPS = ("LOW", "HIGH")
-# Tenant floors of each passenger group (everything except the lobby).
-TENANT_FLOORS = {g: [f for f in config.GROUPS[g]["floors"] if f != LOBBY]
-                 for g in PASSENGER_GROUPS}
-ALL_TENANT_FLOORS = [f for g in PASSENGER_GROUPS for f in TENANT_FLOORS[g]]
+# Tenant floors per group come from population.py (the people live there).
 GROUP_OF_FLOOR = {f: g for g in PASSENGER_GROUPS for f in TENANT_FLOORS[g]}
 
 
@@ -58,12 +59,11 @@ class Segment:
 
 
 class TrafficGenerator:
-    def __init__(self, ctx, segments: list[Segment], accessible_share: float = 0.05,
-                 vip_share: float = 0.01) -> None:
+    def __init__(self, ctx, segments: list[Segment],
+                 population: Population | None = None) -> None:
         self.ctx = ctx
         self.segments = segments
-        self.accessible_share = accessible_share
-        self.vip_share = vip_share
+        self.population = population       # default: ctx.services["population"]
         self.count = 0
 
     @classmethod
@@ -83,6 +83,9 @@ class TrafficGenerator:
         return cls(ctx, segments, **kw)
 
     def start(self) -> None:
+        if self.population is None:
+            self.population = self.ctx.services.get("population") or Population.build(
+                self.ctx.rng)
         self._schedule_next(self.segments[0].start)
 
     # ---------- internals ----------
@@ -101,26 +104,27 @@ class TrafficGenerator:
 
     def _arrive(self, seg: Segment) -> None:
         rng = self.ctx.rng
-        origin, destination = self._pick_trip(seg.profile)
+        origin, destination, owner_floor = self._pick_trip(seg.profile)
+        person = rng.choice(self.population.on_floor(owner_floor))
         self.count += 1
-        accessible = rng.random() < self.accessible_share
-        vip = rng.random() < self.vip_share
         self.ctx.bus.publish(PassengerArrived(
             t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-L{origin}",
             origin=origin, destination=destination, group=GROUP_OF_FLOOR[max(origin, destination)],
-            credential_id=None, accessible=accessible, vip=vip))
+            credential_id=person.credential_id, accessible=person.accessible,
+            vip=person.vip))
         self._schedule_next(self.ctx.clock.now())
 
-    def _pick_trip(self, prof: Profile) -> tuple[int, int]:
+    def _pick_trip(self, prof: Profile) -> tuple[int, int, int]:
+        """(origin, destination, tenant floor of the person making the trip)"""
         rng = self.ctx.rng
         kind = rng.random()
         floor = rng.choice(ALL_TENANT_FLOORS)         # uniform over tenant floors
         if kind < prof.up:
-            return LOBBY, floor
+            return LOBBY, floor, floor
         if kind < prof.up + prof.down:
-            return floor, LOBBY
+            return floor, LOBBY, floor
         others = [f for f in TENANT_FLOORS[GROUP_OF_FLOOR[floor]] if f != floor]
-        return floor, rng.choice(others)               # same group as the first floor
+        return floor, rng.choice(others), floor               # same group as the first floor
 
 
 def _seconds(hhmm: str) -> float:

@@ -12,6 +12,16 @@ Each car is a small state machine that moves through these phases, one at a time
 * Passengers move one at a time, 1 s each: alighters first, then boarders.
 * Stop order is simple collective: keep going the same way while there are
   stops ahead, then reverse.
+
+Assumptions (agreed with the tech lead):
+* DoorsOpened is published when the doors are FULLY open, not when they start to open.
+* Overload: if more passengers wait for this car than fit, the extra ones stay at the floor
+  and OverloadDetected is published (load_pct > 100). Their stop is put back when the car
+  leaves the floor (otherwise it would re-open here forever); the car comes back for them.
+* Fault: a faulted car freezes where it is; when cleared it restarts the interrupted phase
+  from its beginning (e.g. a full 1.5 s step, a full door cycle).
+* CallReassigned: the simulator drops the origin stop on the old car directly, because
+  cancel_stop() is refused for a faulted car.
 * Every callback a car schedules carries the car's "epoch". A fault bumps the
   epoch, so everything the car had scheduled is silently dropped (frozen car).
 """
