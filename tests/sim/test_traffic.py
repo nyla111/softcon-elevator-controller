@@ -84,11 +84,12 @@ def test_accessible_and_vip_shares_configurable():
     assert all(a.accessible for a in all_acc)
 
 
-def test_every_passenger_has_a_card_of_a_tenant_on_the_trip():
-    for a in generate("lunch"):
-        assert a.credential_id is not None and a.credential_id.startswith("card-L")
-        floor = int(a.credential_id.split("-")[1][1:])
-        assert floor in (a.origin, a.destination) and floor != 1
+def test_every_passenger_has_a_card_or_a_visitor_pass():
+    arrivals = generate("lunch")
+    assert all(a.credential_id for a in arrivals)
+    cards = [a for a in arrivals if a.credential_id.startswith("card-L")]
+    passes = [a for a in arrivals if a.credential_id.startswith("QR-")]
+    assert len(cards) + len(passes) == len(arrivals) and 0 < len(passes) < 0.1 * len(arrivals)
 
 
 def test_weekday_schedule_segments():

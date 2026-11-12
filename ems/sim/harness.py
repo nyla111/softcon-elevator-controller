@@ -20,6 +20,7 @@ from typing import Callable, Optional, Sequence, Union
 from ems.contracts import config
 from ems.core.app import Context, build
 
+from .faults import Fault, schedule_fault
 from .passengers import PassengerState
 from .population import Population
 from .traffic import PROFILES, Profile, TrafficGenerator
@@ -30,16 +31,6 @@ WARMUP_S = 600.0
 MEASURE_S = 3600.0
 CLEAR_S = 1800.0
 CHECK_EVERY_S = 5.0
-
-
-@dataclass
-class Fault:
-    """A fault to inject. at_s = sim seconds from the start of the run."""
-    at_s: float
-    car_id: str
-    duration_s: Optional[float] = None   # None = never cleared
-    kind: str = "fault"                  # "fault" (car freezes) or "disconnect"
-    code: str = "F-01"
 
 
 @dataclass
@@ -70,7 +61,7 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
     TrafficGenerator.fixed(ctx, prof, 0.0, arrivals_end, population=population).start()
     pop = population or ctx.services["population"]
     for f in faults:
-        _schedule_fault(ctx, sim, f)
+        schedule_fault(ctx, f)
 
     ctx.clock.run_until(arrivals_end)
     t, deadline = arrivals_end, arrivals_end + clear_s
@@ -96,19 +87,6 @@ def run_seeds(profile: Union[str, Profile], faults: Sequence[Fault] = (),
 
 
 # ---------- internals ----------
-def _schedule_fault(ctx, sim, f: Fault) -> None:
-    if f.kind == "fault":
-        ctx.clock.call_at(f.at_s, lambda: sim.inject_fault(f.car_id, f.code))
-        if f.duration_s is not None:
-            ctx.clock.call_at(f.at_s + f.duration_s, lambda: sim.clear_fault(f.car_id))
-    elif f.kind == "disconnect":
-        ctx.clock.call_at(f.at_s, lambda: sim.set_disconnected(f.car_id, True))
-        if f.duration_s is not None:
-            ctx.clock.call_at(f.at_s + f.duration_s, lambda: sim.set_disconnected(f.car_id, False))
-    else:
-        raise ValueError(f"unknown fault kind {f.kind!r}")
-
-
 def _metrics(sim, measure_from: float, measure_to: float) -> dict:
     measured = [p for p in sim.passengers.values() if measure_from <= p.arrived_at < measure_to]
     waits = [p.wait_s for p in measured if p.wait_s is not None]

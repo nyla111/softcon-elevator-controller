@@ -193,6 +193,17 @@ class GoodsMoveScheduled(Event):
     credential_ids: list[CredentialId] = field(default_factory=list)
 
 
+# ---------- EMS server pair (pub: Part 1 Simulator, failover model) ----------
+@dataclass
+class EmsServerDown(Event):          # primary EMS server crashed (NFR-R2)
+    node: str                        # "primary"
+
+@dataclass
+class EmsServerUp(Event):            # standby took over; controllers return to EMS supervision
+    node: str                        # "standby"
+    gap_s: float                     # seconds without an EMS server (target <= 10 s)
+
+
 # ---------- Camera (pub: Part 1 Simulator camera device) ----------
 @dataclass
 class CameraEvent(Event):
