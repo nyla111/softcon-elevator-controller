@@ -9,7 +9,7 @@ injects faults "20 minutes into the measured window".
 
 schedule_fault(ctx, fault) books the start (and the end, when there is a duration) on ctx.clock.
 Kinds: fault, link_loss (alias disconnect), acs_outage, fire_alarm, mains_loss, overload_burst,
-camera_event, alarm_button, db_outage, ems_crash.
+camera_event, alarm_button, db_outage, ems_crash, plugin_crash.
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def fire_alarm(at: float, clear_after: Optional[float] = None, io_signal_lost: b
                          "reset_after": reset_after})
 
 
-def mains_loss(at: float, restore_after: float, generator_failed: bool = False,
+def mains_loss(at: float, restore_after: Optional[float], generator_failed: bool = False,
                generator_delay: float = 15.0, failed_rescue_cars=(), stuck_cars=()) -> Fault:
     return Fault(at, None, restore_after, "mains_loss",
                  params={"generator_failed": generator_failed,
@@ -86,6 +86,11 @@ def db_outage(at: float, duration: float) -> Fault:
 
 def ems_server_crash(at: float, takeover_s: float = 8.0) -> Fault:
     return Fault(at, None, None, "ems_crash", params={"takeover_s": takeover_s})
+
+
+def plugin_crash(at: float, duration: float) -> Fault:
+    """The dispatch plug-in is dead for `duration`: the FR-105 guard must use its fallback."""
+    return Fault(at, None, duration, "plugin_crash")
 
 
 # ---------- scheduler ----------
@@ -163,9 +168,15 @@ def _ems_crash(ctx, f):
     ctx.clock.call_at(f.at_s, lambda: ctx.services["failover"].crash(f.params.get("takeover_s", 8.0)))
 
 
+def _plugin_crash(ctx, f):
+    _start_end(ctx, f, lambda: ctx.services["dispatch_guard"].set_crashed(True),
+               lambda: ctx.services["dispatch_guard"].set_crashed(False))
+
+
 _HANDLERS = {
     "fault": _car_fault, "link_loss": _link_loss, "disconnect": _link_loss,
     "acs_outage": _acs_outage, "fire_alarm": _fire_alarm, "mains_loss": _mains_loss,
     "overload_burst": _overload_burst, "camera_event": _camera_event,
     "alarm_button": _alarm_button, "db_outage": _db_outage, "ems_crash": _ems_crash,
+    "plugin_crash": _plugin_crash,
 }
