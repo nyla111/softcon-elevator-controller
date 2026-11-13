@@ -36,69 +36,59 @@ scripts/       create_issues.sh + requirements.csv
 
 ## System Architecture
 
-The Elevator Management System (EMS) is implemented as a single Python application with an event-driven architecture. Its components communicate through shared contracts and an in-process event bus, while a simulated clock coordinates time-dependent operations.
+The Elevator Management System (EMS) coordinates passenger requests, elevator dispatching, access control, priority handling, and safety operations across the building. It connects user interfaces and building devices through a centralized application architecture, with monitoring and event handling across all subsystems.
 
 ```mermaid
 flowchart TB
-    subgraph UI["User Interface"]
-        Dashboard["Dashboard"]
-        Building["Building Simulation"]
-        Runner["Scenario Runner"]
-        Panel["Control Panel"]
-    end
+    Users["Passengers · Visitors · Administrators"]
+    Devices["Building Systems<br/>Elevator Controllers · Sensors · ACS · Fire Panel · Cameras"]
 
-    subgraph APP["EMS Application"]
-        Web["FastAPI Web Server"]
-        Core["Core<br/>Event Bus · Simulated Clock · App Wiring"]
+    subgraph EMS["Elevator Management System"]
+        UI["User Interfaces<br/>Dashboard · Floor Panels · Admin Panel"]
 
-        subgraph PARTS["EMS Subsystems"]
-            Sim["Part 1: Simulator"]
-            Dispatch["Part 2: Dispatch"]
-            Access["Part 3: Access Control"]
-            Safety["Part 4: Safety"]
-            Priority["Part 5: Priority Management"]
-            Monitor["Part 6: Monitoring"]
+        subgraph CORE["Core Application"]
+            EventBus["Event Bus & Shared Contracts"]
+            Access["Access Control"]
+            Priority["Priority Management"]
+            Dispatch["Elevator Dispatch"]
+            Safety["Safety & Emergency Management"]
+            Monitor["Monitoring & Administration"]
         end
 
-        Contracts["Shared Contracts<br/>Types · Events · Interfaces · Configuration"]
+        UI <--> EventBus
+
+        EventBus <--> Access
+        EventBus <--> Priority
+        EventBus <--> Dispatch
+        EventBus <--> Safety
+        EventBus <--> Monitor
+
+        Access --> Dispatch
+        Priority --> Dispatch
+        Safety --> Dispatch
     end
 
-    subgraph ENV["Simulated Building Environment"]
-        Cars["Elevator Cars"]
-        Traffic["Passenger Traffic"]
-        Devices["Building Devices<br/>ACS · Fire Panel · Power · Cameras"]
-        Faults["Fault Injection"]
-    end
+    Devices <--> EventBus
+    Dispatch <--> Devices
+    Safety <--> Devices
+    Monitor <--> Devices
 
-    Dashboard --> Web
-    Building --> Web
-    Runner --> Web
-    Panel --> Web
-
-    Web --> Core
-    Core <--> PARTS
-    PARTS <--> Contracts
-
-    Sim <--> Cars
-    Sim <--> Traffic
-    Sim <--> Devices
-    Sim <--> Faults
-
-    Core <--> Sim
+    Users <--> UI
 ```
 
-### Component Overview
+### Main Subsystems
 
-| Component | Responsibility |
+| Subsystem | Main Responsibility |
 |---|---|
-| **Core** | Provides the event bus, simulated clock, application context, and component wiring. |
-| **Part 1 - Simulator** | Simulates elevator movement, passenger traffic, building devices, and injected faults. |
-| **Part 2 - Dispatch** | Responsible for elevator assignment, scheduling, and dispatch modes. |
-| **Part 3 - Access Control** | Handles access permissions, passenger authentication, and control panels. |
-| **Part 4 - Safety** | Handles fire alarms, emergency procedures, and safety-related events. |
-| **Part 5 - Priority Management** | Manages VIP, accessibility, and service-car priorities. |
-| **Part 6 - Monitoring** | Provides system monitoring, dashboards, camera events, and administrative functions. |
-| **Web Interface** | Exposes the EMS through the dashboard, building simulation, control panel, and scenario runner. |
+| **Access Control** | Validates passenger permissions and restricts access to authorized floors and areas. |
+| **Priority Management** | Handles VIP, accessibility, and service-car requests according to priority rules. |
+| **Elevator Dispatch** | Assigns elevator cars, schedules stops, and coordinates passenger transportation. |
+| **Safety Management** | Handles emergency conditions, safety constraints, and emergency operating procedures. |
+| **Monitoring & Administration** | Tracks system status, elevator activity, building events, and operational information. |
+| **Core Application** | Provides shared contracts, event communication, application coordination, and system-wide integration. |
+
+The EMS interacts with elevator controllers and other building systems to execute commands and receive operational events. Its subsystems cooperate to provide coordinated elevator services under normal operation and exceptional conditions.
+
 
 
 
