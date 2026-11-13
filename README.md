@@ -33,6 +33,75 @@ docs/          contract, scope note for Team 3
 scripts/       create_issues.sh + requirements.csv
 ```
 
+
+## System Architecture
+
+The Elevator Management System (EMS) is implemented as a single Python application with an event-driven architecture. Its components communicate through shared contracts and an in-process event bus, while a simulated clock coordinates time-dependent operations.
+
+```mermaid
+flowchart TB
+    subgraph UI["User Interface"]
+        Dashboard["Dashboard"]
+        Building["Building Simulation"]
+        Runner["Scenario Runner"]
+        Panel["Control Panel"]
+    end
+
+    subgraph APP["EMS Application"]
+        Web["FastAPI Web Server"]
+        Core["Core<br/>Event Bus · Simulated Clock · App Wiring"]
+
+        subgraph PARTS["EMS Subsystems"]
+            Sim["Part 1: Simulator"]
+            Dispatch["Part 2: Dispatch"]
+            Access["Part 3: Access Control"]
+            Safety["Part 4: Safety"]
+            Priority["Part 5: Priority Management"]
+            Monitor["Part 6: Monitoring"]
+        end
+
+        Contracts["Shared Contracts<br/>Types · Events · Interfaces · Configuration"]
+    end
+
+    subgraph ENV["Simulated Building Environment"]
+        Cars["Elevator Cars"]
+        Traffic["Passenger Traffic"]
+        Devices["Building Devices<br/>ACS · Fire Panel · Power · Cameras"]
+        Faults["Fault Injection"]
+    end
+
+    Dashboard --> Web
+    Building --> Web
+    Runner --> Web
+    Panel --> Web
+
+    Web --> Core
+    Core <--> PARTS
+    PARTS <--> Contracts
+
+    Sim <--> Cars
+    Sim <--> Traffic
+    Sim <--> Devices
+    Sim <--> Faults
+
+    Core <--> Sim
+```
+
+### Component Overview
+
+| Component | Responsibility |
+|---|---|
+| **Core** | Provides the event bus, simulated clock, application context, and component wiring. |
+| **Part 1 - Simulator** | Simulates elevator movement, passenger traffic, building devices, and injected faults. |
+| **Part 2 - Dispatch** | Responsible for elevator assignment, scheduling, and dispatch modes. |
+| **Part 3 - Access Control** | Handles access permissions, passenger authentication, and control panels. |
+| **Part 4 - Safety** | Handles fire alarms, emergency procedures, and safety-related events. |
+| **Part 5 - Priority Management** | Manages VIP, accessibility, and service-car priorities. |
+| **Part 6 - Monitoring** | Provides system monitoring, dashboards, camera events, and administrative functions. |
+| **Web Interface** | Exposes the EMS through the dashboard, building simulation, control panel, and scenario runner. |
+
+
+
 ## Workflow
 1. Pick an issue assigned to you (one issue = one requirement ID).
 2. Branch from `main`: `part<N>/<short-name>`, e.g. `part5/vip-caps`.
