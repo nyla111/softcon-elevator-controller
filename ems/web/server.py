@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from ems.contracts.events import AlertRaised, CarStatusUpdated
 from ems.core.app import build
+from ems.monitor.router import bind_context as bind_monitor_context, router as monitor_router
 from ems.sim import live, scenarios
 
 STATIC = Path(__file__).parent / "static"
@@ -39,6 +40,8 @@ app.state.lock = threading.RLock()
 app.state.build_lock = threading.Lock()     # one snapshot build at a time
 app.state.snapshot = None                   # ((ctx, t, events), pre-serialised JSON)
 app.state.live = None                     # {"profile", "rate", "seed"} after /api/live/start
+bind_monitor_context(lambda: app.state.ctx)
+app.include_router(monitor_router)
 
 
 # ---------------------------------------------------------------- state

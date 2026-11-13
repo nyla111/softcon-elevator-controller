@@ -108,9 +108,25 @@ def test_run_sim_09_one_seed(client):
 
 
 def test_pages_are_served(client):
-    for path in ("/", "/building/", "/runner/"):
+    for path in ("/", "/building/", "/runner/", "/dashboard/"):
         assert client.get(path).status_code == 200
     assert "tower" in client.get("/building/").text and "SIM-" not in client.get("/runner/").text
+    assert "Live cars" in client.get("/dashboard/").text
+
+
+def test_monitor_role_permissions_and_audit(client):
+    owner = {"X-Role": "owner", "X-User": "owner-1"}
+    security = {"X-Role": "security", "X-User": "guard-1"}
+    assert client.get("/api/monitor/report", headers=owner).status_code == 200
+    assert client.get("/api/monitor/incidents", headers=owner).status_code == 403
+    assert client.get("/api/monitor/incidents", headers=security).status_code == 200
+    r = client.put("/api/monitor/configuration/public_floors", json={"value": [1, 2]},
+                   headers={"X-Role": "facility_manager", "X-User": "fm-1"})
+    assert r.status_code == 200 and r.json()["old"] == [1]
+    assert client.put("/api/monitor/configuration/public_floors", json={"value": [1]},
+                      headers=owner).status_code == 403
+    audit = client.get("/api/monitor/audit", headers=owner).json()
+    assert audit[-1]["user"] == "fm-1" and audit[-1]["old"] == [1]
 
 
 def test_scenarios_list_has_runs_with_start_times(client):
