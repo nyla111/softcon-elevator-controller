@@ -112,3 +112,36 @@ def test_vip_call_is_not_lost_when_its_car_is_taken_for_medical_before_boarding(
     ctx.clock.run_until(600)
     vip = sim.passengers["VIP1"]
     assert vip.alighted_at is not None and vip.destination == 1 and not vip.evacuated
+
+
+def test_send_to_lobby_on_the_real_simulator_keeps_riders_and_their_destinations():
+    """FR-128 end to end on Part 1's simulator: a car with riders goes to the lobby with its
+    doors held; riders are not counted as delivered there; after security finishes, every
+    rider reaches their own floor."""
+    from ems.contracts.events import DoorsOpened, PassengerAlighted
+    ctx = build(seed=3)
+    install_scenario_standins(ctx)
+    sim, p = ctx.services["controllers"], ctx.services["priority"]
+    TrafficGenerator.fixed(ctx, PROFILES["up_peak"], 0.0, 900.0).start()
+    car = None
+    while car is None:
+        ctx.clock.run_until(ctx.clock.now() + 1)
+        car = next((c for c in sim.cars.values() if c.group == "HIGH" and len(c.riders) >= 3
+                    and c.floor >= 20 and c.car_id not in p.holds), None)
+    riders = [r.passenger_id for r in car.riders]
+    t0 = ctx.clock.now()
+    out = p.send_to_lobby("staff-security-1", car.car_id)
+    assert out.ok
+    ctx.clock.run_until(t0 + 200)
+    lobby = [e for e in ctx.bus.of_type(DoorsOpened) if e.car_id == car.car_id and e.t > t0
+             and e.floor == 1]
+    assert lobby and car.doors.name == "OPEN" and car.held          # doors held at L1
+    early = [e for e in ctx.bus.of_type(PassengerAlighted) if e.call_id in riders
+             and e.t > t0 and e.floor != sim.passengers[e.call_id].destination]
+    assert not early                                                 # nobody dropped at L1
+    assert p.finish_trip("staff-security-1", out.ref).reason == "ok"
+    ctx.clock.run_until(t0 + 1200)
+    for rid in riders:
+        r = sim.passengers[rid]
+        assert r.alighted_at is not None and not r.evacuated, rid
+    assert p.holds == {} and not car.closed_to_new_calls
