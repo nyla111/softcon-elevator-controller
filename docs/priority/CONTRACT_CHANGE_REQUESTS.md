@@ -2,7 +2,8 @@
 
 Part 5 did not edit `ems/contracts/` or `ems/core/`. These are the changes Part 5 needs from
 the tech lead (contract) or from another part. Each one says what is blocked today and what
-Part 5 does meanwhile. Status: proposed (2026-11-14), base `8b4afdc`. Issues #9-#12 opened for the four blockers;
+Part 5 does meanwhile. Status: proposed (2026-11-14), base `8b4afdc`; no answer on the issues yet. The full
+handshake for CCR-01 (semantics, failure handling, example) is in INTEGRATION.md section 4. Issues #9-#12 opened for the four blockers;
 CCR-03 is not a blocker and has no issue.
 
 | ID | Blocks | Owner | Kind |
@@ -30,7 +31,10 @@ class PriorityService(Protocol):             # Part 5, ctx.services["priority"]
     def claim_call(self, call: Call) -> Optional[CarId]:
         """VIP calls: Part 5 starts an exclusive trip and returns its car; Part 2 then
         publishes CallAssigned(call, car) without register_stop. None = serve normally.
-        Idempotent per call_id."""
+        Idempotent per call_id. During the call Part 5 asks would_breach_ceiling_without(car)
+        and, for a car with waiting calls, reassign_calls_of(car) and relies on the RETURNED
+        list (calls not moved -> that car is not used). If the trip ends before boarding,
+        Part 5 registers the pick-up stop on the same car."""
     def rank(self, call: Call) -> int: ...          # BR-10 / FR-76, lower = first
     def car_ok_for(self, call: Call, status: CarStatus) -> bool: ...   # FR-08 free capacity
     def door_dwell_s(self, call: Call) -> float: ...                   # FR-08 (with CCR-02)

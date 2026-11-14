@@ -1,49 +1,49 @@
 # Part 5 requirement traceability
 
-Base: `origin/main` @ `8b4afdc` (2026-11-14). Sources in the repo: `scripts/requirements.csv`
+Base: `origin/main` @ `8b4afdc` (re-checked 2026-11-14). Sources in the repo: `scripts/requirements.csv`
 (one-line titles), `docs/CONTRACT.md` (+ changelog), `docs/DECISIONS.md`,
 `ems/contracts/config.py` (FR-33 600 s, FR-71 30 s, FR-72 6/h), `ems/contracts/interfaces.py`
 docstrings, and the Appendix B texts copied into `ems/sim/scenarios.py`. **The SRS v0.13 body and
 Appendix B are not in the repo and were not provided**: behaviour beyond those sources is marked
 "assumption" and listed as an open question (section 3). No threshold or limit value was invented.
 
-Status words: **Unit** = verified with protocol doubles (`tests/priority/`); **Sim** = verified
-against Part 1's real simulator with Part 5 stand-ins for Part 2/3/4; **Blocked** = needs a part or
-contract change that does not exist yet; **Partial** = only the specified part is built.
-No requirement is "integration verified with real Part 2/3/4 services": those parts are stubs.
+Status words (per requirement, Part 5's share):
+**Complete** = built and verified by Part 5 tests (unit with doubles and/or the real simulator);
+**Partial** = only the specified part is built (spec gap); **Blocked** = an owner outside Part 5
+must act (dependency or contract); **Not verified** = built but no test with the real dependency
+is possible yet. Integration with real Part 2/3/4 services is **not verified for any
+requirement** (they are stubs on main).
 
 ## 1. Matrix
 
-| Req | Source | Behaviour built | Owner | Depends on | Code | Test | Status / blocker |
+| Req | Source | Behaviour built | Owner | Depends on | Code | Test | Status |
 |---|---|---|---|---|---|---|---|
-| FR-08 | csv; SIM-11 text; config `accessible_dwell_s` | rank 2; `car_ok_for` free places >= party size; `door_dwell_s` = 10 s; one voice `PanelMessage` (EN+VI) per accessible assignment / re-assignment | P5 policy; P2 applies | P2 (CCR-01), door command (CCR-02) | `policy.py`, `service.py` (`_announce`, `car_ok_for`) | `test_policy`, `test_medical::test_accessible_voice...`, SIM-11 | Unit + Sim. **Blocked**: EMS door-time request (CCR-02); dispatch ordering/filter in real P2 (CCR-01). 10 s doors observed are the simulated controller's own rule |
-| FR-30 | csv | `AlertRaised(high,"fault",["contractor","fm"])` once per fault episode; info on clear | P5 | P1 `ControllerFault` | `maintenance.py` | `test_maintenance`, SIM-06 | Unit + Sim |
-| FR-31 | csv | counters from telemetry (door cycles, floors travelled, starts); reminder once per FM/technician threshold; reset at maintenance exit | P5 | thresholds: **spec gap** | `maintenance.py` | `test_maintenance` | Unit. **Partial**: no default thresholds (none in sources, Q5) |
-| FR-32 | csv | technician (role from Access) enters/exits `MAINTENANCE`; close/re-open to new calls; reassign request; faulted car: state only | P5 | P3 roles (CCR-05), P4 states, P2 reassign | `maintenance.py` | `test_maintenance`, SIM-06 | Unit + Sim (staff card double) |
-| FR-33 | csv; config 600 s | Rush (P2 mode) + another car of the group out -> FM approval, 600 s simulated timeout, late approval refused, deny | P5 | P2 `current_mode` | `maintenance.py` | `test_maintenance`, SIM-06 | Unit + Sim (mode from schedule double) |
-| FR-36 | csv; `would_breach_ceiling_without` docstring | independent-service period = goods move on a passenger car: not in a Rush block (schedule) nor Rush at start (P2 mode), ceiling check at start | P5 | P2 | `goods.py` | `test_goods` | Unit. Assumption: Rush rule only for passenger cars (Q4) |
-| FR-70 | csv | FM per-credential daily quota of exclusive trips, revoke; VIP role itself from ACS / P3 call priority | P5 | P3 | `service.py` | `test_vip::test_fr70...` | Unit. **Partial**: quota meaning not specified (Q1) |
-| FR-71 | csv; config 30 s | empty car with ETA <= 30 s first (fastest), else fastest; refused / breaching cars skipped | P5 | P2 must assign the call to that car (CCR-01) | `policy.vip_candidates`, `service._start_vip` | `test_policy`, `test_vip`, SIM-12 | Unit + Sim |
-| FR-72 | csv; config 6/h | 1 exclusive car per group (any kind); 6 starts per rolling hour `(t-3600, t]`, counted only after a successful start; ceiling check before each start; trip ends on delivery / cancel / re-assign / not boarded in one door cycle / fault / emergency / medical | P5 | P2 `would_breach_ceiling_without` (stub answers False) | `service.py` | `test_vip`, SIM-12 | Unit + Sim. Ceiling answers are stub (**Blocked** on P2). Assumption: 6/h building-wide (Q2) |
-| FR-76 | csv; BR-10 | `rank`, `order` (priority, then created_at) | P5 policy; P2 applies | P2 (CCR-01) | `policy.py` | `test_policy`, SIM-11 (blocked criterion) | Unit. **Blocked** in dispatch |
-| FR-80 | csv | FM shows limits (values given by FM / P6 config) on service-car displays, again at move start | P5 text; P6 values | values: **spec gap** | `goods.py` | `test_goods` | Unit. Values not defined by Part 5 (Q6) |
-| FR-81 | csv | tenant admin request (tenant from Access), window/overlap/credential checks, FM approve/reject, cancel, start/end on the clock | P5 | P3 roles (CCR-05) | `goods.py` | `test_goods`, demo | Unit + demo |
-| FR-82 | csv; `GoodsMoveScheduled` | `GoodsMoveScheduled.credential_ids`; `service_car_accepts()` during the active move | P5 data; **P3 enforces** | P3; CCR-04 for early end | `goods.py` | `test_goods`, demo | Unit. Enforcement at panels is P3's |
-| FR-127 | csv; SIM-18 text | security request; fastest healthy car (empty first); VIP trips of the served groups yield (VIP rider keeps going to their floor); doors held at origin; depart; finish; re-dispatch if the car is lost before pick-up | P5 | P4 state (CCR-03) | `service.py` | `test_medical`, SIM-18 | Unit + Sim |
-| FR-128 | csv | security sends a car to the lobby, doors held, riders keep their destinations, finish returns it | P5 | P6 camera alert reviewed by security | `service.py` | `test_medical` | Unit. Not auto-started by camera events (Q7) |
-| FR-04 | csv (Part 2) | not built by P5; P5 calls `reassign_calls_of` | **P2** | - | - | SIM-06 criterion | **Blocked** (P2 stub) |
-| FR-84 | csv (Part 6) | not built by P5 (P6 already voices the redirect) | **P6** | - | - | - | out of scope |
+| FR-08 | csv; SIM-11 text; config `accessible_dwell_s` | rank 2; `car_ok_for` = room when the car opens at the floor (riders who stay + assigned calls); door time 10 s (`door_dwell_s`); one voice `PanelMessage` (EN+VI) per assignment / re-assignment; VIP never takes a car an accessible passenger waits for | P5 policy; P2 applies | P2 (#9), door command (#10) | `policy.py`, `service.py` | `test_policy`, `test_vip::test_fr08_capacity...`, `test_medical::test_accessible_voice...`, SIM-11 (capacity, first-opening boarding, voice) | Complete (Part 5 policy, sim-verified 10/10 seeds); **Blocked**: EMS door request (#10), use in real dispatch (#9). The 10 s doors observed are the simulated controller's rule |
+| FR-30 | csv | `AlertRaised(high,"fault",["contractor","fm"])` once per fault episode; info on clear | P5 | P1 events | `maintenance.py` | `test_maintenance`, SIM-06 | Complete |
+| FR-31 | csv | counters from telemetry (door cycles, floors travelled, starts); one reminder per threshold; reset at maintenance exit | P5 | thresholds: spec gap | `maintenance.py` | `test_maintenance` | Partial (no thresholds in sources, Q5); unit only |
+| FR-32 | csv | technician (role from Access) in / out of `MAINTENANCE`; close / re-open; faulted car: state only; exit never overrides a Safety state | P5 | P3 roles (#12), P4 | `maintenance.py` | `test_maintenance`, SIM-06 | Complete on Part 5's side; Not verified with real Access / Safety |
+| FR-33 | csv; config 600 s | Rush (P2 mode) + another car of the group out -> FM approval; 600 s timeout; late approval and deny refused; approval revalidated against the car's current state | P5 | P2 `current_mode` | `maintenance.py` | `test_maintenance`, SIM-06 (approve, deny, timeout; 10/10 seeds) | Complete (Rush from the schedule double); Not verified with real Part 2 modes |
+| FR-36 | csv; interfaces docstring | independent-service period = goods move on a passenger car: no Rush block, not Rush at start, ceiling check at start | P5 | P2 | `goods.py` | `test_goods` | Partial (assumption Q4); unit only |
+| FR-70 | csv | FM per-credential daily quota of exclusive trips, revoke; VIP role from P3's call priority | P5 | P3 | `service.py` | `test_vip::test_fr70...` | Partial (quota meaning, Q1) |
+| FR-71 | csv; config 30 s | empty car (no rider, no waiting call) with ETA <= 30 s first, else fastest; skips refused / breaching / not-movable cars | P5 | P2 caller (#9) | `policy.vip_candidates`, `service._start_vip` | `test_policy`, `test_vip`, SIM-12 | Complete on Part 5's side (stand-in caller); **Blocked**: no real caller |
+| FR-72 | csv; config 6/h | 1 exclusive car per group (any kind); 6 starts per rolling hour `(t-3600, t]`, counted after a successful start; ceiling check; exclusivity requires waiting calls moved; cleanup on every trip end | P5 | P2 ceiling answer, `reassign_calls_of` | `service.py` | `test_vip`, SIM-12 (caps exercised and justified, no other boarding; 10/10 seeds) | Complete on Part 5's side; ceiling answers **Not verified** (stub), assumption 6/h per building (Q2) |
+| FR-76 | csv; BR-10 | `rank` / `order`; Part 5 applies medical > VIP and accessible > VIP in its own car choices | P5 policy; P2 applies | P2 (#9) | `policy.py`, `service.py` | `test_policy`, SIM-11, SIM-18 | Partial: **Blocked** in dispatch ordering (P2) |
+| FR-80 | csv | FM shows limits (FM / P6 values) on service-car displays, again at move start | P5 text; P6 values | values: spec gap | `goods.py` | `test_goods`, demo | Partial (values, Q6) |
+| FR-81 | csv | tenant admin request, window / overlap / credential checks, FM approve / reject, cancel, start / end on the clock with epoch guards | P5 | P3 roles (#12) | `goods.py` | `test_goods`, demo | Complete on Part 5's side; Not verified with real Access |
+| FR-82 | csv; `GoodsMoveScheduled` | `GoodsMoveScheduled.credential_ids`; `service_car_accepts()` for the active move only | P5 data; P3 enforces | P3; #11 | `goods.py` | `test_goods`, demo | Part 5 data complete; **Blocked**: enforcement (P3), early end event (#11) |
+| FR-127 | csv; SIM-18 text | security request; fastest healthy car (empty, nobody waiting at that floor, first); VIP trips of the served groups yield; boarded VIP keeps going; unboarded VIP call kept (pick-up re-registered); doors held at origin; depart; finish; re-dispatch if the car is lost before pick-up | P5 | P4 state (CCR-03) | `service.py` | `test_medical`, `test_with_simulator`, SIM-18 (10/10 seeds, event order) | Complete on Part 5's side; Not verified with real Safety |
+| FR-128 | csv | security sends a car to the lobby, doors held, riders keep their destinations, finish returns it | P5 | P6 alert reviewed by security | `service.py` | `test_medical`, `test_with_simulator::test_send_to_lobby_on_the_real_simulator...` | Complete on Part 5's side (workflow assumptions Q7) |
+| FR-04 | csv (Part 2) | not built by P5; P5 calls `reassign_calls_of` and uses the answer | **P2** | - | - | SIM-06 criterion | Blocked (P2) |
+| FR-84 | csv (Part 6) | not built by P5 | **P6** | - | - | - | out of scope |
 
-## 2. Scenarios owned by Part 5
+## 2. Scenarios owned by Part 5 (seeds 1-10, details in VERIFICATION.md)
 
-| Scenario | Part 5 criteria (seeds 1-10) | Not Part 5 / blocked | Result |
+| Scenario | Part 5 criteria | Failing (owner) | Result |
 |---|---|---|---|
-| SIM-06 | all pass | FR-04 re-assignment (P2), degraded marking (P6 on P2's event), integration | FAIL (blocked) |
-| SIM-11 | all pass | EMS door request (CCR-02), dispatch order (P2), Rush wait targets (stand-in dispatcher misses them), integration | FAIL |
-| SIM-12 | all pass | ordinary calls <= 60 s (stand-in dispatcher), integration | FAIL |
-| SIM-18 | all pass | integration | FAIL (blocked) |
-
-Per-seed numbers: `VERIFICATION.md`.
+| SIM-06 | all pass, 10/10 | FR-04 re-assignment (Nam); degraded marking (Nam, rule Mai); integration | FAIL 10/10 |
+| SIM-11 | all pass, 10/10 | EMS door request (#10, Nhi); dispatch order (Nam); Rush wait targets (Nam; fails without Part 5 too); integration | FAIL 10/10 |
+| SIM-12 | all pass, 10/10 | ordinary calls <= 60 s (Nam; fails without Part 5 too); integration | FAIL 10/10 |
+| SIM-18 | all pass, 10/10 | integration | FAIL 10/10 |
 
 ## 3. Open questions (need Minh / Nhi / Team 3)
 
@@ -62,5 +62,6 @@ Per-seed numbers: `VERIFICATION.md`.
 9. FR-33: which cars count as "out" (built: faulted, disconnected, MAINTENANCE,
    INDEPENDENT_SERVICE, FIRE_RECALL, EMERGENCY_POWER, and Part 5 maintenance / goods holds)?
 10. VIP not on board one full door cycle after the car opened at their floor (car full or VIP
-    absent): built as "exclusive hold ends, the call stays with Part 2" (FR-122 analogy).
+    absent): built as "exclusive hold ends; the pick-up stays on the same car as an ordinary
+    stop" (FR-122 analogy). Should Part 2 re-assign instead?
 11. Medical: is "patient on board" confirmed by security (built) or by another signal?
