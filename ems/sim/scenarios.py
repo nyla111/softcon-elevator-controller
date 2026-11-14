@@ -45,6 +45,8 @@ from .faults import Fault, ems_server_crash, fire_alarm, link_loss, measured, pl
 from .harness import CLEAR_S, MEASURE_S, WARMUP_S, RunResult, run
 from .traffic import PROFILES, SRS_ORIGINAL_PEAK_RATE, with_rate
 
+from ems.priority import acceptance as p5     # Part 5 setups and checks (SIM-06 11 12 18)
+
 Criteria = list  # of (criterion, passed, detail)
 
 
@@ -222,7 +224,7 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
                                "(D-01: the carryable peak rate is about 35/min)")]),
     _todo("SIM-05", 'Full weekday on the default schedule', 2, "weekday", 'Each mode meets targets; no one stranded at mode changes', 'FR-11, FR-15', runs=[RunSetup("weekday 24 h", "weekday", mode="weekday", warmup_s=0.0,
                                   measure_s=86400.0)]),
-    _todo("SIM-06", 'Car fault at up-peak, then a second removal requested', 5, "up_peak", 'Waiting calls retained/reassigned; faulted car not moved; second removal needs FM approval; degraded waits logged', 'FR-04, FR-33'),
+    Scenario("SIM-06", 'Car fault at up-peak, then a second removal requested', 5, "up_peak", setup=p5.setup_sim_06, check=p5.check_sim_06, ready=True, srs_criteria='Waiting calls retained/reassigned; faulted car not moved; second removal needs FM approval; degraded waits logged', verifies='FR-04, FR-33'),
     _todo("SIM-07", 'ACS outage for 15 minutes at up-peak', 3, "up_peak", 'Fresh cached permissions used, stale/missing cache restricted to public floors; security alerted; outage waits reported separately', 'FR-49, NFR-SE5, NFR-SE6', notes='ACS outage lasts 15 min (not 5), starting 20 min into the measured window.'),
     _todo("SIM-08", 'Fire alarm at Rush transition with active goods move; optional lockdown variant', 4, "up_peak", 'No controller command after alarm; goods move cancelled; healthy-car recovery requires FM confirmation; isolated cars remain excluded', 'FR-50, FR-55, NFR-SF1', notes='Goods move is enabled before the alarm; the fire alarm is raised at a Rush transition.', runs=[RunSetup("alarm at 17:00 Rush transition", "up_peak", start_hhmm="16:30",
                                    faults=[fire_alarm(measured(20))])]),
@@ -235,8 +237,8 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
         measure_s=DESIGN_MEASURE_S, workload=DESIGN_WORKLOAD,
         envelope_note="SIM-10 checks software latency at the SRS design limits, not passenger "
                       "capacity; 3-year history is not preloaded (D-03)")]),
-    _todo("SIM-11", 'Accessible calls mixed into up-peak', 5, "up_peak", 'Priority below medical and above VIP; free assigned capacity; >=10 s door request; voice feedback; mode wait targets hold', 'FR-08, BR-10'),
-    _todo("SIM-12", 'Ten VIP calls during up-peak in one group', 5, "up_peak", 'At most one exclusive car; at most six exclusive starts per rolling hour; other calls remain within 60 s normal-service ceiling', 'FR-71, FR-72, FR-76', notes='Ten ordinary arrivals in one group are replaced by VIP arrivals at minutes 20-29.'),
+    Scenario("SIM-11", 'Accessible calls mixed into up-peak', 5, "up_peak", setup=p5.setup_sim_11, check=p5.check_sim_11, ready=True, srs_criteria='Priority below medical and above VIP; free assigned capacity; >=10 s door request; voice feedback; mode wait targets hold', verifies='FR-08, BR-10'),
+    Scenario("SIM-12", 'Ten VIP calls during up-peak in one group', 5, "up_peak", setup=p5.setup_sim_12, check=p5.check_sim_12, ready=True, srs_criteria='At most one exclusive car; at most six exclusive starts per rolling hour; other calls remain within 60 s normal-service ceiling', verifies='FR-71, FR-72, FR-76', notes='Ten ordinary arrivals in one group are replaced by VIP arrivals at minutes 20-29.'),
     _todo("SIM-13", 'Overload bursts at the lobby, and a bulky item boarded twice', 4, "up_peak", 'Step-out message within 1 s; calls re-assigned; bulky item flagged', 'FR-100, FR-84', notes='Three overloads within 5 min, plus bulky-item and crowd-only camera events.'),
     _todo("SIM-14", 'Total power loss with a failed generator; one rescue device fails', 4, "up_peak", 'Entrapment alert for that car within 60 s; resume only after 2 min stable mains and FM confirmation', 'FR-110, FR-111', notes='Mains lost at minute 20, with one rescue-device report missing.'),
     _todo("SIM-15", 'Brake fault with passengers between floors at up-peak', 4, "up_peak", 'Entrapment alert within 10 s; calls re-assigned; no EMS command to the car', 'FR-112, NFR-R4'),
@@ -245,7 +247,7 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
         setup=install_dispatch_standin, check=check_sim_16, ready=True,
         srs_criteria='Car marked Disconnected in 3 s; fallback rule assigns all calls', verifies='FR-104, FR-105'),
     _todo("SIM-17", 'Conditional: duplicate/uncertain calls and 20 card actions', 4, "balanced", 'Only proven duplicates/cancelled calls removed; uncertain calls retained; sixth ordinary action starts limit; exits and assistance exempt', 'FR-120, FR-121, FR-125, BR-07'),
-    _todo("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "up_peak", 'VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', 'FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
+    Scenario("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "up_peak", setup=p5.setup_sim_18, check=p5.check_sim_18, ready=True, srs_criteria='VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', verifies='FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
 ]}
 
 

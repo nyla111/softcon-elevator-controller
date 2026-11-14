@@ -15,8 +15,9 @@ def test_all_18_scenarios_with_the_right_owner_part():
 
 
 def test_only_sim_09_and_16_are_ready():
+    # Part 5 added its checks for SIM-06, 11, 12 and 18 (ems/priority/acceptance.py)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
-    assert ready == ["SIM-09", "SIM-16"]
+    assert ready == ["SIM-06", "SIM-09", "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
     for s in SCENARIOS.values():
         if not s.ready:
             assert s.check is None and s.waiting_for == f"Part {s.owner_part} check"
