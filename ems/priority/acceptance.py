@@ -411,7 +411,9 @@ def check_sim_12(result, ctx) -> list:
 
 
 # ================================================================ SIM-18 (FR-127, BR-10)
-SIM18_AFTER = measured(20)
+# Appendix B note: "Medical priority starts after the VIP has boarded" (this replaces the default
+# "20 minutes into the measured window"): the first exclusive VIP boarding of the measured window.
+SIM18_AFTER = measured(0)
 SIM18_HANDLING_S = 30.0          # operator time to load / hand over the patient (scenario choice)
 
 
@@ -456,8 +458,8 @@ def check_sim_18(result, ctx) -> list:
     bus, sim, p, log = ctx.bus, ctx.services["controllers"], _service(ctx), _log(ctx)
     vb, med = log.get("vip_boarded"), _action(ctx, "medical")
     if vb is None or med is None:
-        return [("an occupied VIP trip exists after minute 20 to start the medical trip",
-                 False, "no exclusive VIP boarding after minute 20 in this run"),
+        return [("an occupied VIP trip exists in the measured window to start the medical trip",
+                 False, "no exclusive VIP boarding in the measured window of this run"),
                 _cleared(result), _integration(ctx)]
     t_board, vip_call, vip_car, vip_trip = vb
     t_med, _, outcome = med
