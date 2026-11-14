@@ -54,17 +54,23 @@ def eta_s(status: CarStatus, floor: Floor) -> float:
     return eta
 
 
-def vip_candidates(statuses: Iterable[CarStatus], origin: Floor) -> list[CarStatus]:
-    """FR-71 preference order. First: empty cars with ETA <= VIP_EMPTY_CAR_ETA_S (fastest
-    first); then every other car, fastest first. The caller tries them in this order and
-    skips the ones that fail the FR-72 ceiling check or are refused."""
+def vip_candidates(statuses: Iterable[CarStatus], origin: Floor,
+                   busy: frozenset | set = frozenset()) -> list[CarStatus]:
+    """FR-71 preference order. First: empty cars (no rider and no call waiting for them, `busy`
+    = cars with assigned calls not yet on board) with ETA <= VIP_EMPTY_CAR_ETA_S, fastest first;
+    then every other car, fastest first. The 30 s is a selection rule on the estimated arrival
+    time, not a wait. The caller tries them in this order and skips the ones that fail the
+    FR-72 ceiling check or are refused."""
     cars = sorted(statuses, key=lambda s: (eta_s(s, origin), s.car_id))
-    empty_fast = [s for s in cars
-                  if s.passengers == 0 and eta_s(s, origin) <= config.VIP_EMPTY_CAR_ETA_S]
+    empty_fast = [s for s in cars if s.passengers == 0 and s.car_id not in busy
+                  and eta_s(s, origin) <= config.VIP_EMPTY_CAR_ETA_S]
     return empty_fast + [s for s in cars if s not in empty_fast]
 
 
-def medical_candidates(statuses: Iterable[CarStatus], origin: Floor) -> list[CarStatus]:
-    """FR-127: fastest healthy car, cars without riders first (riders are carried along and
-    delivered afterwards, so an empty car is preferred when one exists)."""
-    return sorted(statuses, key=lambda s: (s.passengers > 0, eta_s(s, origin), s.car_id))
+def medical_candidates(statuses: Iterable[CarStatus], origin: Floor,
+                       waiting_here: frozenset | set = frozenset()) -> list[CarStatus]:
+    """FR-127: fastest healthy car; cars without riders first (riders are carried along and
+    delivered afterwards), then cars nobody is waiting for at the medical floor (they would
+    board while the doors are held for the patient)."""
+    return sorted(statuses, key=lambda s: (s.passengers > 0, s.car_id in waiting_here,
+                                           eta_s(s, origin), s.car_id))

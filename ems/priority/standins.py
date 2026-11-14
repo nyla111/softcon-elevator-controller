@@ -94,12 +94,17 @@ class ScheduleModeDispatcher:
 
 
 class PriorityAwareNearestCar(NearestCar):
-    """Part 1's nearest-car stand-in + the Part 5 hooks Part 2 is asked to call."""
+    """Part 1's nearest-car stand-in + the Part 5 hooks Part 2 is asked to call.
+    claim=False: never ask claim_call (baseline runs without VIP exclusivity)."""
+
+    def __init__(self, ctx, claim: bool = True) -> None:
+        super().__init__(ctx)
+        self.claim = claim
 
     def on_call(self, ev: CallRequested) -> None:
         call: Call = ev.call
         priority = self.ctx.services["priority"]
-        car = priority.claim_call(call)
+        car = priority.claim_call(call) if self.claim else None
         if car is not None:            # Part 5 already sent the car (express): just assign it
             status = self.ctx.services["controllers"].status(car)
             eta = abs(status.position - call.origin) * config.SIM["s_per_floor"]
@@ -159,14 +164,16 @@ class RecordingCarStates:
         return self.inner.safety_active()
 
 
-def install_scenario_standins(ctx, staff: Optional[dict] = None) -> list[str]:
+def install_scenario_standins(ctx, staff: Optional[dict] = None,
+                              vip_exclusive: bool = True) -> list[str]:
     """Install the doubles a Part 5 scenario needs, only where the real part is missing.
     Returns the names of what was installed (also kept in ctx.services['priority_standins'])."""
     installed = []
     if type(ctx.services["dispatcher"]).__name__ == "StubDispatcher":
         ctx.services["dispatcher"] = ScheduleModeDispatcher(ctx, ctx.services["dispatcher"])
-        PriorityAwareNearestCar(ctx)
-        installed += ["ScheduleModeDispatcher", "PriorityAwareNearestCar"]
+        PriorityAwareNearestCar(ctx, claim=vip_exclusive)
+        installed += ["ScheduleModeDispatcher", "PriorityAwareNearestCar"
+                      + ("" if vip_exclusive else "(no claim_call)")]
     ctx.services["priority"].use_authorizer(StaffDirectory(ctx, staff))
     installed.append("StaffDirectory")
     ctx.services["car_states"] = RecordingCarStates(ctx, ctx.services["car_states"])

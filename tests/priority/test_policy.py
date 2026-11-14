@@ -55,3 +55,8 @@ def test_medical_prefers_cars_without_riders_then_fastest():
     order = [s.car_id for s in policy.medical_candidates(
         [_car("A", 1, passengers=3), _car("B", 12), _car("C", 6)], 1)]
     assert order == ["C", "B", "A"]
+
+
+def test_a_car_with_waiting_calls_is_not_empty_for_fr71():
+    order = [s.car_id for s in policy.vip_candidates([_car("A", 2), _car("B", 6)], 1, {"A"})]
+    assert order == ["B", "A"]

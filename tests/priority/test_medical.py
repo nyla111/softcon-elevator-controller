@@ -158,3 +158,31 @@ def test_medical_preempts_vip_of_the_served_group_even_on_the_service_car(env):
     out = env.p.request_medical(SECURITY, 9, 1)               # L9 -> L1: LOW and SERVICE serve it
     assert out.ok and out.car_id == "S"
     assert env.p.finished[-1].end_reason == "medical_preempt"
+
+
+def test_medical_over_unboarded_vip_keeps_the_vip_call(env):
+    """Regression A1 (conversion): the VIP car becomes the medical car before the VIP boards;
+    after the medical trip the car registers the VIP pick-up again."""
+    for c in "FGH":
+        env.controllers.put(c, fault_code="F-1")
+    env.controllers.put("S", fault_code="F-1")
+    vip = env.call(origin=20, destination=1)
+    car = env.p.claim_call(vip)
+    env.publish(CallAssigned(env.now(), vip.call_id, car, 30.0))
+    out = env.p.request_medical(SECURITY, 25, 1)
+    assert out.car_id == car and not env.controllers.sent("register_stop", accepted=None)
+    env.publish(DoorsOpened(env.now(), car, 25))
+    env.p.medical_depart(SECURITY, out.ref)
+    env.publish(DoorsOpened(env.now(), car, 1))
+    env.p.finish_trip(SECURITY, out.ref)
+    assert [x[0] for x in env.controllers.sent(car=car)][-2:] == ["close_to_new_calls",
+                                                                  "register_stop"]
+
+
+def test_medical_prefers_a_car_nobody_waits_for_at_the_medical_floor(env):
+    from ems.contracts.events import CallAssigned as CA, CallRequested as CR
+    waiting = env.call(origin=20, group="HIGH", priority=CallPriority.NORMAL, call_id="w")
+    env.publish(CR(env.now(), waiting))
+    env.publish(CA(env.now(), "w", "E", 3.0))
+    out = env.p.request_medical(SECURITY, 20, 1)
+    assert out.car_id == "F"                             # E would take the waiting person

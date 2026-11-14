@@ -30,7 +30,7 @@ from ems.contracts.types import CallPriority, CarState, DoorState, Mode
 from ems.sim.faults import car_fault, measured, schedule_fault
 from ems.sim.passengers import PassengerState
 
-from .standins import (VipReplacementPopulation, install_scenario_standins,
+from .standins import (StaffDirectory, VipReplacementPopulation, install_scenario_standins,
                        integration_gaps)
 
 RUSH_AVG_S, RUSH_CEILING_S = config.MODE_TARGETS[Mode.RUSH]
@@ -78,16 +78,38 @@ def _measured(result, sim) -> list:
     return [p for p in sim.passengers.values() if a <= p.arrived_at < b]
 
 
-def _waits(people) -> list[float]:
-    return [p.wait_s for p in people if p.wait_s is not None and not p.evacuated]
+def _waits(people, end_t: float) -> list[float]:
+    """Wait of every call: boarding - arrival; a call never picked up counts with
+    end_t - arrival (a lower bound, it is still waiting). Evacuated riders (fire / rescue) are
+    left out as in the harness metrics; cancelled calls have no wait."""
+    out = []
+    for p in people:
+        if p.evacuated or p.state is PassengerState.CANCELLED:
+            continue
+        out.append(p.wait_s if p.wait_s is not None else end_t - p.arrived_at)
+    return out
 
 
-def _wait_summary(waits: list[float]) -> str:
+def _wait_summary(waits: list[float], uncleared: int = 0) -> str:
     if not waits:
-        return "no delivered calls"
+        return "no calls"
     over = sum(1 for w in waits if w > RUSH_CEILING_S)
     return (f"n={len(waits)} avg={sum(waits) / len(waits):.1f} s max={max(waits):.1f} s, "
-            f"{over} over {RUSH_CEILING_S} s")
+            f"{over} over {RUSH_CEILING_S} s, {uncleared} never picked up")
+
+
+def _replay_assignments(ctx):
+    """Yield (event, assigned) in bus order; `assigned` maps call -> car for calls assigned and
+    not yet on board, as it was just BEFORE the event."""
+    assigned: dict[str, str] = {}
+    for e in ctx.bus.log:
+        yield e, assigned
+        if isinstance(e, CallAssigned):
+            assigned[e.call_id] = e.car_id
+        elif isinstance(e, CallReassigned):
+            assigned[e.call_id] = e.to_car
+        elif isinstance(e, (PassengerBoarded, CallCancelled)):
+            assigned.pop(e.call_id, None)
 
 
 def _group_of(ctx, car_id) -> Optional[str]:
@@ -121,6 +143,7 @@ def _max_vip_starts_per_rolling_hour(ctx) -> int:
 SIM06_FAULT_AT, SIM06_FAULT_S, SIM06_CODE = measured(20), 300.0, "F-06"
 SIM06_ASK_EXPIRE, SIM06_ASK_APPROVE = measured(22), measured(23)
 SIM06_APPROVE, SIM06_EXIT, SIM06_LATE = measured(24), measured(29), measured(33)
+SIM06_ASK_DENY, SIM06_DENY = measured(24) + 30.0, measured(24) + 90.0
 
 
 class _Waiting:
@@ -173,6 +196,9 @@ def setup_sim_06(ctx) -> None:
     at(SIM06_APPROVE, lambda: decide("fm approves", "request approve-car"))
     at(SIM06_EXIT, leave)
     at(SIM06_LATE, lambda: decide("fm approves late", "request expire-car"))
+    at(SIM06_ASK_DENY, lambda: ask("request deny-car"))
+    at(SIM06_DENY, lambda: _act(ctx, "fm denies", lambda: m.deny_removal(
+        FM, _action(ctx, "request deny-car")[2].ref)))
 
 
 def check_sim_06(result, ctx) -> list:
@@ -206,8 +232,10 @@ def check_sim_06(result, ctx) -> list:
     gate = (ask_x and ask_a and ask_x[2].reason == ask_a[2].reason == "approval_required")
     fm_alerts = [a for a in bus.of_type(AlertRaised) if a.kind == "removal_approval"]
     out.append(("second removal in Rush waits for FM approval (FM alerted)",
-                bool(gate) and len(fm_alerts) == 2 and all(a.recipients == ["fm"]
-                                                           for a in fm_alerts),
+                bool(gate) and {a.car_id for a in fm_alerts} == {expire_car, approve_car}
+                | ({_action(ctx, "request deny-car")[3]} if _action(ctx, "request deny-car")
+                   else set()) and len(fm_alerts) == len({a.car_id for a in fm_alerts})
+                and all(a.recipients == ["fm"] for a in fm_alerts),
                 f"answers {ask_x and ask_x[2].reason}/{ask_a and ask_a[2].reason}, "
                 f"{len(fm_alerts)} FM alert(s)"))
     expired = [a for a in bus.of_type(AlertRaised)
@@ -226,6 +254,14 @@ def check_sim_06(result, ctx) -> list:
     approve = _action(ctx, "fm approves")
     closed_a = [x for x in mnt if x[1] == approve_car]
     first = closed_a[0][0] if closed_a else None
+    ask_d, deny = _action(ctx, "request deny-car"), _action(ctx, "fm denies")
+    deny_car = ask_d[3] if ask_d else None
+    denied_mnt = [x for x in mnt if x[1] == deny_car]
+    out.append(("denied removal never enters maintenance",
+                ask_d is not None and ask_d[2].reason == "approval_required"
+                and deny is not None and deny[2].reason == "denied" and not denied_mnt,
+                f"car {deny_car}: request {ask_d and ask_d[2].reason}, FM answer "
+                f"{deny and deny[2].reason}, {len(denied_mnt)} MAINTENANCE request(s)"))
     exit_ = _action(ctx, "technician exits")
     out.append(("approved removal enters maintenance only after FM approval, then exits",
                 approve is not None and approve[2].ok and first is not None
@@ -256,10 +292,12 @@ def check_sim_06(result, ctx) -> list:
                 bool(waiting) and len(degraded) == len(waiting),
                 f"{len(degraded)} of {len(waiting)} trip records degraded"
                 + (" (Part 6 marks degraded only on CallReassigned)" if not degraded else "")))
-    affected = [sim.passengers[c].wait_s for c in waiting
-                if sim.passengers[c].wait_s is not None]
-    out.append(("degraded waits reported (affected calls)", True,
-                _wait_summary(affected) if affected else "no affected calls"))
+    affected = _waits([sim.passengers[c] for c in waiting], ctx.clock.now())
+    in_metrics = all(sim.passengers[c].wait_s is not None for c in waiting) and \
+        result.metrics["max_wait_s"] >= max(affected, default=0.0) - 1e-9
+    out.append(("affected calls' long waits stay in the run metrics (not dropped)",
+                bool(waiting) and in_metrics,
+                _wait_summary(affected) + f"; run max wait {result.metrics['max_wait_s']:.1f} s"))
     out.append(_cleared(result))
     out.append(_integration(ctx))
     return out
@@ -268,17 +306,6 @@ def check_sim_06(result, ctx) -> list:
 # ================================================================ SIM-11 (FR-08, BR-10)
 def setup_sim_11(ctx) -> None:
     install_scenario_standins(ctx)
-
-
-def _statuses_at_assignment(ctx) -> dict:
-    """call_id -> CarStatus of the assigned car, as last reported before the assignment."""
-    last, out = {}, {}
-    for e in ctx.bus.log:
-        if isinstance(e, CarStatusUpdated):
-            last[e.status.car_id] = e.status
-        elif isinstance(e, CallAssigned) and e.call_id not in out:
-            out[e.call_id] = last.get(e.car_id)
-    return out
 
 
 def _door_open_s(ctx) -> dict:
@@ -308,13 +335,42 @@ def check_sim_11(result, ctx) -> list:
                 f"{len(assigned & p.announced)} of {len(assigned)} assignments announced, "
                 f"{len(voice)} voice messages"))
 
-    # FR-08 free capacity
-    st = _statuses_at_assignment(ctx)
+    # FR-08 free capacity: riders AND calls already assigned to the car at the same floor
     rated = {c: g.rated_persons for g in ctx.services["building"].groups for c in g.cars}
-    full = [cid for cid in acc if st.get(cid) is not None
-            and rated[st[cid].car_id] - st[cid].passengers < calls[cid].party_size]
-    out.append(("accessible calls assigned to a car with free capacity",
-                bool(st) and not full, f"{len(full)} assigned to a car without room"))
+    last_status, no_room, checked = {}, [], 0
+    first_open, first_cycle, later = {}, set(), []
+    vip_over_acc = []
+    for e, assigned in _replay_assignments(ctx):
+        if isinstance(e, CarStatusUpdated):
+            last_status[e.status.car_id] = e.status
+        elif isinstance(e, CallAssigned) and e.call_id in acc and e.car_id in last_status:
+            call, st = calls[e.call_id], last_status[e.car_id]
+            reserved = sum(calls[c].party_size for c, car in assigned.items()
+                           if car == e.car_id and c in calls and calls[c].origin == call.origin)
+            checked += 1
+            if rated[e.car_id] - st.passengers - reserved < call.party_size:
+                no_room.append(e.call_id)
+        elif isinstance(e, DoorsOpened):
+            for c, car in assigned.items():
+                if c in acc and car == e.car_id and calls[c].origin == e.floor:
+                    if c in first_open:
+                        later.append(c)                   # a second opening: left behind
+                    first_open.setdefault(c, e.t)
+        elif isinstance(e, PassengerBoarded) and e.call_id in acc and e.call_id in first_open \
+                and e.call_id not in later:
+            first_cycle.add(e.call_id)
+        elif isinstance(e, PriorityTripStarted) and e.kind == "vip":
+            vip_over_acc += [c for c, car in assigned.items() if car == e.car_id and c in acc]
+    out.append(("accessible calls assigned to a car with room after riders and calls already "
+                "assigned there", checked > 0 and not no_room,
+                f"{checked} assignments checked, {len(no_room)} without room"))
+    out.append(("every accessible passenger boarded at the first door opening of their car",
+                bool(acc) and first_cycle == acc,
+                f"{len(first_cycle)} of {len(acc)}; {len(set(later))} left behind once"))
+    out.append(("accessible above VIP: no exclusive VIP trip took a car an accessible "
+                "passenger was waiting for", not vip_over_acc,
+                f"{len(vip_over_acc)} case(s); "
+                f"{sum(1 for e in bus.of_type(PriorityTripStarted) if e.kind == 'vip')} VIP trips"))
     boarded = {e.call_id for e in bus.of_type(PassengerBoarded) if e.call_id in acc}
     out.append(("accessible passengers boarded", len(boarded) == len(acc),
                 f"{len(boarded)} of {len(acc)} boarded"))
@@ -342,13 +398,18 @@ def check_sim_11(result, ctx) -> list:
                 if _dispatcher_is_double(ctx) else "real Part 2 dispatcher"))
 
     measured_people = _measured(result, sim)
-    waits = _waits(measured_people)
-    acc_waits = _waits([q for q in measured_people if q.passenger_id in acc])
+    end = ctx.clock.now()
+    waits = _waits(measured_people, end)
+    acc_people = [q for q in measured_people if q.passenger_id in acc]
+    acc_waits = _waits(acc_people, end)
+    open_all = sum(1 for q in measured_people if q.boarded_at is None)
+    open_acc = sum(1 for q in acc_people if q.boarded_at is None)
     avg = sum(waits) / len(waits) if waits else 0.0
     out.append((f"Rush wait targets hold (average <= {RUSH_AVG_S} s, none over "
                 f"{RUSH_CEILING_S} s), every measured call counted",
                 bool(waits) and avg <= RUSH_AVG_S and max(waits) <= RUSH_CEILING_S,
-                f"all: {_wait_summary(waits)}; accessible: {_wait_summary(acc_waits)}"))
+                f"all: {_wait_summary(waits, open_all)}; accessible: "
+                f"{_wait_summary(acc_waits, open_acc)}"))
     out.append(_cleared(result))
     out.append(_integration(ctx))
     return out
@@ -358,8 +419,26 @@ def check_sim_11(result, ctx) -> list:
 SIM12_MINUTES = range(20, 30)
 
 
-def setup_sim_12(ctx) -> None:
-    install_scenario_standins(ctx)
+def setup_sim_12(ctx, vip_exclusive: bool = True) -> None:
+    install_scenario_standins(ctx, vip_exclusive=vip_exclusive)
+    group = ctx.services["building"].passenger_groups[0]
+    windows = [(measured(m), measured(m + 1)) for m in SIM12_MINUTES]
+    ctx.services["population"] = VipReplacementPopulation(
+        ctx, ctx.services["population"], group, windows)
+
+
+def setup_sim_12_baseline(ctx) -> None:
+    """Same seed, same traffic (with the 10 replaced VIPs), same stand-ins; the ONLY difference:
+    the dispatcher stand-in never calls claim_call, so no car is taken for a VIP."""
+    setup_sim_12(ctx, vip_exclusive=False)
+
+
+def setup_sim_12_plain(ctx) -> None:
+    """Evidence only: same traffic (10 replaced VIPs), but Part 1's plain nearest-car stand-in
+    with NO Part 5 hook (no claim_call, no FR-08 capacity filter)."""
+    from ems.sim.baseline import install_dispatch_standin
+    install_dispatch_standin(ctx)
+    ctx.services["priority"].use_authorizer(StaffDirectory(ctx))
     group = ctx.services["building"].passenger_groups[0]
     windows = [(measured(m), measured(m + 1)) for m in SIM12_MINUTES]
     ctx.services["population"] = VipReplacementPopulation(
@@ -387,8 +466,41 @@ def check_sim_12(result, ctx) -> list:
     per_hour = _max_vip_starts_per_rolling_hour(ctx)
     starts = [e for e in bus.of_type(PriorityTripStarted) if e.kind == "vip"]
     out.append(("at most six exclusive VIP starts per rolling hour",
-                per_hour <= config.VIP_MAX_PER_HOUR,
+                bool(starts) and per_hour <= config.VIP_MAX_PER_HOUR,
                 f"max {per_hour} in any hour, {len(starts)} starts in the run"))
+    # the caps were really exercised, and every cap refusal was right at that moment
+    times = [e.t for e in starts]
+    hourly = [d for d in p.decisions if d["reason"] == "hourly_cap"]
+    wrong_hourly = [d for d in hourly
+                    if sum(1 for t in times if d["t"] - 3600.0 < t <= d["t"]) <
+                    config.VIP_MAX_PER_HOUR]
+    excl = [d for d in p.decisions if d["reason"] == "group_exclusive_cap"]
+    active: dict[str, set] = defaultdict(set)
+    busy_at: dict[str, int] = {}
+    for e in bus.log:
+        if isinstance(e, PriorityTripStarted):
+            active[_group_of(ctx, e.car_id)].add(e.car_id)
+        elif isinstance(e, PriorityTripEnded):
+            active[_group_of(ctx, e.car_id)].discard(e.car_id)
+        elif isinstance(e, CallRequested) and e.call.priority is CallPriority.VIP:
+            busy_at[e.call.call_id] = len(active[e.call.group])
+    wrong_excl = [d for d in excl if busy_at.get(d["call_id"], 0) == 0]
+    out.append(("caps exercised and every cap refusal justified at its time",
+                bool(hourly) and not wrong_hourly and not wrong_excl,
+                f"{len(hourly)} hourly_cap refusals ({len(wrong_hourly)} unjustified), "
+                f"{len(excl)} group_exclusive_cap ({len(wrong_excl)} unjustified)"))
+    intruders = []
+    on_trip: set = set()
+    for e in bus.log:
+        if isinstance(e, PriorityTripStarted) and e.kind == "vip":
+            on_trip.add(e.car_id)
+        elif isinstance(e, PriorityTripEnded) and e.kind == "vip":
+            on_trip.discard(e.car_id)
+        elif isinstance(e, PassengerBoarded) and e.car_id in on_trip \
+                and not sim.passengers[e.call_id].vip:
+            intruders.append(e.call_id)
+    out.append(("exclusive: no other passenger boards a car during its VIP trip",
+                bool(starts) and not intruders, f"{len(intruders)} other boarding(s)"))
     checked = all(any(c[0] == s.t and c[1] == s.car_id and c[2] is False
                       for c in p.ceiling_checks) for s in starts)
     out.append(("FR-72 wait-ceiling check asked before every exclusive start",
@@ -402,9 +514,10 @@ def check_sim_12(result, ctx) -> list:
                 f"{len(vip_calls) - len(lost)} of {len(vip_calls)} delivered"))
     ordinary = [q for q in _measured(result, sim)
                 if q.group == group and not q.vip and not q.accessible]
-    waits = _waits(ordinary)
+    waits = _waits(ordinary, ctx.clock.now())
     out.append((f"ordinary calls of group {group} within the {RUSH_CEILING_S} s ceiling",
-                bool(waits) and max(waits) <= RUSH_CEILING_S, _wait_summary(waits)))
+                bool(waits) and max(waits) <= RUSH_CEILING_S,
+                _wait_summary(waits, sum(1 for q in ordinary if q.boarded_at is None))))
     out.append(_cleared(result))
     out.append(_integration(ctx))
     return out
@@ -510,6 +623,25 @@ def check_sim_18(result, ctx) -> list:
                 f"VIP trip ended t={vip_end[0].t if vip_end else None}, medical started "
                 f"t={med_start[0].t if med_start else None} (accessible > VIP ordering in "
                 "dispatch is Part 2's, see SIM-11)"))
+    # event order: VIP boards -> VIP trip ends = medical starts -> doors at origin -> doors at
+    # destination -> medical ends
+    med_end = next((e.t for e in bus.of_type(PriorityTripEnded)
+                    if e.kind == "medical" and e.car_id == car and e.t >= t_med), None)
+    seq = [t_board, vip_end[0].t if vip_end else None, t_med, at_origin, at_dest, med_end]
+    ordered = None not in seq and all(a <= b for a, b in zip(seq, seq[1:]))
+    out.append(("event order: VIP boarded <= VIP yields = medical start < origin < "
+                "destination < medical end", ordered and seq[1] == seq[2]
+                and at_origin is not None and at_origin > t_med,
+                " -> ".join("?" if x is None else f"{x:.1f}" for x in seq)))
+    states = ctx.services["car_states"].log
+    granted = [x for x in states if x[0] == t_med and x[1] == car and x[2] == "request"
+               and x[4] == "priority:medical" and x[5]]
+    converted = vip_car == car
+    released = [x for x in states if x[1] == car and x[2] == "release" and x[0] == med_end]
+    out.append(("medical car held through car_states (requested or converted VIP hold) and "
+                "released at the end", (bool(granted) or converted) and bool(released),
+                f"request {'converted VIP hold' if converted else len(granted)}, "
+                f"release at end {len(released)}"))
     out.append(_cleared(result))
     out.append(_integration(ctx))
     return out
