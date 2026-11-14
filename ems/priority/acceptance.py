@@ -335,20 +335,25 @@ def check_sim_11(result, ctx) -> list:
                 f"{len(assigned & p.announced)} of {len(assigned)} assignments announced, "
                 f"{len(voice)} voice messages"))
 
-    # FR-08 free capacity: riders AND calls already assigned to the car at the same floor
+    # FR-08 free capacity when the car opens at the call's floor: riders who stay + calls
+    # already assigned to the car that do not end there (replayed from the bus)
     rated = {c: g.rated_persons for g in ctx.services["building"].groups for c in g.cars}
-    last_status, no_room, checked = {}, [], 0
+    riders: dict[str, dict] = defaultdict(dict)
+    no_room, checked = [], 0
     first_open, first_cycle, later = {}, set(), []
     vip_over_acc = []
     for e, assigned in _replay_assignments(ctx):
-        if isinstance(e, CarStatusUpdated):
-            last_status[e.status.car_id] = e.status
-        elif isinstance(e, CallAssigned) and e.call_id in acc and e.car_id in last_status:
-            call, st = calls[e.call_id], last_status[e.car_id]
-            reserved = sum(calls[c].party_size for c, car in assigned.items()
-                           if car == e.car_id and c in calls and calls[c].origin == call.origin)
+        if isinstance(e, PassengerBoarded) and e.call_id in calls:
+            riders[e.car_id][e.call_id] = calls[e.call_id].destination
+        elif isinstance(e, PassengerAlighted):
+            riders[e.car_id].pop(e.call_id, None)
+        if isinstance(e, CallAssigned) and e.call_id in acc:
+            call = calls[e.call_id]
+            taken = sum(1 for d in riders[e.car_id].values() if d != call.origin) + sum(
+                calls[c].party_size for c, car in assigned.items()
+                if car == e.car_id and c in calls and calls[c].destination != call.origin)
             checked += 1
-            if rated[e.car_id] - st.passengers - reserved < call.party_size:
+            if rated[e.car_id] - taken < call.party_size:
                 no_room.append(e.call_id)
         elif isinstance(e, DoorsOpened):
             for c, car in assigned.items():
@@ -361,8 +366,8 @@ def check_sim_11(result, ctx) -> list:
             first_cycle.add(e.call_id)
         elif isinstance(e, PriorityTripStarted) and e.kind == "vip":
             vip_over_acc += [c for c, car in assigned.items() if car == e.car_id and c in acc]
-    out.append(("accessible calls assigned to a car with room after riders and calls already "
-                "assigned there", checked > 0 and not no_room,
+    out.append(("accessible calls assigned to a car with room when it opens at their floor "
+                "(riders who stay + calls already assigned)", checked > 0 and not no_room,
                 f"{checked} assignments checked, {len(no_room)} without room"))
     out.append(("every accessible passenger boarded at the first door opening of their car",
                 bool(acc) and first_cycle == acc,
@@ -544,8 +549,15 @@ def setup_sim_18(ctx) -> None:
         origin = floors[len(floors) // 2]
         lobby = ctx.services["building"].lobby
         # after this event's handlers have run (the VIP's express is sent first)
-        ctx.clock.call_later(0.0, lambda: _act(
-            ctx, "medical", lambda: p.request_medical(SECURITY, origin, lobby)))
+        def request() -> None:
+            _act(ctx, "medical", lambda: p.request_medical(SECURITY, origin, lobby))
+            out = _action(ctx, "medical")[2]
+            trip = p.trips.get(out.ref) if out.ok else None
+            if trip is not None and trip.phase == "at_origin":   # car was already open there
+                log["departed"] = True
+                ctx.clock.call_later(SIM18_HANDLING_S, lambda: _act(
+                    ctx, "depart", lambda: p.medical_depart(SECURITY, trip.trip_id)))
+        ctx.clock.call_later(0.0, request)
 
     def on_doors(ev: DoorsOpened) -> None:
         med = _action(ctx, "medical")
@@ -565,6 +577,22 @@ def setup_sim_18(ctx) -> None:
 
     ctx.bus.subscribe(PassengerBoarded, on_boarded)
     ctx.bus.subscribe(DoorsOpened, on_doors)
+
+
+def _open_at(ctx, car, floor, t) -> bool:
+    """Telemetry: the car's last DoorsOpened before t was at `floor` and no status between it
+    and t shows the doors closing / closed or another floor."""
+    last = None
+    for e in ctx.bus.log:
+        if e.t > t:
+            break
+        if isinstance(e, DoorsOpened) and e.car_id == car:
+            last = e
+        elif last is not None and isinstance(e, CarStatusUpdated) and e.status.car_id == car \
+                and e.t >= last.t and (e.status.doors in (DoorState.CLOSING, DoorState.CLOSED)
+                                       or e.status.floor != last.floor):
+            last = None
+    return last is not None and last.floor == floor
 
 
 def check_sim_18(result, ctx) -> list:
@@ -605,6 +633,8 @@ def check_sim_18(result, ctx) -> list:
     trip = next((t for t in p.finished if t.car_id == car and t.kind == "medical"), None)
     reached = [e for e in bus.of_type(DoorsOpened) if e.car_id == car and e.t >= t_med]
     at_origin = next((e.t for e in reached if trip and e.floor == trip.origin), None)
+    if trip is not None and _open_at(ctx, car, trip.origin, t_med):
+        at_origin = t_med                    # already standing there with open doors
     at_dest = next((e.t for e in reached if trip and e.floor == trip.destination
                     and at_origin is not None and e.t > at_origin), None)
     out.append(("a healthy car performs the medical trip to the end",
@@ -629,9 +659,9 @@ def check_sim_18(result, ctx) -> list:
                     if e.kind == "medical" and e.car_id == car and e.t >= t_med), None)
     seq = [t_board, vip_end[0].t if vip_end else None, t_med, at_origin, at_dest, med_end]
     ordered = None not in seq and all(a <= b for a, b in zip(seq, seq[1:]))
-    out.append(("event order: VIP boarded <= VIP yields = medical start < origin < "
+    out.append(("event order: VIP boarded <= VIP yields = medical start <= origin < "
                 "destination < medical end", ordered and seq[1] == seq[2]
-                and at_origin is not None and at_origin > t_med,
+                and at_origin is not None and at_origin >= t_med,
                 " -> ".join("?" if x is None else f"{x:.1f}" for x in seq)))
     states = ctx.services["car_states"].log
     granted = [x for x in states if x[0] == t_med and x[1] == car and x[2] == "request"

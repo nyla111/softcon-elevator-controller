@@ -267,3 +267,35 @@ def test_cancelled_or_reassigned_vip_call_is_not_re_registered(env):
     env.publish(CallAssigned(env.now(), b.call_id, car, 3.0))
     env.publish(CallReassigned(env.now(), b.call_id, car, "H", "fault"))
     assert not env.controllers.sent("register_stop", accepted=None)
+
+
+def test_fr08_capacity_counts_riders_who_stay_and_calls_picked_up_on_the_way(env):
+    """Regression (SIM-11 seed 5): the car picked up an inter-floor rider on its way down who did
+    not leave at the lobby; the accessible passenger was left behind (car 128 % full)."""
+    from ems.contracts.events import PassengerAlighted as PA
+    acc = env.call(origin=1, destination=7, group="LOW", priority=CallPriority.ACCESSIBLE)
+    status = env.controllers.status("A")
+    assert env.p.car_ok_for(acc, status)
+    for i in range(10):                                  # riders going to the lobby: leave there
+        c = _assign(env, f"r{i}", "A", origin=12, group="LOW")
+        c.destination = 1
+        env.publish(PassengerBoarded(env.now(), f"r{i}", "A"))
+    for i in range(10):                                  # riders staying past the lobby
+        c = _assign(env, f"s{i}", "A", origin=12, group="LOW")
+        c.destination = 3
+        env.publish(PassengerBoarded(env.now(), f"s{i}", "A"))
+    status.passengers = 20
+    assert env.p.committed_places("A", 1) == 10
+    assert env.p.car_ok_for(acc, status)                 # 21 - 10 staying = 11 free
+    for i in range(10):                                  # calls on the way, not ending at L1
+        c = _assign(env, f"w{i}", "A", origin=8, group="LOW")
+        c.destination = 3
+    assert env.p.committed_places("A", 1) == 20
+    assert env.p.car_ok_for(acc, status)                 # exactly one place left
+    _assign(env, "w-last", "A", origin=8, group="LOW").destination = 5
+    assert not env.p.car_ok_for(acc, status)
+    env.publish(PA(env.now(), "s0", "A", 3))             # one stayer leaves: room again
+    status.passengers = 19
+    assert env.p.car_ok_for(acc, status)
+    status.passengers = 21                               # controller counts more than seen
+    assert not env.p.car_ok_for(acc, status)

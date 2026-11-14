@@ -116,6 +116,7 @@ class PriorityService:
         self._accessible: dict[CallId, Call] = {}
         self._calls: dict[CallId, Call] = {}           # calls seen on the bus, not yet boarded
         self.assigned: dict[CallId, CarId] = {}        # call -> car, assigned and not boarded
+        self.riders: dict[CarId, dict[CallId, Floor]] = {}  # car -> riders and destinations
         self._seq = 0
         self.fire = False
         self.power_lost = False
@@ -267,19 +268,27 @@ class PriorityService:
         """Calls assigned to the car (CallAssigned / CallReassigned) and not yet on board."""
         return [c for c, car in self.assigned.items() if car == car_id]
 
-    def reserved_places(self, car_id: CarId, floor: Floor) -> int:
-        """Persons already assigned to the car at this floor and not yet on board: they board
-        before a later call at the same stop (the controllers board in arrival order)."""
-        return sum(self._calls[c].party_size for c in self.pending_calls_of(car_id)
-                   if c in self._calls and self._calls[c].origin == floor)
+    def committed_places(self, car_id: CarId, floor: Floor) -> int:
+        """Places taken when the car opens at `floor` (conservative, from bus events): riders
+        who do not leave at that floor, plus every call already assigned to the car (at any
+        floor: it may be picked up on the way) that does not end at that floor."""
+        riders = self.riders.get(car_id, {})
+        staying = sum(1 for dest in riders.values() if dest != floor)
+        pending = sum(self._calls[c].party_size for c in self.pending_calls_of(car_id)
+                      if c in self._calls and self._calls[c].destination != floor)
+        return staying + pending
 
     def car_ok_for(self, call: Call, status: CarStatus) -> bool:
-        """FR-08 free capacity, for Part 2's car filter: room for the party after the riders
-        and after the calls already assigned to this car at the same floor."""
+        """FR-08 free capacity, for Part 2's car filter: room for the whole party when the car
+        opens at the call's floor (committed_places). Riders are tracked from PassengerBoarded /
+        PassengerAlighted; if the controller reports more riders than Part 5 saw board (e.g.
+        Part 5 registered late), the controller's count is used."""
         g = self.group_of_car(status.car_id)
         rated = self.building().group(g).rated_persons if g else 0
-        return policy.accessible_car_ok(
-            call, status, rated - self.reserved_places(status.car_id, call.origin))
+        seen = len(self.riders.get(status.car_id, {}))
+        extra = max(0, status.passengers - seen)
+        free = rated - extra - self.committed_places(status.car_id, call.origin)
+        return free >= call.party_size
 
     # ================================================================ FR-70/71/72 VIP
     def set_vip_quota(self, credential_id: CredentialId, vip_credential: CredentialId,
@@ -421,7 +430,9 @@ class PriorityService:
     # ---------- VIP events ----------
     def on_boarded(self, ev: PassengerBoarded) -> None:
         self.assigned.pop(ev.call_id, None)
-        self._calls.pop(ev.call_id, None)
+        call = self._calls.pop(ev.call_id, None)
+        if call is not None and call.destination is not None:
+            self.riders.setdefault(ev.car_id, {})[ev.call_id] = call.destination
         trip = self.trip_of_call(ev.call_id)
         if trip is None:
             return
@@ -436,6 +447,7 @@ class PriorityService:
 
     def on_alighted(self, ev: PassengerAlighted) -> None:
         self._accessible.pop(ev.call_id, None)
+        self.riders.get(ev.car_id, {}).pop(ev.call_id, None)
         trip = self.trip_of_call(ev.call_id)
         if trip is not None:
             self.end_trip(trip, ev.floor != trip.destination, "delivered"
