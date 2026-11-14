@@ -4,8 +4,8 @@ One service object owns every car Part 5 has taken out of group service (a "hold
 
     kind            car state asked from Part 4      controller commands sent by Part 5
     vip             VIP_EXCLUSIVE                    close_to_new_calls, express
-    medical         VIP_EXCLUSIVE (see note)         close_to_new_calls, express(hold doors)
-    send_to_lobby   VIP_EXCLUSIVE (see note)         close_to_new_calls, express(hold doors)
+    medical         VIP_EXCLUSIVE (see note)         close_to_new_calls, express, then
+    send_to_lobby   VIP_EXCLUSIVE (see note)         express(same floor, hold doors) on arrival
     maintenance     MAINTENANCE                      close_to_new_calls   (maintenance.py)
     goods           INDEPENDENT_SERVICE              set_independent_service (goods.py)
 
@@ -426,7 +426,9 @@ class PriorityService:
             return
         if trip.phase == "to_origin" and ev.floor == trip.origin:
             trip.phase = "at_origin"
-            if trip.kind == "vip" and not trip.boarded:
+            if trip.kind != "vip":
+                self._hold_doors(trip, ev.floor)
+            elif not trip.boarded:
                 # FR-122-style: not on board after one full door cycle (car full, absent) -> the
                 # exclusive hold ends; the call itself stays with Part 2
                 cycle = (self.building().group(trip.group).rated_persons
@@ -435,6 +437,17 @@ class PriorityService:
                 self.ctx.clock.call_later(cycle, lambda: self._vip_not_boarded(trip_id))
         elif trip.phase == "to_destination" and ev.floor == trip.destination:
             trip.phase = "at_destination"
+            if trip.kind != "vip":
+                self._hold_doors(trip, ev.floor)
+
+    def _hold_doors(self, trip: Trip, floor: Floor) -> None:
+        """Keep the doors open at the floor the car has just opened at. Sent on arrival, not
+        with the trip's first express: a hold sent while the car is still in a door cycle at
+        another floor would keep the doors open THERE (simulated controller behaviour)."""
+        if not self.cmd("express", trip.car_id, floor, True):
+            self.alert("high", f"{trip.kind}_doors_not_held", ["security"],
+                       f"Car {trip.car_id} could not hold its doors open at {floor_label(floor)}",
+                       trip.car_id, floor)
 
     def _vip_not_boarded(self, trip_id: str) -> None:
         trip = self.trips.get(trip_id)                 # late callback after the end: ignored
@@ -475,24 +488,27 @@ class PriorityService:
             group = self.group_of_car(s.car_id)
             trip_id = self.next_id("med")
             vip = self.trip_of_car(s.car_id)
+            there = s.position == origin and s.doors is DoorState.OPEN
             if vip is not None:                        # the VIP car itself: convert the hold
-                if not self.cmd("express", s.car_id, origin, True):
+                if not self.cmd("express", s.car_id, origin, there):
                     continue
                 self.end_trip(vip, True, "medical_preempt", keep_hold=True)
                 self.holds[s.car_id] = Hold(s.car_id, EXCLUSIVE, "medical", trip_id, self.now())
             else:
                 if self.take(s.car_id, EXCLUSIVE, "medical", trip_id) is not None:
                     continue
-                if not self.cmd("express", s.car_id, origin, True):
+                if not self.cmd("express", s.car_id, origin, there):
                     self.give_back(s.car_id)
                     continue
-            # FR-127 above VIP + FR-72 one exclusive car per group: VIP trips in the group yield.
-            for other in self.exclusive_in_group(group):
-                if other.kind == "vip":
-                    self.end_trip(other, True, "medical_preempt")
+            # FR-127 above VIP + FR-72 one exclusive car per group: VIP trips of every group that
+            # serves this medical trip (and of the chosen car's group) yield.
+            for g in set(groups) | {group}:
+                for other in self.exclusive_in_group(g):
+                    if other.kind == "vip":
+                        self.end_trip(other, True, "medical_preempt")
             trip = Trip(trip_id, "medical", s.car_id, group, origin, destination, self.now())
-            if s.position == origin and s.doors is DoorState.OPEN:
-                trip.phase = "at_origin"               # already there: no new DoorsOpened
+            if there:
+                trip.phase = "at_origin"               # already there, doors now held open
             self._trip_started(trip)
             return Outcome(True, "ok", trip_id, s.car_id)
         return Outcome(False, "no_eligible_car")
@@ -508,7 +524,7 @@ class PriorityService:
         elif trip.phase != "at_origin":
             out = Outcome(False, "not_at_origin")
         elif not self.commandable(trip.car_id) or not self.cmd(
-                "express", trip.car_id, trip.destination, True):
+                "express", trip.car_id, trip.destination, False):
             out = Outcome(False, "controller_refused")
         else:
             trip.boarded, trip.phase = True, "to_destination"
@@ -539,11 +555,12 @@ class PriorityService:
         status = self.status(car_id)
         if not self.healthy(status):
             return Outcome(False, "car_unavailable")
+        there = status.position == lobby and status.doors is DoorState.OPEN
         trip_id = self.next_id("stl")
         vip = self.trip_of_car(car_id)
         hold = self.holds.get(car_id)
         if vip is not None and vip.kind == "vip":
-            if not self.cmd("express", car_id, lobby, True):
+            if not self.cmd("express", car_id, lobby, there):
                 return Outcome(False, "controller_refused")
             self.end_trip(vip, True, "send_to_lobby", keep_hold=True)
             self.holds[car_id] = Hold(car_id, EXCLUSIVE, "send_to_lobby", trip_id, self.now())
@@ -553,11 +570,11 @@ class PriorityService:
             why = self.take(car_id, EXCLUSIVE, "send_to_lobby", trip_id)
             if why is not None:
                 return Outcome(False, why)
-            if not self.cmd("express", car_id, lobby, True):
+            if not self.cmd("express", car_id, lobby, there):
                 self.give_back(car_id)
                 return Outcome(False, "controller_refused")
         trip = Trip(trip_id, "send_to_lobby", car_id, group, status.floor, lobby, self.now(),
-                    phase="to_destination", boarded=True)
+                    phase="at_destination" if there else "to_destination", boarded=True)
         self._trip_started(trip)
         return Outcome(True, "ok", trip_id, car_id)
 
