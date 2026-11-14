@@ -1,5 +1,5 @@
 """FR-70 / FR-71 / FR-72 VIP exclusive trips, with protocol doubles (conftest.py)."""
-from ems.contracts.events import (CallCancelled, ControllerFault, ControllerFaultCleared,
+from ems.contracts.events import (CallAssigned, CallCancelled, CallReassigned, CallRequested, ControllerFault, ControllerFaultCleared,
                                   DoorsOpened, EmsServerDown, EmsServerUp, FireAlarm,
                                   PassengerAlighted, PassengerBoarded, PriorityTripEnded,
                                   PriorityTripStarted)
@@ -26,7 +26,7 @@ def test_vip_trip_start_board_and_delivery(env):
     assert env.states.states["E"] is CarState.VIP_EXCLUSIVE
     assert [x[0] for x in env.controllers.sent(car="E")] == ["close_to_new_calls", "express"]
     assert env.controllers.sent("express", "E")[0][2] == (1, False)
-    assert env.dispatcher.reassigned == [("E", "priority_vip")]
+    assert env.dispatcher.reassigned == []          # nobody waits for E: nothing to move
     started = env.events(PriorityTripStarted)
     assert [(e.kind, e.car_id, e.origin, e.destination) for e in started] == [("vip", "E", 1, 20)]
     assert env.p.vip_starts == [0.0]
@@ -189,3 +189,81 @@ def test_fr70_quota_and_revoke_need_the_fm(env):
     assert env.p.claim_call(env.call(credential="vip-card-2")) is None
     assert env.p.decisions[-1]["reason"] == "vip_revoked"
     assert all("vip-card" not in str(a) for a in env.p.audit)   # no credential in the audit
+
+
+def _assign(env, call_id, car, origin=1, group="HIGH"):
+    call = env.call(origin=origin, group=group, priority=CallPriority.NORMAL, call_id=call_id)
+    env.publish(CallRequested(env.now(), call))
+    env.publish(CallAssigned(env.now(), call_id, car, 3.0))
+    return call
+
+
+def test_exclusive_vip_needs_waiting_calls_moved_away_first(env):
+    """Regression A3: the stub dispatcher moves nothing, so a car with a waiting call must not
+    become 'exclusive' (that passenger would board the VIP car)."""
+    _assign(env, "w1", "E")
+    car = env.p.claim_call(env.call())
+    assert car == "F"                     # E is not "empty" (someone waits for it): F first
+    assert _vip_requests(env, "E") == [] and env.dispatcher.reassigned == []
+    assert [d["reason"] for d in env.p.decisions] == ["ok"]
+
+
+def test_all_cars_busy_and_nothing_moved_declines_without_using_quota(env):
+    for i, c in enumerate("EFGH"):
+        _assign(env, f"w{i}", c)
+    assert env.p.claim_call(env.call()) is None
+    assert env.p.decisions[-1]["reason"] == "calls_not_moved"
+    assert env.p.vip_starts == [] and env.p.holds == {}
+    assert all(s is CarState.GROUP_SERVICE for s in env.states.states.values())
+    assert not env.controllers.sent("express")
+
+
+def test_busy_car_is_used_when_part2_moves_its_calls(env):
+    for i, c in enumerate("EFGH"):
+        _assign(env, f"w{i}", c)
+    env.dispatcher.reassign_calls_of = lambda car, reason: [
+        c for c, k in env.p.assigned.items() if k == car]
+    assert env.p.claim_call(env.call()) == "E"
+
+
+def test_reassigned_waiting_call_frees_the_car(env):
+    _assign(env, "w1", "E")
+    env.publish(CallReassigned(env.now(), "w1", "E", "G", "test"))
+    assert env.p.pending_calls_of("E") == [] and env.p.pending_calls_of("G") == ["w1"]
+    assert env.p.claim_call(env.call()) == "E"
+
+
+def test_simultaneous_vip_calls_same_timestamp(env):
+    a = env.p.claim_call(env.call(group="HIGH"))
+    b = env.p.claim_call(env.call(group="LOW", destination=9))
+    c = env.p.claim_call(env.call(group="HIGH"))
+    assert a and b and c is None and len(env.p.vip_starts) == 2
+    assert {e.car_id for e in env.events(PriorityTripStarted)} == {a, b}
+
+
+def test_unboarded_vip_trip_end_re_registers_the_pick_up_stop(env):
+    """Regression A1: the call was assigned to the car on Part 5's word; when the exclusive trip
+    ends before boarding, the car must still come for it."""
+    vip = env.call(origin=20, destination=1)
+    car = env.p.claim_call(vip)
+    env.publish(CallAssigned(env.now(), vip.call_id, car, 30.0))     # Part 2 assigns it
+    env.controllers.put(car, fault_code="F-1")
+    env.publish(ControllerFault(env.now(), car, "F-1", False, False))
+    assert not env.controllers.sent("register_stop", car, accepted=None)   # faulted: wait
+    env.controllers.put(car, fault_code=None)
+    env.publish(ControllerFaultCleared(env.now(), car))
+    sent = [x[0] for x in env.controllers.sent(car=car)][-2:]
+    assert sent == ["close_to_new_calls", "register_stop"]               # reopen, then stop
+    assert env.controllers.sent("register_stop", car)[-1][2] == (20,)
+
+
+def test_cancelled_or_reassigned_vip_call_is_not_re_registered(env):
+    a = env.call()
+    car = env.p.claim_call(a)
+    env.publish(CallAssigned(env.now(), a.call_id, car, 3.0))
+    env.publish(CallCancelled(env.now(), a.call_id, "user"))
+    b = env.call()
+    car = env.p.claim_call(b)
+    env.publish(CallAssigned(env.now(), b.call_id, car, 3.0))
+    env.publish(CallReassigned(env.now(), b.call_id, car, "H", "fault"))
+    assert not env.controllers.sent("register_stop", accepted=None)

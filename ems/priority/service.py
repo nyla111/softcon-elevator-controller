@@ -112,7 +112,10 @@ class PriorityService:
         self.audit: list[dict] = []                    # API calls (roles only, no credential)
         self.reopen: dict[CarId, list[tuple]] = {}     # commands to retry after recovery
         self.announced: set[tuple] = set()             # (call_id, car_id) voice feedback sent
+        self.after_release: dict[CarId, list[tuple]] = {}   # commands owed once a hold ends
         self._accessible: dict[CallId, Call] = {}
+        self._calls: dict[CallId, Call] = {}           # calls seen on the bus, not yet boarded
+        self.assigned: dict[CallId, CarId] = {}        # call -> car, assigned and not boarded
         self._seq = 0
         self.fire = False
         self.power_lost = False
@@ -215,11 +218,11 @@ class PriorityService:
         if hold is None:
             return
         self.ctx.get("car_states").release(car_id, hold.state, f"priority:{hold.kind}")
-        if undo is None:
-            return
-        if self.commandable(car_id) and self.cmd(undo[0], car_id, *undo[1:]):
-            return
-        self.reopen.setdefault(car_id, []).append(undo)
+        todo = ([undo] if undo is not None else []) + self.after_release.pop(car_id, [])
+        sent = self.commandable(car_id)
+        left = [u for u in todo if not (sent and self.cmd(u[0], car_id, *u[1:]))]
+        if left:
+            self.reopen.setdefault(car_id, []).extend(left)
 
     def retry_reopen(self, *_ev) -> None:
         for car_id in list(self.reopen):
@@ -260,11 +263,23 @@ class PriorityService:
     order = staticmethod(policy.order)
     door_dwell_s = staticmethod(policy.door_dwell_s)
 
+    def pending_calls_of(self, car_id: CarId) -> list[CallId]:
+        """Calls assigned to the car (CallAssigned / CallReassigned) and not yet on board."""
+        return [c for c, car in self.assigned.items() if car == car_id]
+
+    def reserved_places(self, car_id: CarId, floor: Floor) -> int:
+        """Persons already assigned to the car at this floor and not yet on board: they board
+        before a later call at the same stop (the controllers board in arrival order)."""
+        return sum(self._calls[c].party_size for c in self.pending_calls_of(car_id)
+                   if c in self._calls and self._calls[c].origin == floor)
+
     def car_ok_for(self, call: Call, status: CarStatus) -> bool:
-        """FR-08 free capacity, for Part 2's car filter."""
+        """FR-08 free capacity, for Part 2's car filter: room for the party after the riders
+        and after the calls already assigned to this car at the same floor."""
         g = self.group_of_car(status.car_id)
         rated = self.building().group(g).rated_persons if g else 0
-        return policy.accessible_car_ok(call, status, rated)
+        return policy.accessible_car_ok(
+            call, status, rated - self.reserved_places(status.car_id, call.origin))
 
     # ================================================================ FR-70/71/72 VIP
     def set_vip_quota(self, credential_id: CredentialId, vip_credential: CredentialId,
@@ -333,7 +348,8 @@ class PriorityService:
             return Outcome(False, "no_car")
         dispatcher = self.ctx.get("dispatcher")
         reasons = []
-        for s in policy.vip_candidates(statuses, call.origin):
+        busy = {s.car_id for s in statuses if self.pending_calls_of(s.car_id)}
+        for s in policy.vip_candidates(statuses, call.origin, busy):
             breach = bool(dispatcher.would_breach_ceiling_without(s.car_id))
             self.ceiling_checks.append((self.now(), s.car_id, breach))
             if breach:                                                # FR-72 ceiling check
@@ -341,6 +357,13 @@ class PriorityService:
                 continue
             trip_id = self.next_id("vip")
             why = self.take(s.car_id, EXCLUSIVE, "vip", trip_id)
+            if why is None and s.car_id in busy:
+                # Exclusive means nobody else boards: Part 2 must move every call waiting for
+                # this car (FR-04). Calls it did not move would board the VIP car, so no.
+                moved = set(dispatcher.reassign_calls_of(s.car_id, "priority_vip") or [])
+                if set(self.pending_calls_of(s.car_id)) - moved:
+                    self.give_back(s.car_id)
+                    why = "calls_not_moved"
             if why is None and not self.cmd("express", s.car_id, call.origin, False):
                 self.give_back(s.car_id)
                 why = "controller_refused"
@@ -354,13 +377,14 @@ class PriorityService:
                 grant.used[day] = grant.used.get(day, 0) + 1
             self._trip_started(trip)
             return Outcome(True, "ok", trip_id, s.car_id)
-        return Outcome(False, "ceiling" if reasons and set(reasons) == {"ceiling"}
-                       else "refused")
+        if reasons and len(set(reasons)) == 1 and reasons[0] in ("ceiling", "calls_not_moved"):
+            return Outcome(False, reasons[0])
+        return Outcome(False, "refused")
 
     def _trip_started(self, trip: Trip) -> None:
         self.trips[trip.trip_id] = trip
-        dispatcher = self.ctx.get("dispatcher")
-        dispatcher.reassign_calls_of(trip.car_id, f"priority_{trip.kind}")   # FR-04 is Part 2's
+        if trip.kind != "vip":          # VIP: asked (and checked) while choosing the car
+            self.ctx.get("dispatcher").reassign_calls_of(trip.car_id, f"priority_{trip.kind}")
         self.ctx.bus.publish(PriorityTripStarted(self.now(), trip.kind, trip.car_id,
                                                  trip.origin, trip.destination))
 
@@ -371,7 +395,16 @@ class PriorityService:
         trip.end_reason = reason
         self.finished.append(trip)
         self.ctx.bus.publish(PriorityTripEnded(self.now(), trip.kind, trip.car_id, cancelled))
+        if trip.kind == "vip" and not trip.boarded and \
+                self.assigned.get(trip.call_id) == trip.car_id:
+            # The call was assigned to this car on Part 5's word and its pick-up was an express
+            # target, not a registered stop: register it once the car is back in group service.
+            self.after_release.setdefault(trip.car_id, []).append(
+                ("register_stop", trip.origin, trip.call_id))
         hold = self.holds.get(trip.car_id)
+        if hold is None and trip.car_id in self.after_release:
+            self.reopen.setdefault(trip.car_id, []).extend(self.after_release.pop(trip.car_id))
+            self.retry_reopen()
         if keep_hold or hold is None or hold.ref != trip.trip_id:
             return
         if trip.kind != "vip" and commands and self.commandable(trip.car_id):
@@ -387,6 +420,8 @@ class PriorityService:
 
     # ---------- VIP events ----------
     def on_boarded(self, ev: PassengerBoarded) -> None:
+        self.assigned.pop(ev.call_id, None)
+        self._calls.pop(ev.call_id, None)
         trip = self.trip_of_call(ev.call_id)
         if trip is None:
             return
@@ -408,11 +443,14 @@ class PriorityService:
 
     def on_call_cancelled(self, ev: CallCancelled) -> None:
         self._accessible.pop(ev.call_id, None)
+        self.assigned.pop(ev.call_id, None)
+        self._calls.pop(ev.call_id, None)
         trip = self.trip_of_call(ev.call_id)
         if trip is not None and not trip.boarded:
             self.end_trip(trip, True, f"call_cancelled:{ev.reason}")
 
     def on_reassigned(self, ev: CallReassigned) -> None:
+        self.assigned[ev.call_id] = ev.to_car
         trip = self.trip_of_call(ev.call_id)
         if trip is not None and ev.to_car != trip.car_id and not trip.boarded:
             self.end_trip(trip, True, "reassigned")
@@ -484,7 +522,10 @@ class PriorityService:
             return Outcome(False, "invalid_floors")
         statuses = [s for g in groups
                     for s in self.candidate_statuses(g, (origin, destination), True)]
-        for s in policy.medical_candidates(statuses, origin):
+        waiting_here = {s.car_id for s in statuses
+                        if any(self._calls.get(c) is not None and self._calls[c].origin == origin
+                               for c in self.pending_calls_of(s.car_id))}
+        for s in policy.medical_candidates(statuses, origin, waiting_here):
             group = self.group_of_car(s.car_id)
             trip_id = self.next_id("med")
             vip = self.trip_of_car(s.car_id)
@@ -596,10 +637,12 @@ class PriorityService:
 
     # ================================================================ FR-08 voice feedback
     def on_call_requested(self, ev: CallRequested) -> None:
+        self._calls[ev.call.call_id] = ev.call
         if ev.call.priority is CallPriority.ACCESSIBLE:
             self._accessible[ev.call.call_id] = ev.call
 
     def on_assigned(self, ev: CallAssigned) -> None:
+        self.assigned[ev.call_id] = ev.car_id
         call = self._accessible.get(ev.call_id)
         if call is not None:
             self._announce(call, ev.car_id)

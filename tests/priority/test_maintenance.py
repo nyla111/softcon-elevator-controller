@@ -150,3 +150,25 @@ def test_deny_and_approved_but_refused(env):
     ask = env.p.maintenance.request_maintenance(TECH, "C")
     res = env.p.maintenance.approve_removal(FM, ask.ref)
     assert not res.ok and res.reason == "state_refused" and env.p.holds == {}
+
+
+def test_approval_revalidates_the_car_now(env):
+    """The car was free when the technician asked; by the time the FM approves it is on a VIP
+    trip. The approval must not take it (no MAINTENANCE request, the VIP hold is untouched)."""
+    out = _second_car_in_rush(env)                      # A faulted, request for car B pending
+    for c in "CD":
+        env.controllers.put(c, fault_code="F-1")        # B is the only healthy LOW car left
+    assert env.p.claim_call(env.call(group="LOW", destination=9)) == "B"
+    res = env.p.maintenance.approve_removal(FM, out.ref)
+    assert not res.ok and res.reason == "car_held"
+    assert env.p.holds["B"].kind == "vip"
+    assert not [x for x in env.states.log if x[1] == "B" and x[2] is CarState.MAINTENANCE]
+
+
+def test_exit_never_overrides_a_safety_state(env):
+    m = env.p.maintenance
+    assert m.request_maintenance(TECH, "C").ok
+    env.states.states["C"] = CarState.FAULTED            # Part 4 moved the car meanwhile
+    assert m.exit_maintenance(TECH, "C").ok              # Part 5 leaves its own hold ...
+    assert env.states.states["C"] is CarState.FAULTED    # ... and the Safety state stays
+    assert env.states.log[-1][:3] == ("release", "C", CarState.MAINTENANCE)

@@ -88,3 +88,27 @@ def test_integration_gaps_name_every_stub():
     gaps = " ".join(integration_gaps(ctx))
     assert "Part 2" in gaps and "Part 3" in gaps and "Part 4" in gaps and "StaffDirectory" in gaps
     assert ctx.services["car_states"].state("A") is CarState.GROUP_SERVICE
+
+
+def test_vip_call_is_not_lost_when_its_car_is_taken_for_medical_before_boarding():
+    """Regression A1 reproduced on the real simulator: before the fix the VIP stayed WAITING
+    for ever on a car that had no stop for them."""
+    ctx = build(seed=1)
+    install_scenario_standins(ctx)
+    sim, p = ctx.services["controllers"], ctx.services["priority"]
+    for c in ("F", "G", "H", "S"):
+        sim.inject_fault(c, "F-X")
+    ctx.clock.run_until(5)
+    ctx.bus.publish(PassengerArrived(5, "VIP1", "panel-L20", 20, 1, "HIGH", "card-L20-001",
+                                     False, True))
+    assert p.decisions[-1]["car_id"] == "E"
+    ctx.clock.run_until(8)
+    out = p.request_medical("staff-security-1", 25, 1)
+    assert out.car_id == "E"
+    ctx.clock.run_until(60)
+    assert p.medical_depart("staff-security-1", out.ref).ok
+    ctx.clock.run_until(200)
+    assert p.finish_trip("staff-security-1", out.ref).reason == "ok"
+    ctx.clock.run_until(600)
+    vip = sim.passengers["VIP1"]
+    assert vip.alighted_at is not None and vip.destination == 1 and not vip.evacuated

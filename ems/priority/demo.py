@@ -3,6 +3,7 @@
     python -m ems.priority.demo                      # 3-5 minute walkthrough of every workflow
     python -m ems.priority.demo scenarios            # SIM-06/11/12/18, seeds 1-10, per criterion
     python -m ems.priority.demo scenarios --seeds 1-3 --json runs/part5.json
+    python -m ems.priority.demo baseline             # SIM-12 with / without VIP exclusivity
 
 The walkthrough runs Part 1's simulator at 07:00 (up-peak, Rush) with Part 5 registered and the
 STAND-INS of ems/priority/standins.py for Part 2 / Part 3 / Part 4 (still contract stubs). It
@@ -216,15 +217,58 @@ def scenario_table(seeds: list[int], out_json: str | None = None) -> dict:
     return data
 
 
+def baseline_table(seeds: list[int]) -> list[dict]:
+    """SIM-12 traffic (same seed, same arrivals incl. the 10 replaced VIPs) three ways:
+    with VIP exclusivity; "no claim_call" (only difference: claim_call off); Part 1's plain
+    nearest-car (no Part 5 hook at all: no claim_call, no FR-08 capacity filter)."""
+    from dataclasses import replace as dc_replace
+
+    from ems.sim.scenarios import get, run_setup
+
+    from .acceptance import _measured, _waits, setup_sim_12_baseline, setup_sim_12_plain
+    run = get("SIM-12").runs[0]
+    rows = []
+    print("seed | variant | arrivals | all avg / max (s) | LOW ordinary avg / max / >60 s | "
+          "VIP starts | digest")
+    for seed in seeds:
+        for label, r in (("with VIP exclusivity", run),
+                         ("no claim_call", dc_replace(run, setup=setup_sim_12_baseline)),
+                         ("Part 1 nearest-car, no Part 5 hook",
+                          dc_replace(run, setup=setup_sim_12_plain))):
+            res = run_setup(r, seed)
+            ctx, sim = res.ctx, res.ctx.services["controllers"]
+            group = ctx.services["population"].group
+            people = _measured(res, sim)
+            low = [q for q in people if q.group == group and not q.vip and not q.accessible]
+            allw, loww = _waits(people, ctx.clock.now()), _waits(low, ctx.clock.now())
+            row = {"seed": seed, "variant": label, "arrivals": len(sim.passengers),
+                   "avg": sum(allw) / len(allw), "max": max(allw),
+                   "low_avg": sum(loww) / len(loww), "low_max": max(loww),
+                   "low_over": sum(1 for w in loww if w > 60),
+                   "vip_starts": len(ctx.services["priority"].vip_starts),
+                   "digest": res.event_digest[:12]}
+            rows.append(row)
+            print(f"{seed} | {label} | {row['arrivals']} | {row['avg']:.1f} / {row['max']:.1f} | "
+                  f"{row['low_avg']:.1f} / {row['low_max']:.1f} / {row['low_over']} | "
+                  f"{row['vip_starts']} | {row['digest']}")
+    return rows
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("what", nargs="?", default="walkthrough", choices=["walkthrough", "scenarios"])
+    ap.add_argument("what", nargs="?", default="walkthrough",
+                    choices=["walkthrough", "scenarios", "baseline"])
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--seeds", default="1-10")
     ap.add_argument("--json")
     args = ap.parse_args(argv)
     if args.what == "scenarios":
         scenario_table(_seeds(args.seeds), args.json)
+    elif args.what == "baseline":
+        rows = baseline_table(_seeds(args.seeds))
+        if args.json:
+            with open(args.json, "w") as fh:
+                json.dump(rows, fh, indent=1)
     else:
         Walkthrough(args.seed).all()
 
