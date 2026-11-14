@@ -2,15 +2,16 @@
 
 Part 5 did not edit `ems/contracts/` or `ems/core/`. These are the changes Part 5 needs from
 the tech lead (contract) or from another part. Each one says what is blocked today and what
-Part 5 does meanwhile. Status: proposed (2026-11-14), base `8b4afdc`.
+Part 5 does meanwhile. Status: proposed (2026-11-14), base `8b4afdc`. Issues #9-#12 opened for the four blockers;
+CCR-03 is not a blocker and has no issue.
 
 | ID | Blocks | Owner | Kind |
 |---|---|---|---|
-| CCR-01 | FR-71/72 exclusive VIP trips, FR-08 capacity, FR-76 order in real dispatch | Tech lead (contract) + Part 2 (calls) | document Part 5 API as a Protocol |
-| CCR-02 | FR-08 "EMS requests >= 10 s doors" (SIM-11) | Tech lead + Part 1 (adapter) | new optional command argument |
+| CCR-01 ([#9](https://github.com/nyla111/softcon-elevator-controller/issues/9)) | FR-71/72 exclusive VIP trips, FR-08 capacity, FR-76 order in real dispatch | Tech lead (contract) + Part 2 (calls) | document Part 5 API as a Protocol |
+| CCR-02 ([#10](https://github.com/nyla111/softcon-elevator-controller/issues/10)) | FR-08 "EMS requests >= 10 s doors" (SIM-11) | Tech lead + Part 1 (adapter) | new optional command argument |
 | CCR-03 | Reporting of medical / send-to-lobby car state | Tech lead + Part 4 | state or documentation |
-| CCR-04 | FR-82 end of restriction, SIM-08 "goods move cancelled" evidence | Tech lead | new event |
-| CCR-05 | Production authorisation of security / FM / technician / tenant admin | Part 1 (mock ACS, population) + Part 3 | data, no contract change |
+| CCR-04 ([#11](https://github.com/nyla111/softcon-elevator-controller/issues/11)) | FR-82 end of restriction, SIM-08 "goods move cancelled" evidence | Tech lead | new event |
+| CCR-05 ([#12](https://github.com/nyla111/softcon-elevator-controller/issues/12)) | Production authorisation of security / FM / technician / tenant admin | Part 1 (mock ACS, population) + Part 3 | data, no contract change |
 
 ---
 
