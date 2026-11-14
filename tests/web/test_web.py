@@ -89,7 +89,8 @@ def test_fire_alarm_then_reset_through_the_api(client):
 def test_scenario_list(client):
     rows = client.get("/api/scenarios").json()
     assert [r["id"] for r in rows] == [f"SIM-{i:02d}" for i in range(1, 19)]
-    assert [r["id"] for r in rows if r["ready"]] == ["SIM-09", "SIM-16"]
+    assert [r["id"] for r in rows if r["ready"]] == ["SIM-06", "SIM-09", "SIM-11", "SIM-12",
+                                                     "SIM-16", "SIM-18"]
     assert next(r for r in rows if r["id"] == "SIM-01")["waiting_for"] == "Part 2 check"
 
 
