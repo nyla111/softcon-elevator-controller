@@ -1,5 +1,5 @@
 """Exact timing of the car physics (config.SIM: 1.5 s/floor, 2 s doors, 5 s dwell, 1 s/person)."""
-from ems.contracts.events import (CarStatusUpdated, DoorsOpened, OverloadDetected,
+from ems.contracts.events import (CallAssigned, CarStatusUpdated, DoorsOpened, OverloadDetected,
                                   PassengerAlighted, PassengerBoarded)
 from ems.contracts.types import Direction, DoorState
 
@@ -56,6 +56,18 @@ def test_accessible_passenger_gets_ten_second_dwell():
     arrive(ctx, "P1", 1, 2, accessible=True)
     assign(ctx, sim, "P1", "A")
     ctx.clock.run_until(11.9)                      # doors open at 2.0, dwell 10 -> close at 12.0
+    assert sim.status("A").doors is DoorState.OPEN
+    ctx.clock.run_until(12.0)
+    assert sim.status("A").doors is DoorState.CLOSING
+
+
+def test_ems_requested_dwell_is_applied_and_logged():
+    ctx, sim = make()
+    arrive(ctx, "P1", 1, 2)
+    ctx.bus.publish(CallAssigned(0.0, "P1", "A", 0.0))
+    assert sim.register_stop("A", 1, "P1", min_dwell_s=10.0)     # FR-08: EMS asks for 10 s
+    assert sim.command_log[-1][2:] == ("register_stop", (1, "P1", 10.0), True)
+    ctx.clock.run_until(11.9)                      # doors open at 2.0 -> close at 12.0
     assert sim.status("A").doors is DoorState.OPEN
     ctx.clock.run_until(12.0)
     assert sim.status("A").doors is DoorState.CLOSING
