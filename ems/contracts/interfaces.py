@@ -73,6 +73,23 @@ class DispatchEngine(Protocol):             # Part 2, replaceable plug-in (FR-06
     def choose_car(self, call: Call, cars: list[CarStatus], mode: Mode) -> Optional[CarId]: ...
 
 
+class PriorityService(Protocol):           # Part 5
+    """Part 2 calls these while it dispatches. Lower rank = served first (BR-10, FR-76)."""
+    def claim_call(self, call: Call) -> Optional[CarId]:
+        """VIP calls only (FR-71/72). A car id: Part 5 runs an exclusive trip on it; Part 2
+        publishes CallAssigned without register_stop. None: dispatch normally.
+        Idempotent per call_id."""
+        ...
+    def rank(self, call: Call) -> int: ...
+    def order(self, calls: list[Call]) -> list[Call]: ...
+    def car_ok_for(self, call: Call, status: CarStatus) -> bool:
+        """FR-08: False if the car has no free place for an accessible passenger."""
+        ...
+    def door_dwell_s(self, call: Call) -> float:
+        """FR-08: pass as register_stop(..., min_dwell_s=...)."""
+        ...
+
+
 class Database(Protocol):                   # Part 1 (trip database with buffering, FR-107)
     def write(self, record: dict) -> None:
         """Never raises and never blocks; buffers in memory while the database is down."""

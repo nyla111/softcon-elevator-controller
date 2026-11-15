@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .config import GROUPS, LOBBY
+from .config import GROUPS, LOBBY, SIM
 from .types import (Call, CallId, CarId, CarState, CarStatus, CredentialId,
                     Direction, DoorState, Floor, GroupId, Mode, Permission, Role)
 
@@ -59,6 +59,15 @@ class StubDispatcher:
     def would_breach_ceiling_without(self, car_id: CarId) -> bool: return False
 
 
+class StubPriority:
+    def claim_call(self, call: Call) -> Optional[CarId]: return None
+    def rank(self, call: Call) -> int: return int(call.priority)
+    def order(self, calls) -> list[Call]:
+        return sorted(calls, key=lambda c: (int(c.priority), c.created_at, c.call_id))
+    def car_ok_for(self, call, status) -> bool: return True
+    def door_dwell_s(self, call) -> float: return SIM["min_dwell_s"]
+
+
 class StubNotifier:
     def __init__(self) -> None: self.inbox: list[tuple[list[str], str, str]] = []
     def send(self, recipients, subject, body) -> None:
@@ -76,5 +85,5 @@ class StubDatabase:
 STUBS = {
     "controllers": StubControllers, "acs": StubAcs, "notifier": StubNotifier,
     "access": StubAccess, "car_states": StubCarStates, "dispatcher": StubDispatcher,
-    "db": StubDatabase,
+    "priority": StubPriority, "db": StubDatabase,
 }
