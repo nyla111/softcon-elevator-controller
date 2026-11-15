@@ -14,13 +14,15 @@ Layout (SRS 2.4: about 2,500 workers in 20-30 tenants; low-rise L2-L15, high-ris
 * Exactly round(share x people) employees are accessible (5%) / VIP (1%), picked with rng.sample.
 * Employees may make more than one trip per run (a passenger is drawn with replacement).
 * Visitors are not in this population: they come with a QR pass from the mock ACS.
+* Staff cards (no rng): "staff-security-1", "staff-fm-1", "staff-technician-1" (all floors)
+  and one tenant admin per tenant, "staff-admin-T01".. (that tenant's floors + lobby).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from ems.contracts import config
-from ems.contracts.types import CredentialId, Floor
+from ems.contracts.types import CredentialId, Floor, Role
 
 from .building import BuildingSpec
 
@@ -64,6 +66,26 @@ def _layout_tenants(rng, building: BuildingSpec, n_tenants: int,
             return tenants
 
 
+@dataclass(frozen=True)
+class StaffCard:
+    """Building staff and tenant admins (CCR-05). Fixed ids, no rng draws."""
+    credential_id: CredentialId
+    roles: frozenset[Role]
+    allowed_floors: frozenset[Floor]
+    default_floor: Floor
+    tenant_id: str | None = None
+
+
+def _staff_cards(building: BuildingSpec, tenants: dict[str, list[Floor]]) -> list[StaffCard]:
+    every_floor = frozenset(f for g in building.groups for f in g.floors)
+    cards = [StaffCard(f"staff-{name}-1", frozenset({role}), every_floor, building.lobby)
+             for name, role in (("security", Role.SECURITY), ("fm", Role.FM),
+                                ("technician", Role.TECHNICIAN))]
+    cards += [StaffCard(f"staff-admin-{t}", frozenset({Role.TENANT_ADMIN}),
+                        frozenset(fl) | PUBLIC_FLOORS, fl[0], t) for t, fl in tenants.items()]
+    return cards
+
+
 class Population:
     def __init__(self, employees: list[Employee], tenants: dict[str, list[Floor]],
                  params: dict, building: BuildingSpec | None = None) -> None:
@@ -77,6 +99,7 @@ class Population:
                 self.tenant_of_floor.setdefault(f, t)
         self._by_floor: dict[Floor, list[Employee]] = {}
         self._by_card = {e.credential_id: e for e in employees}
+        self.staff = {c.credential_id: c for c in _staff_cards(self.building, tenants)}
         for e in employees:
             self._by_floor.setdefault(e.home_floor, []).append(e)
 
@@ -125,3 +148,6 @@ class Population:
 
     def lookup(self, credential_id: CredentialId) -> Employee | None:
         return self._by_card.get(credential_id)
+
+    def staff_card(self, credential_id: CredentialId) -> StaffCard | None:
+        return self.staff.get(credential_id)

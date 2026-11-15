@@ -60,6 +60,10 @@ class MockAcs:
         invalid = Permission(credential_id, frozenset(), None, frozenset(), False)
         if credential_id in self.revoked:
             return invalid
+        staff = self.population.staff_card(credential_id)
+        if staff is not None:
+            return Permission(credential_id, staff.allowed_floors, staff.default_floor,
+                              staff.roles, True, staff.tenant_id)
         employee = self.population.lookup(credential_id)
         if employee is not None:
             roles = {Role.EMPLOYEE}
