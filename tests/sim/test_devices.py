@@ -21,6 +21,20 @@ def test_acs_lookup_of_an_employee_card():
     assert Role.VIP in acs.lookup(vip.credential_id).roles
 
 
+def test_acs_knows_staff_cards():
+    ctx, _ = make()
+    acs, pop = ctx.services["acs"], ctx.services["population"]
+    for card, role in (("staff-security-1", Role.SECURITY), ("staff-fm-1", Role.FM),
+                       ("staff-technician-1", Role.TECHNICIAN)):
+        perm = acs.lookup(card)
+        assert perm.valid and perm.roles == {role} and 30 in perm.allowed_floors
+    admin = acs.lookup("staff-admin-T01")
+    assert admin.roles == {Role.TENANT_ADMIN} and admin.tenant_id == "T01"
+    assert admin.allowed_floors == frozenset(pop.tenants["T01"]) | {1}
+    acs.revoke("staff-fm-1")
+    assert not acs.lookup("staff-fm-1").valid
+
+
 def test_unknown_and_revoked_credentials_are_invalid():
     ctx, _ = make()
     acs = ctx.services["acs"]
