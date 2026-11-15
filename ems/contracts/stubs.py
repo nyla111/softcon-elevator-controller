@@ -19,7 +19,7 @@ class StubControllers:
     def status(self, car_id: CarId) -> CarStatus: return self._s[car_id]
     def all_status(self, group: Optional[GroupId] = None) -> list[CarStatus]:
         return [s for s in self._s.values() if group is None or s.group == group]
-    def register_stop(self, car_id, floor, call_id) -> bool: return True
+    def register_stop(self, car_id, floor, call_id, min_dwell_s=None) -> bool: return True
     def cancel_stop(self, car_id, call_id) -> bool: return True
     def park(self, car_id, floor) -> bool: return True
     def set_standby(self, car_id, on) -> bool: return True
