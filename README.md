@@ -107,6 +107,11 @@ The EMS interacts with elevator controllers and other building systems to execut
 - **v0.4-scenario-setup**: every Appendix B setup is executable: runs start at a time of day, 24 h weekday run with per-block metrics (SIM-05), Eco surge (SIM-04), design-limit building and latency hooks (SIM-10).
 
 ### Run the demo
+With Docker (no Python needed):
+```bash
+docker compose up --build           # or: docker build -t ems . && docker run -p 8000:8000 ems
+```
+Without Docker:
 ```bash
 pip install -e ".[dev]"
 uvicorn ems.web.server:app          # offline, no build step
