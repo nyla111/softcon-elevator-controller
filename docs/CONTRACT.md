@@ -9,7 +9,7 @@ One Python app. Six parts talk in two ways only:
 1. **Time**: use `ctx.clock.now()` only. Never `time.time()`, `datetime.now()` or `sleep()`. Delays = `ctx.clock.call_later(sec, fn)`.
 2. **Randomness**: use `ctx.rng` only (seeded runs must repeat exactly).
 3. **One publisher per event** (see "pub:" in events.py). Don't publish other parts' events.
-4. **Car state**: only Part 4 changes it. Others ask via `car_states.request(...)`; it may say no (BR-06).
+4. **Car state**: only Part 4 changes it. Others ask via `car_states.request(...)`; it may say no (BR-06). `VIP_EXCLUSIVE` means any exclusive priority trip (VIP, medical, send-to-lobby); the kind is in `PriorityTripStarted.kind`.
 5. **Controllers can refuse** any command (returns False). Always handle False.
 6. **No personal data** in trip records or reports. Credential IDs only in the security log.
 7. **Don't edit `contracts/` or `core/`**. Need a new event/field? Ask the tech lead.
