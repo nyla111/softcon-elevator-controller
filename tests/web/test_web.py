@@ -33,6 +33,7 @@ def test_live_start_runs_traffic_and_state_has_the_new_fields(client):
     assert 0 < len(s["events"]) <= 30 and all("s " in line for line in s["events"])
     assert not any("CarStatusUpdated" in line for line in s["events"])
     assert {c["state"] for c in s["cars"]} == {"GROUP_SERVICE"}      # read from car_states
+    assert not any("credential_id" in line or "card-L" in line for line in s["events"])
 
 
 def test_live_start_rejects_unknown_profile(client):
