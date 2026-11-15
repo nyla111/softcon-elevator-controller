@@ -90,14 +90,15 @@ def test_fire_alarm_then_reset_through_the_api(client):
 def test_scenario_list(client):
     rows = client.get("/api/scenarios").json()
     assert [r["id"] for r in rows] == [f"SIM-{i:02d}" for i in range(1, 19)]
-    assert [r["id"] for r in rows if r["ready"]] == ["SIM-06", "SIM-09", "SIM-11", "SIM-12",
-                                                     "SIM-16", "SIM-18"]
-    assert next(r for r in rows if r["id"] == "SIM-01")["waiting_for"] == "Part 2 check"
+    assert [r["id"] for r in rows if r["ready"]] == ["SIM-01", "SIM-02", "SIM-03", "SIM-04",
+                                                     "SIM-05", "SIM-06", "SIM-09", "SIM-10",
+                                                     "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
+    assert next(r for r in rows if r["id"] == "SIM-07")["waiting_for"] == "Part 3 check"
 
 
 def test_run_not_ready_and_unknown_scenario(client):
-    r = client.post("/api/scenarios/SIM-02/run?seed=1").json()
-    assert r["ready"] is False and r["message"] == "not ready: waiting for Part 2 check"
+    r = client.post("/api/scenarios/SIM-07/run?seed=1").json()
+    assert r["ready"] is False and r["message"] == "not ready: waiting for Part 3 check"
     assert client.post("/api/scenarios/SIM-99/run").status_code == 404
 
 
@@ -134,7 +135,7 @@ def test_monitor_role_permissions_and_audit(client):
 def test_scenarios_list_has_runs_with_start_times(client):
     rows = {s["id"]: s for s in client.get("/api/scenarios").json()}
     assert rows["SIM-08"]["runs"][0]["start_hhmm"] == "16:30"
-    assert rows["SIM-10"]["runs"][0]["rate"] == 400.0 and rows["SIM-10"]["waiting_for"] == "Part 2 check"
+    assert rows["SIM-10"]["runs"][0]["rate"] == 400.0 and rows["SIM-10"]["waiting_for"] is None
     assert [r["label"] for r in rows["SIM-04"]["runs"]] == ["quiet eco", "quiet balanced", "surge"]
 
 

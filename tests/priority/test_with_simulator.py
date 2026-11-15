@@ -83,7 +83,8 @@ def test_heartbeat_loss_ends_a_vip_trip_and_the_car_is_reopened_later():
 
 
 def test_integration_gaps_name_every_stub():
-    ctx = build(seed=1)
+    # Part 2 is real on main now: leave it out so every stand-in is still exercised
+    ctx = build(seed=1, parts=["sim", "safety", "access", "priority", "monitor"])
     install_scenario_standins(ctx)
     gaps = " ".join(integration_gaps(ctx))
     assert "Part 2" in gaps and "Part 3" in gaps and "Part 4" in gaps

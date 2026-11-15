@@ -14,10 +14,12 @@ def test_all_18_scenarios_with_the_right_owner_part():
     assert sum(len(v) for v in OWNERS.values()) == 18
 
 
-def test_only_sim_09_and_16_are_ready():
-    # Part 5 added its checks for SIM-06, 11, 12 and 18 (ems/priority/acceptance)
+def test_ready_scenarios():
+    # Part 5 added its checks for SIM-06, 11, 12 and 18 (ems/priority/acceptance),
+    # Part 2 for SIM-01..05 and 10 (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
-    assert ready == ["SIM-06", "SIM-09", "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
+    assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-09",
+                     "SIM-10", "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
     for s in SCENARIOS.values():
         if not s.ready:
             assert s.check is None and s.waiting_for == f"Part {s.owner_part} check"
@@ -26,9 +28,9 @@ def test_only_sim_09_and_16_are_ready():
 
 
 def test_not_ready_scenario_reports_what_it_waits_for():
-    r = run_scenario("SIM-01", 1)
+    r = run_scenario("SIM-07", 1)
     assert r["ready"] is False and r["passed"] is None and r["criteria"] == []
-    assert r["message"] == "not ready: waiting for Part 2 check"
+    assert r["message"] == "not ready: waiting for Part 3 check"
 
 
 def test_describe_resolves_the_default_rate():
@@ -77,7 +79,7 @@ def test_every_scenario_setup_matches_appendix_b():
 def test_sim_10_has_a_design_limit_setup():
     s = SCENARIOS["SIM-10"]
     (r,) = s.runs
-    assert s.waiting_for == "Part 2 check" and not s.ready
+    assert s.waiting_for is None and s.ready
     assert r.building == "design_limit" and r.rate == 400.0 and r.measure_s == 3600.0
     assert r.workload == {"lookups_per_min": 400.0, "camera_per_day": 2000.0,
                           "dashboard_users": 50, "dashboard_requests": 5}

@@ -3,7 +3,7 @@
 Each Scenario says what to run (profile, rate, faults, run lengths) and, once an owner has
 written it, how to judge the run (`check`). Ownership:
     Part 1: SIM-09, SIM-16 (checks below)
-    Part 2: SIM-01 02 03 04 05 10     Part 3: SIM-07
+    Part 2: SIM-01 02 03 04 05 10 (checks in ems/dispatch/acceptance.py)     Part 3: SIM-07
     Part 4: SIM-08 13 14 15 17        Part 5: SIM-06 11 12 18
 HOW A PART ADDS ITS SCENARIO: edit the entry in SCENARIOS (below), set `faults`, write a function
   check(result, ctx) -> list[(criterion, passed, detail)]
@@ -26,7 +26,7 @@ schedule, with per-block metrics in RunResult.blocks. SIM-08 starts at 16:30 so 
 (measured minute 20) falls on the 17:00 Rush transition. SIM-10 is the design-limit run: building
 "design_limit" (64 cars, 8 groups, 128 stops, 200 tenants, 20,000 people), 400 calls/min,
 400 lookups/min, 2,000 camera events/day, 50 dashboard users; latency hooks only. Its checks
-are Part 2's ("Part 2 check").
+are Part 2's.
 rate=None means "the profile's default rate" (D-01). A check gets the RunResult and the finished
 Context (bus log, services).
 """
@@ -212,6 +212,22 @@ def _part5(name: str) -> Callable:
     return call
 
 
+def _part2(name: str) -> Callable:
+    """Part 2 setup / check (ems/dispatch/acceptance.py), imported only when it runs."""
+    def call(*args):
+        from importlib import import_module
+        return getattr(import_module("ems.dispatch.acceptance"), name)(*args)
+    call.__name__ = name
+    return call
+
+
+def _ready2(sid: str, title: str, profile: Optional[str], srs: str, verifies: str,
+            notes: str = "", **kw) -> Scenario:
+    """A Part 2 scenario with its check written (ems/dispatch/acceptance.py)."""
+    return Scenario(sid, title, 2, profile, srs_criteria=srs, verifies=verifies, notes=notes,
+                    check=_part2(f"check_{sid.lower().replace('-', '_')}"), ready=True, **kw)
+
+
 def _todo(sid: str, title: str, part: int, profile: Optional[str], srs: str, verifies: str,
           notes: str = "", waiting_for: Optional[str] = None, **kw) -> Scenario:
     return Scenario(sid, title, part, profile, waiting_for=waiting_for or f"Part {part} check",
@@ -219,18 +235,19 @@ def _todo(sid: str, title: str, part: int, profile: Optional[str], srs: str, ver
 
 
 SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
-    _todo("SIM-01", 'Morning up-peak, all passengers with cards', 2, "up_peak", 'Average wait 25 s or less, none over 60 s; car shown within 1.5 s', 'NFR-P3, NFR-P5'),
-    _todo("SIM-02", 'Lunch and evening peaks', 2, "lunch", 'As SIM-01', 'NFR-P3', runs=[RunSetup("lunch", "lunch"), RunSetup("evening", "evening")]),
-    _todo("SIM-03", 'Office hours, inter-floor traffic (Balanced)', 2, "balanced", 'Average 30 s or less, none over 90 s', 'NFR-P3'),
-    _todo("SIM-04", 'Eco quiet paired with Balanced; separate surge phase', 2, "eco_quiet", 'At least 15% run-time saving in every quiet pair; Eco mean <=45 s and ceiling <=120 s; surge switches under FR-14', 'FR-14, NFR-E1, NFR-P3', runs=[
-        RunSetup("quiet eco", "eco_quiet", pair="quiet", start_hhmm="21:00", requested_mode="eco"),
+    _ready2("SIM-01", 'Morning up-peak, all passengers with cards', "up_peak", 'Average wait 25 s or less, none over 60 s; car shown within 1.5 s', 'NFR-P3, NFR-P5'),
+    _ready2("SIM-02", 'Lunch and evening peaks', "lunch", 'As SIM-01', 'NFR-P3', runs=[RunSetup("lunch", "lunch"), RunSetup("evening", "evening")]),
+    _ready2("SIM-03", 'Office hours, inter-floor traffic (Balanced)', "balanced", 'Average 30 s or less, none over 90 s', 'NFR-P3'),
+    _ready2("SIM-04", 'Eco quiet paired with Balanced; separate surge phase', "eco_quiet", 'At least 15% run-time saving in every quiet pair; Eco mean <=45 s and ceiling <=120 s; surge switches under FR-14', 'FR-14, NFR-E1, NFR-P3', runs=[
+        RunSetup("quiet eco", "eco_quiet", pair="quiet", start_hhmm="21:00", requested_mode="eco",
+                 setup=_part2("setup_eco")),
         RunSetup("quiet balanced", "eco_quiet", pair="quiet", start_hhmm="21:00",
-                 requested_mode="balanced"),
+                 requested_mode="balanced", setup=_part2("setup_balanced")),
         RunSetup("surge", "up_peak", SRS_ORIGINAL_PEAK_RATE, start_hhmm="21:00",
                  warmup_s=600.0, measure_s=900.0, clear_s=1800.0, warmup_profile="eco_quiet",
                  envelope_note="Eco surge at 75/min for 15 min is outside the normal envelope "
                                "(D-01: the carryable peak rate is about 35/min)")]),
-    _todo("SIM-05", 'Full weekday on the default schedule', 2, "weekday", 'Each mode meets targets; no one stranded at mode changes', 'FR-11, FR-15', runs=[RunSetup("weekday 24 h", "weekday", mode="weekday", warmup_s=0.0,
+    _ready2("SIM-05", 'Full weekday on the default schedule', "weekday", 'Each mode meets targets; no one stranded at mode changes', 'FR-11, FR-15', runs=[RunSetup("weekday 24 h", "weekday", mode="weekday", warmup_s=0.0,
                                   measure_s=86400.0)]),
     Scenario("SIM-06", 'Car fault at up-peak, then a second removal requested', 5, "up_peak", setup=_part5("setup_sim_06"), check=_part5("check_sim_06"), ready=True, srs_criteria='Waiting calls retained/reassigned; faulted car not moved; second removal needs FM approval; degraded waits logged', verifies='FR-04, FR-33'),
     _todo("SIM-07", 'ACS outage for 15 minutes at up-peak', 3, "up_peak", 'Fresh cached permissions used, stale/missing cache restricted to public floors; security alerted; outage waits reported separately', 'FR-49, NFR-SE5, NFR-SE6', notes='ACS outage lasts 15 min (not 5), starting 20 min into the measured window.'),
@@ -240,7 +257,7 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
         ems_server_crash(CRASH_AT, TAKEOVER_S)], setup=_setup_with_recorder,
         check=check_sim_09, ready=True,
         srs_criteria='Failover within 10 s; service continues on controller logic', verifies='FR-54, NFR-R2'),
-    _todo("SIM-10", 'Design-limit configuration and concurrent workload', 2, "balanced", 'At least 99% of calls assigned <=1 s; all dashboard changes <=1 s; at least 95% of credential responses <=1.5 s', 'NFR-P1, NFR-P2, NFR-P5, NFR-S2', runs=[RunSetup(
+    _ready2("SIM-10", 'Design-limit configuration and concurrent workload', "balanced", 'At least 99% of calls assigned <=1 s; all dashboard changes <=1 s; at least 95% of credential responses <=1.5 s', 'NFR-P1, NFR-P2, NFR-P5, NFR-S2', runs=[RunSetup(
         "design limit", "balanced", DESIGN_CALLS_PER_MIN, start_hhmm="10:00", building="design_limit",
         measure_s=DESIGN_MEASURE_S, workload=DESIGN_WORKLOAD,
         envelope_note="SIM-10 checks software latency at the SRS design limits, not passenger "
