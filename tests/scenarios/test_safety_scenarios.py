@@ -8,7 +8,8 @@ import pytest
 from ems.contracts import events as E
 from ems.contracts.types import Call, CallSource
 from ems.core.app import build
-from ems.sim.scenarios import SCENARIOS, _reassignment_check, run_scenario
+from ems.safety.acceptance import _reassignment_check
+from ems.sim.scenarios import SCENARIOS, run_scenario
 
 SAFETY_CRITERIA = {
     "SIM-08": {"fire at 17:00 Rush transition", "zero EMS controller commands throughout fire handling",

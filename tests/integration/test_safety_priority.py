@@ -1,66 +1,47 @@
-"""Current PR #16 integration audit; PR #13 is deliberately not the target.
+"""Real Safety/Priority integration; known Priority defects are tracked in issue #18.
 
-Enable with SAFETY_PR16_TREE pointing at an unmodified detached checkout of PRIORITY_COMMIT.
-Runtime code is byte-verified against Git objects and loaded under a separate package name.
-The Access fixture delegates to the real mock ACS; this is not a Part 3 integration claim.
+Access uses the mock ACS adapter until Part 3 provides its service.
 """
 import ast
-import importlib.util
-import io
-import os
-import subprocess
-import sys
-import tarfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from ems import priority
 from ems.contracts import events as E
 from ems.contracts.interfaces import PriorityService
 from ems.contracts.types import Call, CallPriority, CallSource, Role
 from ems.contracts.types import CarState as S
 from ems.core.app import build
+from ems.priority.standins import PriorityAwareNearestCar
+from ems.safety.acceptance import _fire_goods_check
 from ems.sim.building import BuildingSpec
-from ems.sim.scenarios import _fire_goods_check
 
-PRIORITY_COMMIT = "4a7b11348056083ada4f30187af708afa812a417"
 SECURITY, FM, TECH, ADMIN = ("staff-security-1", "staff-fm-1", "staff-technician-1", "staff-admin-T01")
 
 
-@pytest.fixture(scope="module")
-def pr16_package():
-    tree = os.environ.get("SAFETY_PR16_TREE")
-    if not tree:
-        pytest.skip("PR #16 audit requires SAFETY_PR16_TREE; see docs/safety/SYNC_AUDIT.md")
-    root = Path(tree).resolve()
-    repo = Path(__file__).resolve().parents[2]
-    archive = subprocess.check_output(["git", "archive", PRIORITY_COMMIT, "ems/priority"], cwd=repo)
-    with tarfile.open(fileobj=io.BytesIO(archive)) as members:
-        for member in members:
-            if member.isfile() and member.name.endswith(".py"):
-                expected = members.extractfile(member).read().replace(b"\r\n", b"\n")
-                if (root / member.name).read_bytes().replace(b"\r\n", b"\n") != expected:
-                    pytest.fail(f"PR #16 source changed: {member.name}")
-    name = "ems._priority_pr16_audit"
-    spec = importlib.util.spec_from_file_location(
-        name, root / "ems/priority/__init__.py", submodule_search_locations=[str(root / "ems/priority")])
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    yield module
-    for key in list(sys.modules):
-        if key == name or key.startswith(name + "."):
-            del sys.modules[key]
+class KnownPriorityDefect(AssertionError):
+    """Only the tracked contract comparison may xfail; setup/runtime errors must fail."""
+
+
+def priority_contract(condition, message):
+    if not condition:
+        raise KnownPriorityDefect(message)
+
+
+def require(condition, message):
+    if not condition:
+        pytest.fail(message)
 
 
 @pytest.fixture
-def environment(pr16_package):
+def environment():
     def make(building=None):
         ctx = build(parts=["sim", "safety"], services={"building": building} if building else None)
         # Explicit test adapter while real Access is absent. Staff roles come from merged ACS.
         ctx.services["access"] = SimpleNamespace(permission=ctx.services["acs"].lookup)
-        pr16_package.register(ctx)
+        priority.register(ctx)
         return ctx, ctx.services["priority"], ctx.services["car_states"], ctx.services["controllers"]
     return make
 
@@ -80,7 +61,7 @@ def alarm(ctx, kind):
 def clear_physical(ctx, sim, kind):
     if kind == "fire":
         ctx.services["devices"].fire.clear()
-        assert sim.reset_fire()
+        require(sim.reset_fire(), "controller fire reset failed")
     else:
         ctx.services["devices"].power.restore_mains()
         ctx.clock.run_until(120)
@@ -90,7 +71,7 @@ def confirm(safety):
     safety.report_safety_clear(True)
     for car in safety.table.cars():
         safety.report_controller_normal(car, True)
-    assert safety.confirm_recovery(Role.FM)
+    require(safety.confirm_recovery(Role.FM), "Safety recovery gate did not open")
 
 
 def active_goods(ctx, p, car="S", end=600):
@@ -221,8 +202,8 @@ def test_goods_end_event_cannot_clear_an_independent_safety_fault(environment):
     assert safety.state("S") is S.FAULTED and safety.dispatchable("SERVICE") == []
 
 
-def test_production_priority_publishers_respect_approved_event_ownership(pr16_package):
-    root = Path(pr16_package.__file__).parent
+def test_production_priority_publishers_respect_approved_event_ownership():
+    root = Path(priority.__file__).parent
     allowed = {"PriorityTripStarted", "PriorityTripEnded", "GoodsMoveScheduled", "GoodsMoveEnded",
                "PanelMessage", "AlertRaised"}
     published = set()
@@ -237,48 +218,104 @@ def test_production_priority_publishers_respect_approved_event_ownership(pr16_pa
     assert published <= allowed and "GoodsMoveEnded" in published
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="FAIL PR16-01: preemption owner transfer")
+@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
+                   reason="GitHub issue #18 PR16-01: preemption owner transfer")
 @pytest.mark.parametrize("replacement", ["medical", "send_to_lobby"])
 def test_preemption_releases_the_owner_that_acquired_the_hold(environment, replacement):
     ctx, p, safety, _sim = environment()
     car = p.claim_call(vip_call(origin=20, destination=25))
     if car is None:
-        pytest.fail("audit precondition: VIP failed to start")
+        pytest.fail("integration precondition: VIP failed to start")
     ctx.clock.run_until(3)
     outcome = (p.request_medical(SECURITY, 20, 25) if replacement == "medical"
                else p.send_to_lobby(SECURITY, car))
     if not outcome.ok or outcome.car_id != car:
-        pytest.fail("audit precondition: replacement must reuse the VIP car")
-    assert p.finish_trip(SECURITY, outcome.ref).ok
-    assert safety.state(car) is S.GROUP_SERVICE
+        pytest.fail("integration precondition: replacement must reuse the VIP car")
+    require(p.finish_trip(SECURITY, outcome.ref).ok, "replacement trip did not finish")
+    priority_contract(safety.state(car) is S.GROUP_SERVICE, "preempted owner's hold remains")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="FAIL PR16-02: VIP-held medical state bypass")
+@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
+                   reason="GitHub issue #18 PR16-02: VIP-held medical state bypass")
 @pytest.mark.parametrize("state", [S.FAULTED, S.MAINTENANCE])
 def test_preemption_cannot_select_an_authoritatively_isolated_vip(environment, state):
     ctx, p, safety, _sim = environment()
     car = p.claim_call(vip_call(origin=20, destination=25))
     if car is None:
-        pytest.fail("audit precondition: VIP failed to start")
+        pytest.fail("integration precondition: VIP failed to start")
     ctx.clock.run_until(3)
-    assert safety.request(car, state, "audit:isolated")
-    assert p.request_medical(SECURITY, 20, 25).car_id != car
+    require(safety.request(car, state, "test:isolated"), "isolation setup failed")
+    priority_contract(p.request_medical(SECURITY, 20, 25).car_id != car,
+                      "medical preemption selected an isolated VIP car")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="FAIL PR16-03: cached claim bypasses safety")
+@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
+                   reason="GitHub issue #18 PR16-03: cached claim bypasses safety")
 @pytest.mark.parametrize("kind", ["fire", "power"])
 def test_cached_claim_cannot_return_cancelled_car_during_emergency(environment, kind):
     ctx, p, _safety, _sim = environment()
     call = vip_call()
-    assert p.claim_call(call) is not None
+    require(p.claim_call(call) is not None, "VIP setup failed")
     alarm(ctx, kind)
-    assert p.claim_call(call) is None
+    priority_contract(p.claim_call(call) is None, "cached claim returned a cancelled car")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="FAIL PR16-04: fire latch needs service group")
+@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
+                   reason="GitHub issue #18 PR16-04: fire latch needs service group")
 def test_priority_fire_recovery_works_without_a_service_group(environment):
     ctx, p, safety, sim = environment(BuildingSpec.design_limit())
     alarm(ctx, "fire")
     clear_physical(ctx, sim, "fire")
     confirm(safety)
-    assert not p.emergency()
+    priority_contract(not p.emergency(), "Priority fire latch remained after Safety recovery")
+
+
+@pytest.mark.parametrize("reason,cancelled,car,when", [
+    ("completed", False, "S", 10), ("emergency:power", True, "S", 10),
+    ("emergency:fire", True, "A", 10), ("emergency:fire", True, "S", 11),
+])
+def test_wrong_goods_terminal_evidence_cannot_pass_fire_cancellation(reason, cancelled, car, when):
+    ctx = build(parts=[])
+    ctx.services["controllers"] = SimpleNamespace(command_log=[])
+    ctx.bus.publish(E.GoodsMoveScheduled(0, "move", "S", 0, 20))
+    ctx.bus.publish(E.GoodsMoveEnded(when, "move", car, cancelled, reason))
+    assert not _fire_goods_check(ctx, E.FireAlarm(10))[1]
+
+
+def test_terminal_event_alone_does_not_prove_active_move_or_prevent_restart():
+    ctx = build(parts=[])
+    commands = []
+    ctx.services["controllers"] = SimpleNamespace(command_log=commands)
+    ctx.bus.publish(E.GoodsMoveEnded(10, "move", "S", True, "emergency:fire"))
+    assert not _fire_goods_check(ctx, E.FireAlarm(10))[1]
+    ctx.bus.publish(E.GoodsMoveScheduled(0, "move", "S", 0, 20))
+    assert _fire_goods_check(ctx, E.FireAlarm(10))[1]
+    commands.append((11, "S", "set_independent_service", (True,), True))
+    assert not _fire_goods_check(ctx, E.FireAlarm(10))[1]
+
+
+def test_normal_owner_release_does_not_erase_another_owner_maintenance(environment):
+    _ctx, p, safety, _sim = environment()
+    car = p.claim_call(vip_call())
+    assert (S.VIP_EXCLUSIVE, "priority:vip") in safety.table.holds[car]
+    assert safety.request(car, S.MAINTENANCE, "audit:maintenance")
+    p.end_trip(p.trip_of_car(car), True, "audit", commands=False)
+    assert safety.state(car) is S.MAINTENANCE
+    assert safety.table.holds[car] == {(S.MAINTENANCE, "audit:maintenance")}
+
+
+@pytest.mark.parametrize("kind", ["fire", "power"])
+def test_accessible_dispatch_standin_respects_real_safety_guard(environment, kind):
+    ctx, _p, safety, sim = environment()
+    PriorityAwareNearestCar(ctx)
+    alarm(ctx, kind)
+    ctx.bus.publish(E.PassengerArrived(0, "accessible", "panel", 1, 20, "HIGH", None, True, False))
+    assert not ctx.bus.of_type(E.CallAssigned) and sim.command_log == []
+    assert not safety.dispatchable("HIGH")
+
+
+def test_single_mechanical_alert_owner_and_separate_safety_entrapment(environment):
+    ctx, _p, _safety, sim = environment()
+    sim.inject_fault("A", "brake")
+    alerts = [a for a in ctx.bus.of_type(E.AlertRaised) if a.kind == "fault"]
+    assert len(alerts) == 1 and alerts[0].recipients == ["contractor", "fm"]

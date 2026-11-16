@@ -33,6 +33,37 @@ def test_not_ready_scenario_reports_what_it_waits_for():
     assert r["message"] == "not ready: waiting for Part 2 check"
 
 
+def test_registry_loads_part4_only_when_a_part4_scenario_executes():
+    import subprocess
+    import sys
+    from textwrap import dedent
+
+    code = dedent('''
+        import sys
+        from ems.sim.scenarios import SCENARIOS, describe, run_scenario
+
+        module = "ems.safety.acceptance"
+        assert module not in sys.modules
+        for scenario in SCENARIOS.values():
+            describe(scenario)
+        for sid in ("SIM-08", "SIM-13", "SIM-14", "SIM-15", "SIM-17"):
+            result = run_scenario(sid, 1)
+            assert result["ready"] is False and result["passed"] is None
+        assert module not in sys.modules
+        # Executing another owner's scenario must not load Safety acceptance either.
+        for sid in ("SIM-09", "SIM-08"):
+            for setup in SCENARIOS[sid].runs:
+                setup.warmup_s = setup.measure_s = setup.clear_s = 0
+        run_scenario("SIM-09", 1)
+        assert module not in sys.modules
+        result = run_scenario("SIM-08", 1, metrics_only=True)
+        assert module in sys.modules
+        assert result["ready"] is False and result["passed"] is None
+        assert result["criteria"]
+    ''')
+    subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+
+
 def test_describe_resolves_the_default_rate():
     d = describe(SCENARIOS["SIM-09"])
     assert d["rate"] == 35 and d["owner_part"] == 1 and d["faults"] == ["ems_crash at 1800 s"]
