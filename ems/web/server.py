@@ -46,10 +46,11 @@ app.include_router(monitor_router)
 
 # ---------------------------------------------------------------- state
 def _event_line(ev) -> str:
-    """One short text line: sim time, event name, its small fields."""
+    """One short text line: sim time, event name, its small fields. Credential ids are never
+    shown (rule 6: they belong in the security log only)."""
     bits = []
     for f in fields(ev):
-        if f.name == "t":
+        if f.name == "t" or f.name.startswith("credential_id"):
             continue
         value = getattr(ev, f.name)
         if is_dataclass(value):                       # Call -> its id

@@ -18,3 +18,19 @@ jobs:
         run: ruff check --select E9,F63,F7,F82 .
       - name: Tests
         run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ems:ci .
+      - name: Start container and check the API
+        run: |
+          docker run -d --name ems -p 8000:8000 ems:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/api/state > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:8000/api/state > /dev/null
+          curl -sf http://localhost:8000/building/ > /dev/null
+      - name: Container logs
+        if: always()
+        run: docker logs ems

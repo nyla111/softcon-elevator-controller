@@ -192,6 +192,13 @@ class GoodsMoveScheduled(Event):
     end: float
     credential_ids: list[CredentialId] = field(default_factory=list)
 
+@dataclass
+class GoodsMoveEnded(Event):
+    move_id: str
+    car_id: CarId
+    cancelled: bool                  # False only when the move finished as planned
+    reason: str                      # "completed" | "cancelled" | "start_refused" | "emergency:fire" ...
+
 
 # ---------- EMS server pair (pub: Part 1 Simulator, failover model) ----------
 @dataclass

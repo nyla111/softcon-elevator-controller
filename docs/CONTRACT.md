@@ -9,7 +9,7 @@ One Python app. Six parts talk in two ways only:
 1. **Time**: use `ctx.clock.now()` only. Never `time.time()`, `datetime.now()` or `sleep()`. Delays = `ctx.clock.call_later(sec, fn)`.
 2. **Randomness**: use `ctx.rng` only (seeded runs must repeat exactly).
 3. **One publisher per event** (see "pub:" in events.py). Don't publish other parts' events.
-4. **Car state**: only Part 4 changes it. Others ask via `car_states.request(...)`; it may say no (BR-06).
+4. **Car state**: only Part 4 changes it. Others ask via `car_states.request(...)`; it may say no (BR-06). `VIP_EXCLUSIVE` means any exclusive priority trip (VIP, medical, send-to-lobby); the kind is in `PriorityTripStarted.kind`.
 5. **Controllers can refuse** any command (returns False). Always handle False.
 6. **No personal data** in trip records or reports. Credential IDs only in the security log.
 7. **Don't edit `contracts/` or `core/`**. Need a new event/field? Ask the tech lead.
@@ -33,7 +33,7 @@ Test your part alone with `build(seed=1, parts=["<your_part>"])`.
 | 2 Dispatch & modes | `ems/dispatch` | dispatcher | Dispatcher, DispatchEngine |
 | 3 Access & panels | `ems/access` | access | AccessService |
 | 4 Safety & edge cases | `ems/safety` | car_states | CarStates |
-| 5 Priority & service car | `ems/priority` | priority | (events only + own API) |
+| 5 Priority & service car | `ems/priority` | priority | PriorityService |
 | 6 Dashboard, camera & admin | `ems/monitor` | reports | (subscribes to all events) |
 
 ## Conventions
@@ -61,3 +61,7 @@ Changes made to `contracts/` after the first skeleton, newest last.
 | `ctx.services["building"]` (`BuildingSpec`, `ems/sim/building.py`) | Part 1 | all parts | **Read the building layout (groups, cars, floors served) from `ctx.services['building']`; do not import `config.GROUPS` directly** (SIM-10 uses a different layout: 8 groups x 8 cars, 128 stops, ids `G1`..`G8`, cars `G1-1`..`G8-8`). For a non-reference building Part 1 registers a stand-in `car_states` (`SpecCarStates`); Part 4's real service registers over it. |
 | Scenario runs: every Appendix B setup is executable (`ems/sim/scenarios.py`, `harness.run`) | Part 1 | Part 2, all scenario owners | `RunResult.blocks` (SIM-05: per schedule block label, start, end, profile, calls, avg/max wait, `stranded`), `RunResult.latency` (SIM-10: assignment, lookup, camera, dashboard), manifest keys `outside_normal_envelope`, `measured_minutes`. Multi-run scenarios: `check(results, ctxs)`. SIM-10 `waiting_for` is now "Part 2 check". |
 | Profile `eco_quiet` (`traffic.py`) | Part 1 | Part 2 | Alias of `eco` (2/min, balanced mix); the weekday schedule uses it in Eco blocks. |
+| `register_stop(..., min_dwell_s=None)` (interfaces.py, stubs, simulator) | Part 2 (caller) | Part 1 simulator | FR-08 (#10): the EMS asks for a minimum door-open time at that stop; pass `priority.door_dwell_s(call)`. The simulator applies it and logs `(floor, call_id, min_dwell_s)` in `command_log`. Default unchanged. |
+| `PriorityService` protocol, `StubPriority` (interfaces.py, stubs.py) | Part 5 | Part 2 | #9: **for a VIP call Part 2 calls `ctx.get('priority').claim_call(call)` before choosing a car**; a car id means publish `CallAssigned` without `register_stop`, `None` means dispatch normally. Use `order()` / `rank()` for BR-10 order and `car_ok_for()` for FR-08 free capacity. The stub never claims and orders by `CallPriority`. |
+| `GoodsMoveEnded(move_id, car_id, cancelled, reason)` (events.py) | Part 5 | Part 3, Part 4, Part 6 | #11: a goods move ended (completed or cancelled early). Part 3 lifts the FR-82 service-car restriction; SIM-08 uses it as evidence that the active move was cancelled at the fire alarm. |
+| Staff cards in the mock ACS (`Population.staff`, `ems/sim/population.py`) | Part 1 | Part 3, Part 5 | #12, no contract change: `staff-security-1`, `staff-fm-1`, `staff-technician-1` (all floors) and `staff-admin-T01`.. (one tenant admin per tenant). Authorise staff actions from `access.permission(card).roles`, never from a role string chosen by the caller. |

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .config import GROUPS, LOBBY
+from .config import GROUPS, LOBBY, SIM
 from .types import (Call, CallId, CarId, CarState, CarStatus, CredentialId,
                     Direction, DoorState, Floor, GroupId, Mode, Permission, Role)
 
@@ -19,7 +19,7 @@ class StubControllers:
     def status(self, car_id: CarId) -> CarStatus: return self._s[car_id]
     def all_status(self, group: Optional[GroupId] = None) -> list[CarStatus]:
         return [s for s in self._s.values() if group is None or s.group == group]
-    def register_stop(self, car_id, floor, call_id) -> bool: return True
+    def register_stop(self, car_id, floor, call_id, min_dwell_s=None) -> bool: return True
     def cancel_stop(self, car_id, call_id) -> bool: return True
     def park(self, car_id, floor) -> bool: return True
     def set_standby(self, car_id, on) -> bool: return True
@@ -59,6 +59,15 @@ class StubDispatcher:
     def would_breach_ceiling_without(self, car_id: CarId) -> bool: return False
 
 
+class StubPriority:
+    def claim_call(self, call: Call) -> Optional[CarId]: return None
+    def rank(self, call: Call) -> int: return int(call.priority)
+    def order(self, calls) -> list[Call]:
+        return sorted(calls, key=lambda c: (int(c.priority), c.created_at, c.call_id))
+    def car_ok_for(self, call, status) -> bool: return True
+    def door_dwell_s(self, call) -> float: return SIM["min_dwell_s"]
+
+
 class StubNotifier:
     def __init__(self) -> None: self.inbox: list[tuple[list[str], str, str]] = []
     def send(self, recipients, subject, body) -> None:
@@ -76,5 +85,5 @@ class StubDatabase:
 STUBS = {
     "controllers": StubControllers, "acs": StubAcs, "notifier": StubNotifier,
     "access": StubAccess, "car_states": StubCarStates, "dispatcher": StubDispatcher,
-    "db": StubDatabase,
+    "priority": StubPriority, "db": StubDatabase,
 }

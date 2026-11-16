@@ -8,7 +8,8 @@ Each car is a small state machine that moves through these phases, one at a time
 * DoorsOpened is published when the doors are fully open, and the dwell timer
   starts at that moment.
 * Dwell = max(5 s, or 10 s if an accessible passenger boards/alights,
-  1 s x number of passengers boarding + alighting).
+  1 s x number of passengers boarding + alighting,
+  min_dwell_s asked by the EMS in register_stop for that floor).
 * Passengers move one at a time, 1 s each: alighters first, then boarders.
 * Stop order is simple collective: keep going the same way while there are
   stops ahead, then reverse.
@@ -124,6 +125,7 @@ class SimCar:
         self.express_floor: Optional[Floor] = None
         self.hold_doors = False                # express(..., hold_doors_open=True)
         self.held = False                      # dwell is over but doors stay open
+        self.dwell_requests: dict[Floor, float] = {}   # floor -> min door time asked by EMS
 
     # ---------- helpers ----------
     def _now(self) -> float:
@@ -290,6 +292,7 @@ class SimCar:
             self._later((i + 1) * self.p["s_per_passenger"], lambda a=action, q=passenger: a(q))
         accessible = any(p.accessible for _, p in moves)
         base = self.p["accessible_dwell_s"] if accessible else self.p["min_dwell_s"]
+        base = max(base, self.dwell_requests.pop(self.floor, 0.0))
         self._later(max(base, len(moves) * self.p["s_per_passenger"]), self._end_dwell)
 
     def _board(self, p: Passenger) -> None:
@@ -670,13 +673,17 @@ class Simulator:
     def all_status(self, group: Optional[GroupId] = None) -> list[CarStatus]:
         return [c.status() for c in self.cars.values() if group is None or c.group == group]
 
-    def register_stop(self, car_id: CarId, floor: Floor, call_id: CallId) -> bool:
+    def register_stop(self, car_id: CarId, floor: Floor, call_id: CallId,
+                      min_dwell_s: Optional[float] = None) -> bool:
         car = self.cars.get(car_id)
         ok = (not self.ems_down and car is not None and car.accepts_calls()
               and floor in car.floors)
         if ok:
             car.add_stop(floor, call_id)
-        return self._audit(car_id, "register_stop", (floor, call_id), ok)
+            if min_dwell_s is not None:
+                car.dwell_requests[floor] = max(min_dwell_s, car.dwell_requests.get(floor, 0.0))
+        args = (floor, call_id) if min_dwell_s is None else (floor, call_id, min_dwell_s)
+        return self._audit(car_id, "register_stop", args, ok)
 
     def cancel_stop(self, car_id: CarId, call_id: CallId) -> bool:
         car = self.cars.get(car_id)
