@@ -1,7 +1,7 @@
 """Safety supervision. Physical recall/rescue and command interlocks stay in controllers.
 
 No ControllerAdapter command is sent here. Recovery attestations are internal integration
-entry points, not authenticated UI endpoints (see docs/safety/INTEGRATION.md).
+entry points, not authenticated UI endpoints (see docs/safety.md).
 """
 from __future__ import annotations
 
