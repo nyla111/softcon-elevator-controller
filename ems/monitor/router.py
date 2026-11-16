@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from ems.contracts.types import Role
+from ems.monitor.service import ROLE_PERMISSIONS
 
 router = APIRouter(prefix="/api/monitor", tags=["monitor"])
 _context: Callable[[], Any] | None = None
@@ -48,6 +49,13 @@ class ConfigBody(BaseModel):
     value: Any
 
 
+class ChangeBody(BaseModel):
+    action: str
+    target: str
+    old: Any
+    new: Any
+
+
 @router.get("/report")
 def report(period: str = "month", mode: str | None = None,
            x_user: str | None = Header(None), x_role: str | None = Header(None)):
@@ -57,10 +65,44 @@ def report(period: str = "month", mode: str | None = None,
             else _service().period_report(period, mode)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+@router.get("/permissions")
+def permissions(x_user: str | None = Header(None), x_role: str | None = Header(None)):
+    _, role = _identity(x_user, x_role)
+    return {"role": role.value, "permissions": sorted(ROLE_PERMISSIONS.get(role, ())) }
+
+
+@router.get("/tenant-report")
+def tenant_report(x_user: str | None = Header(None), x_role: str | None = Header(None),
+                  x_tenant: str | None = Header(None)):
+    _allow(_identity(x_user, x_role), {Role.TENANT_ADMIN})
+    if not x_tenant:
+        raise HTTPException(400, "X-Tenant header is required")
+    return _service().tenant_report(x_tenant)
+
+
+@router.get("/diagnostics")
+def diagnostics(x_user: str | None = Header(None), x_role: str | None = Header(None)):
+    _allow(_identity(x_user, x_role), {Role.TECHNICIAN, Role.FM, Role.SYSADMIN})
+    return {"fault_history": _service().fault_history}
+
+
+@router.post("/changes")
+def human_change(body: ChangeBody, x_user: str | None = Header(None),
+                 x_role: str | None = Header(None)):
+    user, role = _allow(_identity(x_user, x_role), {Role.FM, Role.TECHNICIAN})
+    try:
+        return _service().record_human_change(user, role, body.action, body.target,
+                                              body.old, body.new)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 @router.get("/incidents")
 def incidents(x_user: str | None = Header(None), x_role: str | None = Header(None)):
     _allow(_identity(x_user, x_role), {Role.SECURITY, Role.SYSADMIN})
-    return list(_service().incidents.values())
+    return [row for row in _service().incidents.values() if row["status"] != "safety_alert"]
 
 
 @router.post("/incidents/{event_id}/review")
