@@ -17,11 +17,11 @@ from .service import AccessManager
 def register(ctx) -> None:
     """Subscribe to events and register access service."""
 
-    service = AccessManager(ctx)  # tạo bộ phận quản lý quyền truy cập
+    service = AccessManager(ctx)  # Create the real access manager
 
-    ctx.bus.subscribe(  # khi Simulator thông báo có hành khách mới, tự động gọi on_passenger
+    ctx.bus.subscribe(  # Handle passenger arrivals from the simulator
         PassengerArrived,
         service.on_passenger
     )
 
-    ctx.services["access"] = service  # đăng ký AccessManager để các phần khác sử dụng
+    ctx.services["access"] = service  # Expose the real service to the other parts

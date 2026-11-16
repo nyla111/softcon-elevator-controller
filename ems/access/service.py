@@ -1,15 +1,9 @@
-"""
+"""Part 3: Access & Panels service.
 
-1. FR-40 - floor_access --> có được vào tầng này không?
-2. FR-45 - floor_selection --> # quẹt thẻ tự gọi tầng nào và có thể đổi tầng trong 5 giây không?
-3. FR-49 - acs_fallback --> xử lý sao khi hệ thống xác thực thẻ mất kết nối?
-4. FR-41 - visitor_qr_pass --> cấp QR code cho khách
-5. FR-85 - courier_access --> người giao hàng được phép dùng tầng nào?
-6. FR-42 - lockdown --> khoá những tầng nhất định, và check xem ai vẫn có quyền đi những tầng đó
-7. FR-44 - public_floors --> những tầng luôn available
-8. FR-43 - access_logging --> giúp Security xem lịch sử sử dụng thẻ và những lần truy cập bị từ chối
-9. FR-46 - refused_panel --> xử lý những gì hành khách nhìn thấy khi hệ thống từ chối quyền truy cập
-10. FR-48 - in_car_access --> ử lý tình huống hành khách đã ở trong cabin thang máy và muốn bấm một tầng yêu cầu quyền truy cập
+AccessManager coordinates FR-40 floor checks, FR-45 floor selection,
+FR-49 ACS fallback, FR-41 visitor QR, FR-85 courier access,
+FR-42 lockdown, FR-44 public schedules, FR-43 access logging,
+FR-46 refusal messages, FR-48 in-car selection, and FR-126 group QR.
 """
 from __future__ import annotations
 

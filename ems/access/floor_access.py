@@ -72,7 +72,7 @@ class FloorAccess:
                 event.credential_id
             )
 
-            if permission.valid:  # nếu nhận diện valid
+            if permission.valid:  # Verified credential
                 allowed.update(
                     permission.allowed_floors
                 )
@@ -81,7 +81,7 @@ class FloorAccess:
                 )
 
         # Step 3: Check destination
-        if event.destination not in allowed or not self.lockdown.can_visit_floor(event.destination, permission):  # nếu chọn tầng không được phép -> refuse access
+        if event.destination not in allowed or not self.lockdown.can_visit_floor(event.destination, permission):  # Reject an unauthorized or locked floor
             self.refused_panel.refuse(
                 event.panel_id,
                 event.credential_id,

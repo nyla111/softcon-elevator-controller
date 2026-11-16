@@ -4,7 +4,7 @@ from __future__ import annotations
 from ..contracts.config import OTHER_FLOOR_WINDOW_S
 from ..contracts.events import CallReplaced, CallRequested
 from ..contracts.types import Call, CallSource
-# ĐÚNG
+# Access refusal event
 from ems.contracts.events import AccessRefused
 
 

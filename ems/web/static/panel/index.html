@@ -1,15 +1,67 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Part 3 - Lobby destination panel</title>
-<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMS | Destination Panel</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 3rem auto;
+           padding: 0 1rem; background: #f6f8fb; color: #19233b; }
+    main { background: white; border-radius: 14px; padding: 2rem;
+           box-shadow: 0 5px 24px #16254c16; }
+    label { display: block; font-weight: 600; margin-top: 1.1rem; }
+    input { box-sizing: border-box; display: block; width: 100%; font: inherit;
+            padding: .7rem; margin-top: .35rem; border: 1px solid #9aa8bc; border-radius: 7px; }
+    button { margin-top: 1.2rem; padding: .75rem 1.4rem; border: 0;
+             border-radius: 7px; color: white; background: #2054a6; font: inherit; cursor: pointer; }
+    #result { margin-top: 1.3rem; padding: 1rem; border-radius: 8px;
+              background: #edf2fa; white-space: pre-wrap; min-height: 1.5em; }
+    #result.refused { background: #fde9e9; color: #8c2525; }
+    #result.allowed { background: #e3f6eb; color: #145e32; }
+    small { color: #596479; }
+  </style>
+</head>
 <body>
-<h1>Part 3 - Lobby destination panel</h1>
-<p>Placeholder. Owner replaces this page. Data: <code>GET /api/state</code></p>
-<pre id="out"></pre>
-<script>
-async function poll() {
-  const r = await fetch("/api/state");
-  document.getElementById("out").textContent = JSON.stringify(await r.json(), null, 2);
-}
-poll(); setInterval(poll, 1000);
-</script>
-</body></html>
+  <main>
+    <h1>Lobby destination panel</h1>
+    <p>Enter a card and a destination floor. This uses the real ACS and Access rules.</p>
+    <form id="panel-form">
+      <label for="card">Card ID</label>
+      <input id="card" name="card" value="card-L5-001" autocomplete="off" required>
+      <label for="floor">Destination floor</label>
+      <input id="floor" name="floor" type="number" value="18" required>
+      <button type="submit">Check access</button>
+    </form>
+    <p><small>Demo refusal: card-L5-001 → L18. Allowed example: card-L5-001 → L5.</small></p>
+    <div id="result" role="status" aria-live="polite">Submit a request to see the result.</div>
+  </main>
+  <script>
+    const form = document.getElementById("panel-form");
+    const result = document.getElementById("result");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      result.className = "";
+      result.textContent = "Checking access...";
+      try {
+        const response = await fetch("/api/access/panel/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            credential_id: document.getElementById("card").value,
+            destination: Number(document.getElementById("floor").value)
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          result.textContent = data.detail || "Request could not be processed.";
+          return;
+        }
+        result.className = data.accepted ? "allowed" : "refused";
+        result.textContent = data.message;
+      } catch (_) {
+        result.textContent = "Cannot reach the EMS server.";
+      }
+    });
+  </script>
+</body>
+</html>
