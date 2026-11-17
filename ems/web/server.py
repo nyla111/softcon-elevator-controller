@@ -30,7 +30,7 @@ from ems.contracts.events import AlertRaised, CarStatusUpdated
 from ems.core.app import build
 from ems.access.router import router as access_router
 from ems.monitor.router import bind_context as bind_monitor_context, router as monitor_router
-from ems.sim import live, scenarios
+from ems.sim import live, scenarios, scripted
 
 STATIC = Path(__file__).parent / "static"
 MAX_ADVANCE_S = 600.0
@@ -207,6 +207,7 @@ class LiveStart(BaseModel):
     profile: str = "up_peak"
     rate: Optional[float] = None          # persons/min; None = the profile's default
     seed: int = 1
+    script: Optional[str] = None          # passenger list as CSV or JSON text (ems/sim/scripted.py)
 
 
 class LiveFault(BaseModel):
@@ -218,13 +219,17 @@ class LiveFault(BaseModel):
 @app.post("/api/live/start")
 def live_start(body: LiveStart) -> dict:
     try:
-        ctx = live.start_live(body.profile, body.rate, body.seed)
+        trips = scripted.loads(body.script) if body.script else None
+        ctx = live.start_live(body.profile, body.rate, body.seed, trips)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    started = body.model_dump(exclude={"script"})
+    if trips is not None:
+        started.update(profile="scripted", rate=None, trips=len(trips))
     with app.state.lock:
         app.state.ctx = ctx
-        app.state.live = body.model_dump()
-    return {"started": body.model_dump()}
+        app.state.live = started
+    return {"started": started}
 
 
 @app.post("/api/live/fault")

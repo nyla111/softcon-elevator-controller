@@ -12,6 +12,7 @@ from ems.core.app import Context, build
 
 from . import faults as F
 from .baseline import install_dispatch_standin
+from .scripted import ScriptedTraffic, ScriptedTrip
 from .traffic import PROFILES, TrafficGenerator, with_rate
 
 LIVE_HORIZON_S = 7 * 86400.0       # traffic keeps coming for a simulated week
@@ -26,13 +27,18 @@ FAULT_KINDS = {
 DEFAULT_DURATION_S = {"link_loss": 300.0, "acs_outage": 900.0, "plugin_crash": 300.0}
 
 
-def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 1) -> Context:
-    if profile not in PROFILES:
+def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 1,
+               script: list[ScriptedTrip] | None = None) -> Context:
+    """A live run with random traffic of one profile, or with a fixed passenger list (script)."""
+    if script is None and profile not in PROFILES:
         raise ValueError(f"unknown profile {profile!r}")
     ctx = build(seed=seed)
     install_dispatch_standin(ctx)
-    prof = with_rate(profile, rate) if rate else PROFILES[profile]
-    TrafficGenerator.fixed(ctx, prof, 0.0, LIVE_HORIZON_S).start()
+    if script is not None:
+        ScriptedTraffic(ctx, script).start()
+    else:
+        prof = with_rate(profile, rate) if rate else PROFILES[profile]
+        TrafficGenerator.fixed(ctx, prof, 0.0, LIVE_HORIZON_S).start()
     return ctx
 
 
