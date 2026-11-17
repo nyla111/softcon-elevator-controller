@@ -24,7 +24,7 @@ class PauseMixin:
 
     def on_server_down(self, ev: EmsServerDown) -> None:
         self.ems_down = True
-        for rec in [self.calls[c] for c in list(self.open)]:
+        for rec in [self.calls[c] for c in sorted(self.open)]:
             if rec.state == "pending":   # unassigned: the controllers take them now
                 rec.state = "controller"
 
@@ -35,7 +35,7 @@ class PauseMixin:
         """Fire recall: controllers dropped every stop. Waiting calls go back to the queue,
         keeping their wait clock; exclusive priority trips are over."""
         for car_id in list(self.waiting):
-            for cid in list(self.waiting.get(car_id, ())):
+            for cid in sorted(self.waiting.get(car_id, ())):
                 rec = self.calls[cid]
                 self._unlink(rec)
                 rec.prev_car, rec.car, rec.state = car_id, None, "pending"
