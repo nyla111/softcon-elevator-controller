@@ -1,8 +1,15 @@
+from pathlib import Path
+
 import pytest
 
 from ems.contracts.events import PassengerArrived
 from ems.core.app import build
-from ems.sim.scripted import ScriptedTraffic, ScriptedTrip, loads
+from ems.sim.baseline import install_dispatch_standin
+from ems.sim.harness import run
+from ems.sim.passengers import PassengerState
+from ems.sim.scripted import ScriptedTraffic, ScriptedTrip, load, loads
+
+DEMO = Path(__file__).resolve().parents[2] / "docs" / "examples" / "passengers_demo.csv"
 
 
 def test_csv_and_json_give_the_same_trips():
@@ -45,3 +52,12 @@ def test_trips_arrive_on_time_with_their_defaults():
     assert a.credential_id == pop.on_floor(12)[0].credential_id     # default card
     assert (b.t, b.passenger_id, b.group, b.vip) == (9.0, "me", "HIGH", True)
 
+
+def test_demo_list_runs_end_to_end():
+    r = run("scripted", seed=1, script=load(DEMO), setup=install_dispatch_standin,
+            warmup_s=0.0, measure_s=120.0, clear_s=900.0, out_dir=None, keep_ctx=True)
+    people = r.ctx.services["controllers"].passengers
+    assert people["refused-L18"].state is PassengerState.REFUSED    # card-L5-001 has no L18
+    assert people["accepted-L5"].state is PassengerState.DONE
+    assert r.metrics["n_delivered"] == 5 and r.metrics["calls_refused"] == 1
+    assert r.metrics["calls_not_cleared"] == 0

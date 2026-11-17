@@ -25,6 +25,7 @@ from .building import BuildingSpec
 from .faults import Fault, schedule_fault
 from .passengers import PassengerState
 from .population import Population
+from .scripted import ScriptedTraffic, ScriptedTrip
 from .traffic import (PEAK_PROFILES, PROFILES, SRS_ORIGINAL_PEAK_RATE, Profile, Segment,
                       TrafficGenerator, schedule_segments)
 
@@ -68,7 +69,8 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
         keep_ctx: bool = False, start_hhmm: Optional[str] = None, traffic: str = "fixed",
         warmup_profile: Union[None, str, Profile] = None,
         building: Optional[BuildingSpec] = None, workload: Optional[dict] = None,
-        manifest_extra: Optional[dict] = None) -> RunResult:
+        manifest_extra: Optional[dict] = None,
+        script: Optional[Sequence[ScriptedTrip]] = None) -> RunResult:
     """Run one scenario. `setup(ctx)` runs after build (e.g. to install a dispatcher).
     out_dir=None skips writing the evidence manifest.
 
@@ -80,9 +82,12 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
     building       layout of the run (default: the reference building).
     workload       SIM-10 design-limit hooks: {"lookups_per_min", "camera_per_day",
                    "dashboard_users", "dashboard_requests"}.
-    manifest_extra extra keys for the evidence manifest."""
+    manifest_extra extra keys for the evidence manifest.
+    script         a fixed passenger list (scripted.py) instead of random traffic; the profile
+                   argument is then only a label."""
     weekday = traffic == "weekday"
-    prof = None if weekday else (PROFILES[profile] if isinstance(profile, str) else profile)
+    prof = None if weekday or script is not None else (
+        PROFILES[profile] if isinstance(profile, str) else profile)
     label = profile if isinstance(profile, str) else profile.name
     ctx = build(seed=seed, start=_start_datetime(start_hhmm),
                 services={"building": building} if building is not None else None)
@@ -90,7 +95,9 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
     if setup is not None:
         setup(ctx)
     arrivals_end = warmup_s + measure_s
-    if weekday:
+    if script is not None:
+        ScriptedTraffic(ctx, list(script), population=population).start()
+    elif weekday:
         segments = schedule_segments(ctx, until=arrivals_end)
         TrafficGenerator(ctx, segments, population=population).start()
     elif warmup_profile is not None and warmup_s > 0:
@@ -124,8 +131,12 @@ def run(profile: Union[str, Profile], seed: int, faults: Sequence[Fault] = (), *
         ctx.clock.run_until(t)
 
     metrics = _metrics(sim, warmup_s, arrivals_end)
-    pdict = ({"name": label, "rate_per_min": None, "schedule": "weekday"} if weekday
-             else asdict(prof))
+    if script is not None:
+        pdict = {"name": label, "rate_per_min": None, "scripted_trips": len(script)}
+    elif weekday:
+        pdict = {"name": label, "rate_per_min": None, "schedule": "weekday"}
+    else:
+        pdict = asdict(prof)
     params = {"profile": pdict, "warmup_s": warmup_s, "measure_s": measure_s,
               "clear_s": clear_s, "population": pop.params, "faults": [asdict(f) for f in faults],
               "ended_at_s": ctx.clock.now(), "start": ctx.clock.now_dt().isoformat(),
