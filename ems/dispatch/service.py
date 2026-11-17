@@ -43,6 +43,7 @@ POLICY_EVERY_S = 5.0
 REFUSED_BACKOFF_S = 5.0          # a car that refused a stop is not asked again for 5 s
 LOBBY_HOLD_MAX_S = 10.0          # Rush up-peak: longest door hold asked at the lobby
 LOBBY_HOLD_MIN_S = 6.0           # shorter holds are not worth asking
+BALANCED_LOBBY_CARS = 1          # Balanced: idle cars parked at the lobby (rest near demand)
 ECO_ACTIVE_CARS = 2              # Eco: cars per group kept in service (4.3: "at least 1")
 BY = "dispatch"                  # requested_by for car_states
 
@@ -114,29 +115,38 @@ class Dispatcher:
         self._next_risk = 0.0
         self._next_policy = 0.0
         self._last_breach_alert: dict[GroupId, float] = {}
+        self.active = True
 
     # ================================================================ wiring
     def subscribe(self) -> None:
-        bus = self.ctx.bus
-        bus.subscribe(CallRequested, self.on_call_requested)
-        bus.subscribe(CallReplaced, self.on_call_replaced)
-        bus.subscribe(CallCancelled, self.on_call_cancelled)
-        bus.subscribe(PassengerBoarded, self.on_boarded)
-        bus.subscribe(PassengerAlighted, self.on_alighted)
-        bus.subscribe(OverloadDetected, self.on_overload)
-        bus.subscribe(ControllerFault, lambda e: self.reassign_calls_of(e.car_id, "fault"))
-        bus.subscribe(HeartbeatLost, lambda e: self.reassign_calls_of(e.car_id, "link_lost"))
-        bus.subscribe(CarStateChanged, self.on_car_state)
-        bus.subscribe(PriorityTripStarted, self.on_priority_started)
-        bus.subscribe(PriorityTripEnded, lambda e: self.exclusive.discard(e.car_id))
-        bus.subscribe(FireAlarm, self.on_fire)
-        bus.subscribe(FireAlarmCleared, self.on_fire_cleared)
-        bus.subscribe(MainsLost, self.on_mains_lost)
-        bus.subscribe(GeneratorReady, self.on_power_back)
-        bus.subscribe(MainsRestored, self.on_power_back)
-        bus.subscribe(EmsServerDown, self.on_server_down)
-        bus.subscribe(EmsServerUp, self.on_server_up)
-        self.ctx.clock.every(TICK_S, self.tick)
+        on = self._on
+        on(CallRequested, self.on_call_requested)
+        on(CallReplaced, self.on_call_replaced)
+        on(CallCancelled, self.on_call_cancelled)
+        on(PassengerBoarded, self.on_boarded)
+        on(PassengerAlighted, self.on_alighted)
+        on(OverloadDetected, self.on_overload)
+        on(ControllerFault, lambda e: self.reassign_calls_of(e.car_id, "fault"))
+        on(HeartbeatLost, lambda e: self.reassign_calls_of(e.car_id, "link_lost"))
+        on(CarStateChanged, self.on_car_state)
+        on(PriorityTripStarted, self.on_priority_started)
+        on(PriorityTripEnded, lambda e: self.exclusive.discard(e.car_id))
+        on(FireAlarm, self.on_fire)
+        on(FireAlarmCleared, self.on_fire_cleared)
+        on(MainsLost, self.on_mains_lost)
+        on(GeneratorReady, self.on_power_back)
+        on(MainsRestored, self.on_power_back)
+        on(EmsServerDown, self.on_server_down)
+        on(EmsServerUp, self.on_server_up)
+        self.ctx.clock.every(TICK_S, lambda: self.tick() if self.active else None)
+
+    def _on(self, event_type, handler) -> None:
+        self.ctx.bus.subscribe(event_type, lambda e: handler(e) if self.active else None)
+
+    def detach(self) -> None:
+        """Stop reacting to anything (tests of the stand-ins build the full app, then detach)."""
+        self.active = False
+
 
     def _svc(self, name: str):
         return self.ctx.services[name]
@@ -713,11 +723,12 @@ class Dispatcher:
             total = max(1, up + down)
             n_lobby = max(1, round(n * up / total)) if up else 0
             return [lobby] * n_lobby + spread(n - n_lobby) if n - n_lobby else [lobby] * n
-        # Balanced: one car at the lobby, the others at the busiest recent origin floors
+        # Balanced: some cars at the lobby, the others at the busiest recent origin floors
+        k = min(n, BALANCED_LOBBY_CARS)
         busiest = [f for f, _ in Counter(c.origin for c in recent if c.origin != lobby)
-                   .most_common(n - 1)]
-        rest = busiest + [f for f in spread(n - 1) if f not in busiest]
-        return [lobby] + rest[:n - 1]
+                   .most_common(n - k)]
+        rest = busiest + [f for f in spread(n - k) if f not in busiest]
+        return [lobby] * k + rest[:n - k]
 
     # ================================================================ helpers
     def _recent(self, group: GroupId, window_s: float) -> list[Call]:

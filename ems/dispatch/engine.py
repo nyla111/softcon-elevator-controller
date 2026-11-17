@@ -8,7 +8,8 @@ the passengers it already serves, once with the new call added. The cost of a ca
   + w_run * extra moving seconds and door cycles                    (energy, mode dependent)
   + w_busy * extra seconds the car stays busy (it comes back later for the passengers who have
     not arrived yet: this makes a car serve few floors per trip, like up-peak sectoring)
-  + a penalty for every passenger pushed towards the mode's wait ceiling (FR-13, BR-01)
+  + a penalty for every passenger pushed towards the mode's wait ceiling (FR-13, BR-01), and a
+    much larger one for every second a passenger is pushed past the ceiling itself
 
 and the cheapest car wins (ties: lower car id). A car where the new call would not fit on the
 trip (FR-101) is skipped. None = no car can take the call now (it waits in the pending queue).
@@ -27,13 +28,16 @@ from .model import Pax, Plan, replay
 
 # (w_wait, w_ride, w_run, w_busy): Rush = waiting time first, Eco = run time first (SRS 4.3)
 WEIGHTS = {
-    Mode.RUSH: (1.0, 0.25, 0.0, 1.5),
+    Mode.RUSH: (1.0, 0.25, 0.0, 1.0),
     Mode.BALANCED: (1.0, 0.5, 0.2, 0.5),
     Mode.ECO: (1.0, 0.3, 3.0, 0.0),
 }
 DOOR_CYCLE_RUN_S = 4.0         # a door cycle counted as run time (2 s open + 2 s close)
 CEILING_PENALTY = 10.0         # cost per second a passenger's total wait goes past the soft line
 SOFT_CEILING = 0.75            # soft line = 75% of the mode's wait ceiling
+# cost per second a passenger is pushed past the ceiling itself; Balanced only (in Rush it
+# lengthens trips at peak and the average gets worse, measured on SIM-01/02)
+HARD_PENALTY = {Mode.RUSH: 0.0, Mode.BALANCED: 100.0, Mode.ECO: 0.0}
 QUADRATIC = 1.0                # waits cost w + Q * w^2 / ceiling: long waits weigh more (BR-01)
 
 
@@ -117,7 +121,9 @@ class EtdEngine:
 
     def _ceiling(self, base: Plan, new: Plan, call: Call, mode: Mode) -> float:
         warn = SOFT_CEILING * MODE_TARGETS[mode][1]
-        def over(plan: Plan) -> float:
-            return sum(max(0.0, self.book.elapsed(cid) + t - warn)
+        hard = MODE_TARGETS[mode][1]
+        def over(plan: Plan, line: float) -> float:
+            return sum(max(0.0, self.book.elapsed(cid) + t - line)
                        for cid, t in plan.pickup.items())
-        return CEILING_PENALTY * max(0.0, over(new) - over(base))
+        return (CEILING_PENALTY * max(0.0, over(new, warn) - over(base, warn))
+                + HARD_PENALTY[mode] * max(0.0, over(new, hard) - over(base, hard)))
