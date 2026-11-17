@@ -103,15 +103,12 @@ def test_no_credential_in_trip_records_or_part5_alerts(observed_run):
     assert not [c for c in creds if any(c in t for t in texts)]
 
 
-def test_runner_api_runs_a_part5_scenario_and_reports_blocked():
+def test_runner_api_runs_a_part5_scenario_with_real_parts():
     from ems.web.server import app
     client = TestClient(app)
     listing = {s["id"]: s for s in client.get("/api/scenarios").json()}
     assert all(listing[s]["ready"] for s in ("SIM-06", "SIM-11", "SIM-12", "SIM-18"))
     r = client.post("/api/scenarios/SIM-18/run?seed=1").json()
-    assert r["ready"] is True and r["passed"] is False and r["message"] == "FAIL"
-    blocked = [c for c in r["criteria"] if not c["passed"]]
-    assert [c["criterion"] for c in blocked] == [
-        "integration with real Part 2/3/4 services (not stand-ins)"]
-    assert blocked[0]["detail"].startswith("BLOCKED")
+    # Parts 2, 3 and 4 are real on main: SIM-18 runs on them and passes
+    assert r["ready"] is True and r["passed"] is True and r["message"] == "PASS"
     assert client.get("/api/state").status_code == 200

@@ -29,10 +29,15 @@ def test_live_start_runs_traffic_and_state_has_the_new_fields(client):
     assert set(s["waiting"]) == {"LOW", "HIGH", "SERVICE"} and sum(s["waiting"]["LOW"].values()) > 0
     assert s["ems"] == {"status": "up", "controllers_fallback": False}
     assert s["dispatch_fallback_active"] is False and s["active_faults"] == []
-    assert s["dispatch_guard"]["calls"] > 0 and s["alerts_total"] == 0
+    # the live run starts at 00:00 (Eco); 35/min makes Part 2 step up to Balanced (FR-14),
+    # which raises one info alert to the FM. No other alert is expected.
+    assert s["dispatch_guard"]["calls"] > 0
+    assert all(a["severity"] == "info" and a["kind"] == "eco_step_up" for a in s["alerts"])
     assert 0 < len(s["events"]) <= 30 and all("s " in line for line in s["events"])
     assert not any("CarStatusUpdated" in line for line in s["events"])
-    assert {c["state"] for c in s["cars"]} == {"GROUP_SERVICE"}      # read from car_states
+    # read from car_states; at 00:00 (Eco) Part 2 may hold idle cars in Standby (4.3 table)
+    assert {c["state"] for c in s["cars"]} <= {"GROUP_SERVICE", "STANDBY"}
+    assert "GROUP_SERVICE" in {c["state"] for c in s["cars"]}
     assert not any("credential_id" in line or "card-L" in line for line in s["events"])
 
 

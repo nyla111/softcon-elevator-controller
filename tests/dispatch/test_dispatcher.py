@@ -69,8 +69,8 @@ def test_fault_reassigns_waiting_calls_and_keeps_clock_fr04():
     car = ctx.bus.of_type(CallAssigned)[0].car_id
     ctx.services["controllers"].inject_fault(car)
     ctx.bus.publish(ControllerFault(0.5, car, "F-01", False, False))
-    (ev,) = ctx.bus.of_type(CallReassigned)
-    assert ev.from_car == car and ev.to_car != car and ev.reason == "fault"
+    (ev,) = ctx.bus.of_type(CallReassigned)      # Part 4 or Part 2 moves it, only once
+    assert ev.from_car == car and ev.to_car != car and ev.reason.endswith("fault")
     rec = ctx.services["dispatcher"].calls["c1"]
     assert rec.call.created_at == 0.0 and rec.car == ev.to_car
 
