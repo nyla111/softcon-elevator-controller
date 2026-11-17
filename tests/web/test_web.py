@@ -196,3 +196,18 @@ def test_50_concurrent_state_requests_return_within_1_s(client):
     [t.join() for t in threads]
     assert not bad and len(times) == 150
     assert max(times) < 1.0, max(times)
+
+
+def test_timed_faults_can_be_cleared_early(client):
+    client.post("/api/live/start", json={"profile": "eco", "seed": 1})
+    for kind, restore, car, shown in (("link_loss", "link_restore", "B", "car B link lost"),
+                                      ("acs_outage", "acs_restore", None, "ACS down"),
+                                      ("plugin_crash", "plugin_restore", None,
+                                       "dispatch plug-in crashed")):
+        assert client.post("/api/live/fault", json={"kind": kind, "car_id": car}).status_code == 200
+        assert shown in client.get("/api/state").json()["active_faults"]
+        assert client.post("/api/live/fault", json={"kind": restore, "car_id": car}).status_code == 200
+        assert shown not in client.get("/api/state").json()["active_faults"]
+    r = client.post("/api/access/panel/request",
+                    json={"credential_id": "card-L5-001", "destination": 5})
+    assert r.json()["accepted"] is True             # ACS is back: no public-floor fallback
