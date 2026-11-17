@@ -1,0 +1,7 @@
+t,origin,destination,card,accessible,vip,passenger_id
+0,1,5,card-L5-001,,,accepted-L5
+15,1,18,card-L5-001,,,refused-L18
+30,1,12,,,,
+45,1,22,,true,,accessible-L22
+60,9,1,,,,
+75,20,1,,,,
