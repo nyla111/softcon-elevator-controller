@@ -75,8 +75,13 @@ def test_medical_may_take_the_vip_car_itself(env):
     out = env.p.request_medical(SECURITY, 20, 1)
     assert out.ok and out.car_id == "E"
     assert env.p.holds["E"].kind == "medical"
-    assert env.states.log[n_requests:] == []                 # hold converted, no new request
-    assert env.states.states["E"] is CarState.VIP_EXCLUSIVE
+    # owner hand-over (#18 PR16-01): medical takes the state first, then the VIP owner leaves
+    assert [x[:4] for x in env.states.log[n_requests:]] == [
+        ("request", "E", CarState.VIP_EXCLUSIVE, "priority:medical"),
+        ("release", "E", CarState.VIP_EXCLUSIVE, "priority:vip")]
+    assert env.states.holds["E"] == {(CarState.VIP_EXCLUSIVE, "priority:medical")}
+    assert env.p.finish_trip(SECURITY, out.ref).ok
+    assert env.states.states["E"] is CarState.GROUP_SERVICE and env.states.holds["E"] == set()
 
 
 def test_no_eligible_car_alerts_security(env):

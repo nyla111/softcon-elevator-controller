@@ -49,11 +49,18 @@ class VipMixin:
         return sum(1 for t in self.vip_starts if at - HOUR_S < t <= at)
 
     def claim_call(self, call: Call) -> Optional[CarId]:
-        """Idempotent per call id: the same call always gets the same answer."""
+        """One decision per call id. A car id is returned only while that exclusive trip is
+        still running on it: once the trip has ended (emergency, fault, re-assignment, ...) or
+        during an emergency the answer is None (dispatch normally); a cancelled trip is never
+        started again for the same call."""
         if call.priority is not CallPriority.VIP:
             return None
         if call.call_id in self.claims:
-            return self.claims[call.call_id]
+            car = self.claims[call.call_id]
+            trip = self.trip_of_call(call.call_id)
+            if car is None or trip is None or trip.car_id != car or self.emergency():
+                return None
+            return car
         outcome = self._start_vip(call)
         car = outcome.car_id if outcome.ok else None
         self.claims[call.call_id] = car

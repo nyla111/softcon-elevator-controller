@@ -24,10 +24,10 @@ from typing import Optional
 from ems.contracts.events import (AlertRaised, CallAssigned, CallCancelled, CallReassigned,
                                   CallRequested, CarStateChanged, ControllerFault,
                                   ControllerFaultCleared, DoorsOpened, EmsServerDown, EmsServerUp,
-                                  FireAlarm, FirefighterService, GeneratorReady, HeartbeatLost,
-                                  HeartbeatRestored, MainsLost, MainsRestored, PanelMessage,
-                                  PassengerAlighted, PassengerBoarded, PriorityTripEnded,
-                                  PriorityTripStarted)
+                                  FireAlarm, FireAlarmCleared, FirefighterService, GeneratorReady,
+                                  HeartbeatLost, HeartbeatRestored, MainsLost, MainsRestored,
+                                  PanelMessage, PassengerAlighted, PassengerBoarded,
+                                  PriorityTripEnded, PriorityTripStarted)
 from ems.contracts.types import (Call, CallId, CallPriority, CarId, CarState, CarStatus,
                                  CredentialId, Floor, GroupId, Role, floor_label)
 
@@ -62,7 +62,8 @@ class PriorityService(VipMixin, MedicalMixin):
         self.assigned: dict[CallId, CarId] = {}        # call -> car, assigned and not boarded
         self.riders: dict[CarId, dict[CallId, Floor]] = {}  # car -> riders and destinations
         self._seq = 0
-        self.fire = False
+        self.fire_alarm = False                        # FireAlarm until cleared / reset
+        self.firefighters: set[CarId] = set()          # cars in firefighter service
         self.power_lost = False
         self.ems_down = False
         self.maintenance = None                        # set by register()
@@ -106,7 +107,13 @@ class PriorityService(VipMixin, MedicalMixin):
     def healthy(self, status: CarStatus) -> bool:
         return status.fault_code is None and not status.disconnected
 
+    @property
+    def fire(self) -> bool:
+        return self.fire_alarm or bool(self.firefighters)
+
     def emergency(self) -> bool:
+        """Part 5's own view of the building signals, and Part 4's: a real Safety service keeps
+        safety_active() until its recovery gate (FM confirmation) has opened."""
         return self.fire or self.power_lost or self.ctx.get("car_states").safety_active()
 
     def blocked_reason(self) -> Optional[str]:
@@ -147,6 +154,25 @@ class PriorityService(VipMixin, MedicalMixin):
             states.release(car_id, state, f"priority:{kind}")
             return "controller_refused"
         self.holds[car_id] = Hold(car_id, state, kind, ref, self.now())
+        return None
+
+    def retake(self, car_id: CarId, kind: str, ref: str, command: tuple) -> Optional[str]:
+        """Hand a car Part 5 holds to another of its kinds (a medical or send-to-lobby trip
+        taking a VIP car). The new owner asks car_states for the same state first, and only
+        then the old owner releases it, so the car never leaves the state in between and no
+        hold is left under the old owner. Refused if Part 4 has put the car in a state that
+        outranks the hold (faulted, maintenance, an emergency, ...)."""
+        hold = self.holds[car_id]
+        states = self.ctx.get("car_states")
+        if states.state(car_id) is not hold.state:
+            return "car_isolated"
+        if not states.request(car_id, hold.state, f"priority:{kind}"):
+            return "state_refused"
+        if not self.cmd(command[0], car_id, *command[1:]):
+            states.release(car_id, hold.state, f"priority:{kind}")
+            return "controller_refused"
+        self.holds[car_id] = Hold(car_id, hold.state, kind, ref, self.now())
+        states.release(car_id, hold.state, f"priority:{hold.kind}")
         return None
 
     def give_back(self, car_id: CarId,
@@ -206,7 +232,9 @@ class PriorityService(VipMixin, MedicalMixin):
                 continue
             hold = self.holds.get(s.car_id)
             if hold is not None:
-                if allow_vip_held and hold.kind == "vip":
+                # only while Part 4 still has it in the state of our hold (not isolated since)
+                if allow_vip_held and hold.kind == "vip" and \
+                        states.state(s.car_id) is hold.state:
                     out.append(s)
                 continue
             if states.state(s.car_id) is CarState.GROUP_SERVICE and s.car_id in dispatchable:
@@ -367,13 +395,23 @@ class PriorityService(VipMixin, MedicalMixin):
                        trip.car_id)
 
     def on_fire(self, ev: FireAlarm) -> None:
-        self.fire = True
+        self.fire_alarm = True
         self._emergency_stop("fire")
 
+    def on_fire_cleared(self, ev: FireAlarmCleared) -> None:
+        # Layouts without a service group have no firefighter car, so no FirefighterService
+        # ends the fire for them. Recovery itself stays with Part 4 (safety_active()).
+        self.fire_alarm = False
+        self.retry_reopen()
+
     def on_firefighter(self, ev: FirefighterService) -> None:
-        if not ev.active:                             # published when the fire reset is done
-            self.fire = False
-            self.retry_reopen()
+        if ev.active:
+            self.firefighters.add(ev.car_id)
+            return
+        # published when the controller fire reset is done, which needs the alarm cleared
+        self.firefighters.discard(ev.car_id)
+        self.fire_alarm = False
+        self.retry_reopen()
 
     def on_mains_lost(self, ev: MainsLost) -> None:
         self.power_lost = True
@@ -407,6 +445,7 @@ def subscribe(ctx, service: PriorityService) -> None:
             (PassengerBoarded, service.on_boarded), (PassengerAlighted, service.on_alighted),
             (DoorsOpened, service.on_doors_opened), (ControllerFault, service.on_car_lost),
             (HeartbeatLost, service.on_car_lost), (FireAlarm, service.on_fire),
+            (FireAlarmCleared, service.on_fire_cleared),
             (FirefighterService, service.on_firefighter), (MainsLost, service.on_mains_lost),
             (MainsRestored, service.on_mains_restored), (EmsServerDown, service.on_ems_down),
             (EmsServerUp, service.on_ems_up)]:
