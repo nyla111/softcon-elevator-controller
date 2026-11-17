@@ -115,6 +115,8 @@ def test_pages_are_served(client):
         assert client.get(path).status_code == 200
     assert "tower" in client.get("/building/").text and "SIM-" not in client.get("/runner/").text
     assert "Live cars" in client.get("/dashboard/").text
+    assert "Security incident review" in client.get("/dashboard/").text
+    assert "reviewIncident" in client.get("/dashboard/").text
 
 
 def test_monitor_role_permissions_and_audit(client):
@@ -130,6 +132,24 @@ def test_monitor_role_permissions_and_audit(client):
                       headers=owner).status_code == 403
     audit = client.get("/api/monitor/audit", headers=owner).json()
     assert audit[-1]["user"] == "fm-1" and audit[-1]["old"] == [1]
+
+
+def test_monitor_all_staff_roles_and_human_change_audit(client):
+    technician = {"X-Role": "technician", "X-User": "tech-1"}
+    tenant = {"X-Role": "tenant_admin", "X-User": "tenant-admin", "X-Tenant": "T01"}
+    fm = {"X-Role": "facility_manager", "X-User": "fm-1"}
+    assert client.get("/api/monitor/diagnostics", headers=technician).status_code == 200
+    assert client.get("/api/monitor/tenant-report", headers=tenant).status_code == 200
+    assert client.get("/api/monitor/report", headers=technician).status_code == 403
+    change = {"action": "mode.change", "target": "LOW", "old": "eco", "new": "rush"}
+    assert client.post("/api/monitor/changes", json=change, headers=fm).status_code == 200
+    assert client.post("/api/monitor/changes", json=change, headers=technician).status_code == 403
+    permissions = client.get("/api/monitor/permissions", headers=tenant).json()
+    assert permissions["role"] == "tenant_admin" and "tenant_report.read" in permissions["permissions"]
+
+
+def test_monitor_requires_identity_headers(client):
+    assert client.get("/api/monitor/report").status_code == 401
 
 
 def test_scenarios_list_has_runs_with_start_times(client):
@@ -177,3 +197,33 @@ def test_50_concurrent_state_requests_return_within_1_s(client):
     [t.join() for t in threads]
     assert not bad and len(times) == 150
     assert max(times) < 1.0, max(times)
+
+
+def test_timed_faults_can_be_cleared_early(client):
+    client.post("/api/live/start", json={"profile": "eco", "seed": 1})
+    for kind, restore, car, shown in (("link_loss", "link_restore", "B", "car B link lost"),
+                                      ("acs_outage", "acs_restore", None, "ACS down"),
+                                      ("plugin_crash", "plugin_restore", None,
+                                       "dispatch plug-in crashed")):
+        assert client.post("/api/live/fault", json={"kind": kind, "car_id": car}).status_code == 200
+        assert shown in client.get("/api/state").json()["active_faults"]
+        assert client.post("/api/live/fault", json={"kind": restore, "car_id": car}).status_code == 200
+        assert shown not in client.get("/api/state").json()["active_faults"]
+    r = client.post("/api/access/panel/request",
+                    json={"credential_id": "card-L5-001", "destination": 5})
+    assert r.json()["accepted"] is True             # ACS is back: no public-floor fallback
+
+
+def test_refused_passenger_leaves_the_waiting_queue(client):
+    client.post("/api/live/start", json={"profile": "eco", "seed": 1})
+    sim = app.state.ctx.services["controllers"]
+    before = len(sim.waiting)
+    r = client.post("/api/access/panel/request",
+                    json={"credential_id": "card-L5-001", "destination": 18})
+    assert r.json()["accepted"] is False
+    assert len(sim.waiting) == before                        # not counted as waiting
+    assert sim.undelivered() == before
+    r = client.post("/api/access/panel/request",
+                    json={"credential_id": "card-L5-001", "destination": 5})
+    assert r.json()["accepted"] is True
+    assert len(sim.waiting) == before + 1                    # the accepted one still waits

@@ -14,15 +14,18 @@ def test_all_18_scenarios_with_the_right_owner_part():
     assert sum(len(v) for v in OWNERS.values()) == 18
 
 
-def test_ready_scenarios():
-    # Part 5 added its checks for SIM-06, 11, 12 and 18 (ems/priority/acceptance),
-    # Part 2 for SIM-01..05 and 10 (ems/dispatch/acceptance)
+def test_ready_scenarios_have_complete_acceptance_integrations():
+    # Part 5: SIM-06, 11, 12, 18 (ems/priority/acceptance); Part 2: SIM-01..05, 10
+    # (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
     assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-09",
                      "SIM-10", "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
     for s in SCENARIOS.values():
         if not s.ready:
-            assert s.check is None and s.waiting_for == f"Part {s.owner_part} check"
+            if s.owner_part == 4:
+                assert callable(s.check) and s.waiting_for
+            else:
+                assert s.check is None and s.waiting_for == f"Part {s.owner_part} check"
         else:
             assert s.check is not None and s.waiting_for is None
 
@@ -31,6 +34,37 @@ def test_not_ready_scenario_reports_what_it_waits_for():
     r = run_scenario("SIM-07", 1)
     assert r["ready"] is False and r["passed"] is None and r["criteria"] == []
     assert r["message"] == "not ready: waiting for Part 3 check"
+
+
+def test_registry_loads_part4_only_when_a_part4_scenario_executes():
+    import subprocess
+    import sys
+    from textwrap import dedent
+
+    code = dedent('''
+        import sys
+        from ems.sim.scenarios import SCENARIOS, describe, run_scenario
+
+        module = "ems.safety.acceptance"
+        assert module not in sys.modules
+        for scenario in SCENARIOS.values():
+            describe(scenario)
+        for sid in ("SIM-08", "SIM-13", "SIM-14", "SIM-15", "SIM-17"):
+            result = run_scenario(sid, 1)
+            assert result["ready"] is False and result["passed"] is None
+        assert module not in sys.modules
+        # Executing another owner's scenario must not load Safety acceptance either.
+        for sid in ("SIM-09", "SIM-08"):
+            for setup in SCENARIOS[sid].runs:
+                setup.warmup_s = setup.measure_s = setup.clear_s = 0
+        run_scenario("SIM-09", 1)
+        assert module not in sys.modules
+        result = run_scenario("SIM-08", 1, metrics_only=True)
+        assert module in sys.modules
+        assert result["ready"] is False and result["passed"] is None
+        assert result["criteria"]
+    ''')
+    subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
 
 
 def test_describe_resolves_the_default_rate():

@@ -61,6 +61,8 @@
       <div class="row"><button id="start">Start</button><button id="play">Play</button>
         <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
         <button class="spd" data-s="60">60x</button></div>
+      <h3>Access control</h3>
+      <div class="row"><a href="/panel/" target="_blank" rel="noopener noreferrer">Open the lobby destination panel</a></div>
       <h3>Faults</h3>
       <div class="row"><label>car <select id="car">
         <option>A</option><option>B</option><option>C</option><option>D</option>
@@ -70,8 +72,10 @@
         <button data-k="fire_alarm">Fire alarm</button><button data-k="fire_clear">Fire clear + reset</button>
         <button data-k="mains_loss">Mains loss</button><button data-k="mains_restore">Mains restore</button>
         <button data-k="car_fault">Car fault</button><button data-k="clear_fault">Clear fault</button>
-        <button data-k="link_loss">Link loss (5 min)</button><button data-k="acs_outage">ACS outage</button>
-        <button data-k="ems_crash">EMS server crash</button><button data-k="plugin_crash">Plug-in crash</button>
+        <button data-k="link_loss">Link loss (5 min)</button><button data-k="link_restore">Link restore</button>
+        <button data-k="acs_outage">ACS outage (15 min)</button><button data-k="acs_restore">ACS restore</button>
+        <button data-k="plugin_crash">Plug-in crash (5 min)</button><button data-k="plugin_restore">Plug-in restore</button>
+        <button data-k="ems_crash">EMS server crash</button>
         <button data-k="overload_burst">Overload burst</button><button data-k="bulky_item">Bulky item</button>
       </div>
       <h3>Active faults</h3><div id="activeFaults"><div style="color:var(--dim)">none</div></div>

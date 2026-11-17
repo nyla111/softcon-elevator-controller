@@ -174,6 +174,7 @@ def _metrics(sim, measure_from: float, measure_to: float) -> dict:
         # every passenger still waiting/riding at the end, warm-up arrivals included
         "calls_not_cleared": sim.undelivered(),
         "calls_cancelled": sum(1 for p in everyone if p.state is PassengerState.CANCELLED),
+        "calls_refused": sum(1 for p in everyone if p.state is PassengerState.REFUSED),
     }
 
 
@@ -191,7 +192,8 @@ def _block_metrics(sim, segments, measure_from: float, measure_to: float) -> lis
             continue
         mine = [p for p in people if start <= p.arrived_at < end]
         waits = [p.wait_s for p in mine if not p.evacuated and p.wait_s is not None]
-        stranded = [p for p in mine if p.state is not PassengerState.CANCELLED
+        stranded = [p for p in mine
+                    if p.state not in (PassengerState.CANCELLED, PassengerState.REFUSED)
                     and not p.evacuated and (p.alighted_at is None
                                              or p.alighted_at > end + STRANDED_AFTER_S)]
         mode = seg.label.split(" ", 1)[1] if " " in seg.label else ""
