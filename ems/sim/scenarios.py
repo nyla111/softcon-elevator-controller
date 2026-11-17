@@ -41,7 +41,8 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarS
 
 from .baseline import install_dispatch_standin
 from .building import BUILDINGS
-from .faults import Fault, ems_server_crash, fire_alarm, link_loss, measured, plugin_crash
+from .faults import (Fault, camera_event, ems_server_crash, fire_alarm, link_loss, mains_loss,
+                     measured, overload_burst, plugin_crash)
 from .harness import CLEAR_S, MEASURE_S, WARMUP_S, RunResult, run
 from .traffic import PROFILES, SRS_ORIGINAL_PEAK_RATE, with_rate
 
@@ -202,6 +203,15 @@ DESIGN_SHORT_REASON = "60 measured minutes took longer than about 5 min of wall 
 DESIGN_WORKLOAD = {"lookups_per_min": 400.0, "camera_per_day": 2000.0,
                    "dashboard_users": 50, "dashboard_requests": 5}
 
+def _part4(name: str) -> Callable:
+    """Load Safety setup / checks only when a Part 4 scenario executes them."""
+    def call(*args):
+        from importlib import import_module
+        return getattr(import_module("ems.safety.acceptance"), name)(*args)
+    call.__name__ = name
+    return call
+
+
 def _part5(name: str) -> Callable:
     """Part 5 setup / check (ems/priority/acceptance), imported only when it runs, so the
     registry and the other scenarios keep working even if Part 5 fails to import."""
@@ -258,6 +268,29 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
     Scenario("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "up_peak", setup=_part5("setup_sim_18"), check=_part5("check_sim_18"), ready=True, srs_criteria='VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', verifies='FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
 ]}
 
+# Full acceptance remains blocked; metrics_only runs exercise available Safety behavior.
+# The checks return actual unmet criteria rather than declaring stub integrations successful.
+for _sid, _check, _waiting in [
+    ("SIM-08", _part4("check_sim_08"), "Active goods scenario setup; FM and controller recovery integration"),
+    ("SIM-13", _part4("check_sim_13"), "Part 2 overload message and waiting-call reassignment"),
+    ("SIM-14", _part4("check_sim_14"), "FM and controller recovery integration"),
+    ("SIM-15", _part4("check_sim_15"), "Part 2 waiting-call reassignment"),
+    ("SIM-17", _part4("check_sim_17"), "Access pre-acceptance action and proven-duplicate integration"),
+]:
+    SCENARIOS[_sid].check = _check
+    SCENARIOS[_sid].waiting_for = _waiting
+
+SCENARIOS["SIM-08"].runs[0].setup = _part4("_setup_safety_fire")
+SCENARIOS["SIM-08"].runs[0].faults = [fire_alarm(measured(20), 300, reset_after=5)]
+SCENARIOS["SIM-13"].runs[0].faults = [
+    overload_burst("A", measured(minute)) for minute in (20, 22, 24)
+] + [camera_event("bulky_item", "A", measured(21)),
+     camera_event("bulky_item", "A", measured(23)),
+     camera_event("repeated_overload", "A", measured(24), people_count=20)]
+SCENARIOS["SIM-14"].runs[0].faults = [
+    mains_loss(measured(20), 300, generator_failed=True, failed_rescue_cars=("A",))]
+SCENARIOS["SIM-15"].runs[0].setup = _part4("_setup_safety_brake")
+
 
 def get(scenario_id: str) -> Scenario:
     return SCENARIOS[scenario_id]
@@ -311,8 +344,8 @@ def _run_summary(r: RunSetup, result: RunResult) -> dict:
 def run_scenario(scenario_id: str, seed: int, out_dir=None, metrics_only: bool = False) -> dict:
     """Run ONE seed headless (every run of the scenario). Returns plain data: metrics + criteria,
     or 'not ready'. One run: check(result, ctx). Several runs: check(results, ctxs), in run order.
-    metrics_only=True runs the setup of a scenario whose check is still an empty slot and returns
-    the metrics (per-block, latency, ...) with no pass/fail."""
+    metrics_only=True also runs blocked scenarios, returning metrics and any available partial
+    criteria. The aggregate passed value stays None until the scenario is ready."""
     s = get(scenario_id)
     base = {"id": s.id, "title": s.title, "seed": seed, "owner_part": s.owner_part,
             "profile": s.profile}
@@ -323,8 +356,12 @@ def run_scenario(scenario_id: str, seed: int, out_dir=None, metrics_only: bool =
     results = [run_setup(r, seed, out_dir) for r in s.runs]
     runs = [_run_summary(r, x) for r, x in zip(s.runs, results)]
     if not_ready:
+        partial = (s.check(results[0], results[0].ctx)
+                   if s.check is not None and len(results) == 1 else [])
         return base | {"ready": False, "passed": None, "metrics": results[0].metrics,
-                       "criteria": [], "runs": runs, "metrics_only": True,
+                       "criteria": [{"criterion": c, "passed": bool(ok), "detail": str(d)}
+                                    for c, ok, d in partial],
+                       "runs": runs, "metrics_only": True,
                        "message": f"metrics only: waiting for {s.waiting_for}"}
     if len(results) == 1:
         raw = s.check(results[0], results[0].ctx)
