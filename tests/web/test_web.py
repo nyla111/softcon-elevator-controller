@@ -226,3 +226,14 @@ def test_refused_passenger_leaves_the_waiting_queue(client):
                     json={"credential_id": "card-L5-001", "destination": 5})
     assert r.json()["accepted"] is True
     assert len(sim.waiting) == before + 1                    # the accepted one still waits
+
+
+def test_live_start_with_a_passenger_list(client):
+    script = "t,origin,destination,card\n0,1,5,card-L5-001\n"
+    r = client.post("/api/live/start", json={"profile": "up_peak", "seed": 1, "script": script})
+    assert r.json()["started"]["profile"] == "scripted" and r.json()["started"]["trips"] == 1
+    client.post("/api/advance?seconds=60")
+    assert app.state.ctx.services["controllers"].passengers["S0001"].destination == 5
+    assert len(app.state.ctx.services["controllers"].passengers) == 1   # no random traffic
+    bad = client.post("/api/live/start", json={"script": "t,origin,destination\n0,1,99\n"})
+    assert bad.status_code == 400 and "floor 99" in bad.text

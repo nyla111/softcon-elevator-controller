@@ -58,6 +58,8 @@
         <label>rate/min <input id="rate" placeholder="default" size="6"></label>
         <label>seed <input id="seed" value="1" size="4"></label>
       </div>
+      <div class="row"><label title="CSV or JSON: t, origin, destination, card, accessible, vip, passenger_id. Replaces the random traffic.">passenger list
+        <input id="script" type="file" accept=".csv,.json"></label></div>
       <div class="row"><button id="start">Start</button><button id="play">Play</button>
         <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
         <button class="spd" data-s="60">60x</button></div>
@@ -232,7 +234,12 @@ function setPlaying(on) {
   b.textContent = on ? "Pause" : "Play"; b.classList.toggle("on", on);
 }
 async function startLive(profile, rate, seed) {
-  await post("/api/live/start", { profile, rate: rate === "" || rate == null ? null : Number(rate), seed: Number(seed) });
+  const file = document.getElementById("script").files[0];       // fixed list instead of random
+  const script = file ? await file.text() : null;
+  try {
+    await post("/api/live/start", { profile, rate: rate === "" || rate == null ? null : Number(rate),
+                                    seed: Number(seed), script });
+  } catch (e) { alert(e.message); return; }
   setPlaying(true);
 }
 document.getElementById("start").onclick = () => startLive(
