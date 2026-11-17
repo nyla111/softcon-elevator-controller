@@ -22,3 +22,13 @@ def register(ctx) -> None:
     dispatcher = Dispatcher(ctx)
     dispatcher.subscribe()
     ctx.services["dispatcher"] = dispatcher
+
+
+def detach(ctx) -> None:
+    """Turn the real dispatcher off and put the contract stub back (stand-in tests)."""
+    from ems.contracts.stubs import StubDispatcher
+
+    real = ctx.services.get("dispatcher")
+    if hasattr(real, "detach"):
+        real.detach()
+    ctx.services["dispatcher"] = StubDispatcher()
