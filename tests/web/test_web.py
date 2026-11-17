@@ -211,3 +211,18 @@ def test_timed_faults_can_be_cleared_early(client):
     r = client.post("/api/access/panel/request",
                     json={"credential_id": "card-L5-001", "destination": 5})
     assert r.json()["accepted"] is True             # ACS is back: no public-floor fallback
+
+
+def test_refused_passenger_leaves_the_waiting_queue(client):
+    client.post("/api/live/start", json={"profile": "eco", "seed": 1})
+    sim = app.state.ctx.services["controllers"]
+    before = len(sim.waiting)
+    r = client.post("/api/access/panel/request",
+                    json={"credential_id": "card-L5-001", "destination": 18})
+    assert r.json()["accepted"] is False
+    assert len(sim.waiting) == before                        # not counted as waiting
+    assert sim.undelivered() == before
+    r = client.post("/api/access/panel/request",
+                    json={"credential_id": "card-L5-001", "destination": 5})
+    assert r.json()["accepted"] is True
+    assert len(sim.waiting) == before + 1                    # the accepted one still waits
