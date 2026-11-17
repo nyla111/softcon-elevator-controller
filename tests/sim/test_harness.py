@@ -18,7 +18,9 @@ def test_run_clears_all_calls_and_writes_manifest(tmp_path):
 
 
 def test_no_dispatcher_means_calls_not_cleared():
-    r = run("balanced", 1, out_dir=None, **SHORT)          # stub: nobody assigns cars
+    # the default build registers the real dispatcher: take it out again
+    from ems.dispatch import detach
+    r = run("balanced", 1, out_dir=None, setup=detach, **SHORT)   # nobody assigns cars
     assert not r.passed and r.metrics["calls_not_cleared"] > 0
 
 

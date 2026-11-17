@@ -2,26 +2,25 @@
 
 Seeds 1-10, every seed on its own (definition: ems/priority/acceptance.py).
 
-Runs on Part 1's simulator with the Part 5 stand-ins for the missing Part 2/3/4 services.
+Runs on Part 1's simulator with the real Part 2/3/4 services.
 """
 import pytest
 
-from .part5_helpers import BLOCKED_REASON, assert_part5_criteria, result
+from .part5_helpers import RUSH_MAX_GAP, assert_part5_criteria, result
 
-NOT_PART5 = {
-    'priority order medical > accessible > VIP > ordinary applied by the dispatcher': 'Part 2 must apply rank()',
-    'Rush wait targets hold (average <= 25 s, none over 60 s), every measured call counted': 'nearest-car stand-in misses Rush targets even without Part 5',
+KNOWN_GAPS = {
+    'Rush wait targets hold (average <= 25 s, none over 60 s), every measured call counted': RUSH_MAX_GAP,
 }
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("seed", range(1, 11))
 def test_sim_11_part5_criteria(seed):
-    assert_part5_criteria("SIM-11", seed, NOT_PART5)
+    assert_part5_criteria("SIM-11", seed, KNOWN_GAPS)
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(strict=True, reason=BLOCKED_REASON)
+@pytest.mark.xfail(reason=RUSH_MAX_GAP)
 @pytest.mark.parametrize("seed", range(1, 11))
 def test_sim_11_full_acceptance(seed):
     assert result("SIM-11", seed)["passed"]
