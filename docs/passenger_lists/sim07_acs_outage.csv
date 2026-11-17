@@ -1,0 +1,7 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,9,card-L9-001,,,before-outage,,,,delivered,60,permission looked up and cached
+30,,,,,,,acs_outage,,600,alert:acs_down,,FR-49 ACS stops answering
+60,1,9,card-L9-001,,,cached,,,,delivered,60,FR-49 fresh cached permission is used
+70,1,14,card-L14-001,,,not-cached,,,,refused,,FR-49 no cache: public floors only
+80,9,1,card-L9-001,,,way-down,,,,delivered,60,BR-07 the way down stays open
+700,1,14,card-L14-001,,,after-outage,,,,delivered,60,ACS back after 10 min

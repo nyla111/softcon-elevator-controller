@@ -9,7 +9,8 @@ from ems.sim.harness import run
 from ems.sim.passengers import PassengerState
 from ems.sim.scripted import ScriptedTraffic, ScriptedTrip, load, loads, run_list
 
-DEMO = Path(__file__).resolve().parents[2] / "docs" / "examples" / "passengers_demo.csv"
+LISTS = Path(__file__).resolve().parents[2] / "docs" / "passenger_lists"
+DEMO = LISTS / "demo.csv"
 
 
 def test_csv_and_json_give_the_same_trips():
@@ -84,3 +85,10 @@ def test_failed_expectations_are_reported():
     assert [(c.expected, c.actual, c.ok) for c in checks] == [
         ("delivered", "refused", False), ("alert:entrapment", "no_alert:entrapment", False)]
 
+
+@pytest.mark.parametrize("path", sorted(LISTS.glob("*.csv")), ids=lambda p: p.name)
+def test_passenger_list_meets_its_expectations(path):
+    _, checks = run_list(load(path))
+    failed = [f"row {c.row} {c.subject}: expected {c.expected}, got {c.actual}"
+              for c in checks if not c.ok]
+    assert not failed, "\n".join(failed)
