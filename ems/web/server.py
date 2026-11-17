@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from ems.contracts.events import AlertRaised, CarStatusUpdated
 from ems.core.app import build
+from ems.access.router import router as access_router
 from ems.monitor.router import bind_context as bind_monitor_context, router as monitor_router
 from ems.sim import live, scenarios
 
@@ -42,6 +43,7 @@ app.state.snapshot = None                   # ((ctx, t, events), pre-serialised 
 app.state.live = None                     # {"profile", "rate", "seed"} after /api/live/start
 bind_monitor_context(lambda: app.state.ctx)
 app.include_router(monitor_router)
+app.include_router(access_router)
 
 
 # ---------------------------------------------------------------- state

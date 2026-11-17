@@ -114,6 +114,8 @@ def test_pages_are_served(client):
         assert client.get(path).status_code == 200
     assert "tower" in client.get("/building/").text and "SIM-" not in client.get("/runner/").text
     assert "Live cars" in client.get("/dashboard/").text
+    assert "Security incident review" in client.get("/dashboard/").text
+    assert "reviewIncident" in client.get("/dashboard/").text
 
 
 def test_monitor_role_permissions_and_audit(client):
@@ -129,6 +131,24 @@ def test_monitor_role_permissions_and_audit(client):
                       headers=owner).status_code == 403
     audit = client.get("/api/monitor/audit", headers=owner).json()
     assert audit[-1]["user"] == "fm-1" and audit[-1]["old"] == [1]
+
+
+def test_monitor_all_staff_roles_and_human_change_audit(client):
+    technician = {"X-Role": "technician", "X-User": "tech-1"}
+    tenant = {"X-Role": "tenant_admin", "X-User": "tenant-admin", "X-Tenant": "T01"}
+    fm = {"X-Role": "facility_manager", "X-User": "fm-1"}
+    assert client.get("/api/monitor/diagnostics", headers=technician).status_code == 200
+    assert client.get("/api/monitor/tenant-report", headers=tenant).status_code == 200
+    assert client.get("/api/monitor/report", headers=technician).status_code == 403
+    change = {"action": "mode.change", "target": "LOW", "old": "eco", "new": "rush"}
+    assert client.post("/api/monitor/changes", json=change, headers=fm).status_code == 200
+    assert client.post("/api/monitor/changes", json=change, headers=technician).status_code == 403
+    permissions = client.get("/api/monitor/permissions", headers=tenant).json()
+    assert permissions["role"] == "tenant_admin" and "tenant_report.read" in permissions["permissions"]
+
+
+def test_monitor_requires_identity_headers(client):
+    assert client.get("/api/monitor/report").status_code == 401
 
 
 def test_scenarios_list_has_runs_with_start_times(client):
