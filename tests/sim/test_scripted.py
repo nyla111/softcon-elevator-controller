@@ -7,7 +7,7 @@ from ems.core.app import build
 from ems.sim.baseline import install_dispatch_standin
 from ems.sim.harness import run
 from ems.sim.passengers import PassengerState
-from ems.sim.scripted import ScriptedTraffic, ScriptedTrip, load, loads
+from ems.sim.scripted import ScriptedTraffic, ScriptedTrip, load, loads, run_list
 
 DEMO = Path(__file__).resolve().parents[2] / "docs" / "examples" / "passengers_demo.csv"
 
@@ -22,8 +22,12 @@ def test_csv_and_json_give_the_same_trips():
 
 
 @pytest.mark.parametrize("text, message", [
-    ("t,origin,destination\nx,1,5\n", "required numbers"),
+    ("t,origin,destination\nx,1,5\n", "t must be a number"),
     ("t,origin,destination\n-1,1,5\n", ">= 0"),
+    ("t,origin\n0,1\n", "needs origin and destination"),
+    ("t,event\n0,earthquake\n", "unknown event"),
+    ("t,origin,destination,expect\n0,1,5,arrived\n", "expect must be one of"),
+    ("t,event,expect\n0,fire_alarm,delivered\n", "alert:<kind>"),
     ("t,origin,destination,vip\n0,1,5,maybe\n", "vip must be true or false"),
 ])
 def test_bad_rows_are_rejected(text, message):
@@ -61,3 +65,22 @@ def test_demo_list_runs_end_to_end():
     assert people["accepted-L5"].state is PassengerState.DONE
     assert r.metrics["n_delivered"] == 5 and r.metrics["calls_refused"] == 1
     assert r.metrics["calls_not_cleared"] == 0
+
+
+def test_visitor_card_gets_a_pass_for_its_floor():
+    ctx = build(seed=1)
+    traffic = ScriptedTraffic(ctx, loads("t,origin,destination,card\n0,1,12,visitor:12\n"))
+    card = traffic.arrivals[0]["card"]
+    assert ctx.services["acs"].lookup(card).allowed_floors >= {12}
+    with pytest.raises(ValueError, match="visitor:<floor>"):
+        ScriptedTraffic(ctx, loads("t,origin,destination,card\n0,1,12,visitor:x\n"))
+
+
+def test_failed_expectations_are_reported():
+    text = ("t,origin,destination,card,event,car,expect\n"
+            "0,1,18,card-L5-001,,,delivered\n"            # refused in reality
+            "5,,,,check,,alert:entrapment\n")             # nothing happens
+    _, checks = run_list(loads(text))
+    assert [(c.expected, c.actual, c.ok) for c in checks] == [
+        ("delivered", "refused", False), ("alert:entrapment", "no_alert:entrapment", False)]
+
