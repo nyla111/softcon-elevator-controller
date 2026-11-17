@@ -118,3 +118,5 @@ uvicorn ems.web.server:app          # offline, no build step
 ```
 Open http://localhost:8000/building/ (pick a profile, press Start, then Play; speed 1x / 10x / 60x; fault buttons on the right) and http://localhost:8000/runner/ (run SIM-09 and SIM-16 over seeds 1-10; the other scenarios say which part still has to add its check in `ems/sim/scenarios.py`).
 
+To follow specific passengers instead of random traffic, choose a **passenger list** (CSV or JSON) on the building page before pressing Start. Columns: `t` (seconds from start), `origin`, `destination`, and optional `card`, `accessible`, `vip`, `passenger_id`; empty fields use an employee of the trip's floor. Example: [`docs/examples/passengers_demo.csv`](docs/examples/passengers_demo.csv) (one accepted trip, one refused, one accessible passenger). The same list runs headless with `run("scripted", seed=1, script=load(path))` (`ems/sim/scripted.py`).
+
