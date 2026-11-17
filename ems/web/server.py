@@ -234,6 +234,7 @@ def live_fault(body: LiveFault) -> dict:
             done = live.apply_fault(app.state.ctx, body.kind, body.car_id, body.duration)
         except ValueError as exc:
             raise HTTPException(400, str(exc))
+        app.state.snapshot = None         # a restore may publish no event: rebuild the state
         return {"injected": done, "t": app.state.ctx.clock.now()}
 
 

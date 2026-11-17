@@ -3,6 +3,8 @@
 Everything here is Part 1: it only builds the simulator, traffic and building signals. While
 Part 2 is still the stub dispatcher, the nearest-car stand-in (baseline.py) assigns the calls.
 Fault buttons use the same helpers as the scenarios (faults.py), scheduled for "now".
+Timed faults (link loss, ACS outage, plug-in crash) end on their own; the *_restore kinds end
+them early.
 """
 from __future__ import annotations
 
@@ -19,6 +21,7 @@ FAULT_KINDS = {
     "fire_alarm": False, "fire_clear": False, "mains_loss": False, "mains_restore": False,
     "car_fault": True, "clear_fault": True, "link_loss": True, "acs_outage": False,
     "ems_crash": False, "plugin_crash": False, "overload_burst": True, "bulky_item": True,
+    "link_restore": True, "acs_restore": False, "plugin_restore": False,
 }
 DEFAULT_DURATION_S = {"link_loss": 300.0, "acs_outage": 900.0, "plugin_crash": 300.0}
 
@@ -51,6 +54,12 @@ def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
         devices.power.restore_mains()
     elif kind == "clear_fault":
         sim.clear_fault(car_id)
+    elif kind == "link_restore":          # end a timed fault early (demo convenience)
+        sim.set_disconnected(car_id, False)
+    elif kind == "acs_restore":
+        ctx.services["acs"].set_down(False)
+    elif kind == "plugin_restore":
+        ctx.services["dispatch_guard"].set_crashed(False)
     else:
         fault = {
             "fire_alarm": lambda: F.fire_alarm(now),
