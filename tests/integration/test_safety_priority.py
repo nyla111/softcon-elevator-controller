@@ -1,4 +1,4 @@
-"""Real Safety/Priority integration; known Priority defects are tracked in issue #18.
+"""Real Safety/Priority integration; the issue #18 cases (PR16-01..04) run as normal tests.
 
 Access uses the mock ACS adapter until Part 3 provides its service.
 """
@@ -218,8 +218,6 @@ def test_production_priority_publishers_respect_approved_event_ownership():
     assert published <= allowed and "GoodsMoveEnded" in published
 
 
-@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
-                   reason="GitHub issue #18 PR16-01: preemption owner transfer")
 @pytest.mark.parametrize("replacement", ["medical", "send_to_lobby"])
 def test_preemption_releases_the_owner_that_acquired_the_hold(environment, replacement):
     ctx, p, safety, _sim = environment()
@@ -235,8 +233,6 @@ def test_preemption_releases_the_owner_that_acquired_the_hold(environment, repla
     priority_contract(safety.state(car) is S.GROUP_SERVICE, "preempted owner's hold remains")
 
 
-@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
-                   reason="GitHub issue #18 PR16-02: VIP-held medical state bypass")
 @pytest.mark.parametrize("state", [S.FAULTED, S.MAINTENANCE])
 def test_preemption_cannot_select_an_authoritatively_isolated_vip(environment, state):
     ctx, p, safety, _sim = environment()
@@ -249,8 +245,6 @@ def test_preemption_cannot_select_an_authoritatively_isolated_vip(environment, s
                       "medical preemption selected an isolated VIP car")
 
 
-@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
-                   reason="GitHub issue #18 PR16-03: cached claim bypasses safety")
 @pytest.mark.parametrize("kind", ["fire", "power"])
 def test_cached_claim_cannot_return_cancelled_car_during_emergency(environment, kind):
     ctx, p, _safety, _sim = environment()
@@ -260,8 +254,6 @@ def test_cached_claim_cannot_return_cancelled_car_during_emergency(environment, 
     priority_contract(p.claim_call(call) is None, "cached claim returned a cancelled car")
 
 
-@pytest.mark.xfail(strict=True, raises=KnownPriorityDefect,
-                   reason="GitHub issue #18 PR16-04: fire latch needs service group")
 def test_priority_fire_recovery_works_without_a_service_group(environment):
     ctx, p, safety, sim = environment(BuildingSpec.design_limit())
     alarm(ctx, "fire")

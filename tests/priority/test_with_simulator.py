@@ -1,8 +1,6 @@
 """Part 5 against Part 1's REAL simulator (cars, passengers, controllers, mock ACS), with the
 Part 2/3/4 contract stubs + Part 5 stand-ins (ems/priority/standins.py). This is integration
 with the simulator only, not with Part 2/3/4 (still stubs at the base commit)."""
-import pytest
-
 from ems.contracts.events import (CallAssigned, HeartbeatLost, PassengerArrived,
                                   PriorityTripEnded, PriorityTripStarted)
 from ems.contracts.types import CarState, Role
@@ -99,11 +97,6 @@ def test_integration_gaps_name_every_stub():
     assert ctx.services["car_states"].state("A") is CarState.GROUP_SERVICE
 
 
-# Remove this strict xfail when issue #18 / PR16-01 is fixed.
-@pytest.mark.xfail(
-    strict=True,
-    reason="Priority PR16-01: incorrect VIP state-owner release during medical preemption; see #18",
-)
 def test_vip_call_is_not_lost_when_its_car_is_taken_for_medical_before_boarding():
     """Regression A1 reproduced on the real simulator: before the fix the VIP stayed WAITING
     for ever on a car that had no stop for them."""

@@ -62,8 +62,12 @@ class FakeControllers:
 
 
 class FakeCarStates:
+    """Holds are (state, owner) as in Part 4: a release only removes the caller's own hold.
+    Writing states[car] directly stands for another owner (e.g. Safety) moving the car."""
+
     def __init__(self) -> None:
         self.states = {c: CarState.GROUP_SERVICE for g in BUILDING.groups for c in g.cars}
+        self.holds: dict[str, set[tuple]] = {}   # car -> {(state, by)} granted here
         self.refuse: set[tuple] = set()          # (car, state)
         self.log: list[tuple] = []
         self.safety = False
@@ -76,13 +80,17 @@ class FakeCarStates:
         self.log.append(("request", car_id, new, by, ok))
         if ok:
             self.states[car_id] = new
+            self.holds.setdefault(car_id, set()).add((new, by))
         return ok
 
     def release(self, car_id, from_state, by):
-        ok = self.states[car_id] is from_state
+        holds = self.holds.get(car_id, set())
+        ok = (from_state, by) in holds
         self.log.append(("release", car_id, from_state, by, ok))
         if ok:
-            self.states[car_id] = CarState.GROUP_SERVICE
+            holds.discard((from_state, by))
+            if self.states[car_id] is from_state and all(s is not from_state for s, _ in holds):
+                self.states[car_id] = min((s for s, _ in holds), default=CarState.GROUP_SERVICE)
         return ok
 
     def dispatchable(self, group):

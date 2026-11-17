@@ -9,7 +9,7 @@ from __future__ import annotations
 from ems.contracts.types import CarId, CredentialId, DoorState, Floor, GroupId, Role, floor_label
 
 from . import policy
-from .model import EXCLUSIVE, Hold, Outcome, Trip
+from .model import EXCLUSIVE, Outcome, Trip
 
 
 class MedicalMixin:
@@ -49,11 +49,11 @@ class MedicalMixin:
             trip_id = self.next_id("med")
             vip = self.trip_of_car(s.car_id)
             there = s.position == origin and s.doors is DoorState.OPEN
-            if vip is not None:                        # the VIP car itself: convert the hold
-                if not self.cmd("express", s.car_id, origin, there):
+            if vip is not None:                        # the VIP car itself: hand the hold over
+                if self.retake(s.car_id, "medical", trip_id,
+                               ("express", origin, there)) is not None:
                     continue
                 self.end_trip(vip, True, "medical_preempt", keep_hold=True)
-                self.holds[s.car_id] = Hold(s.car_id, EXCLUSIVE, "medical", trip_id, self.now())
             else:
                 if self.take(s.car_id, EXCLUSIVE, "medical", trip_id) is not None:
                     continue
@@ -119,10 +119,10 @@ class MedicalMixin:
         vip = self.trip_of_car(car_id)
         hold = self.holds.get(car_id)
         if vip is not None and vip.kind == "vip":
-            if not self.cmd("express", car_id, lobby, there):
-                return Outcome(False, "controller_refused")
+            why = self.retake(car_id, "send_to_lobby", trip_id, ("express", lobby, there))
+            if why is not None:
+                return Outcome(False, why)
             self.end_trip(vip, True, "send_to_lobby", keep_hold=True)
-            self.holds[car_id] = Hold(car_id, EXCLUSIVE, "send_to_lobby", trip_id, self.now())
         elif hold is not None:
             return Outcome(False, f"car_held:{hold.kind}")
         else:

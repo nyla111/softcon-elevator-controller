@@ -16,7 +16,14 @@ are kept on the archive branch `part5/minh-priority-service-car` (PR #13).
 Rules kept: car state only through `car_states` (Part 5 releases only states it holds);
 every refused command is rolled back and costs nothing; no command to a faulted car or during
 fire, power loss or EMS downtime; a VIP pick-up owed after an interrupted trip is registered only
-while that call is still assigned to that car and the car is in group service. Events published:
+while that call is still assigned to that car and the car is in group service.
+
+With Part 4's Safety (issue #18): `claim_call` gives a car only while that VIP trip is still
+running and no emergency is active, and never starts a cancelled trip again for the same call; a
+medical / send-to-lobby trip taking a VIP car asks `car_states` for the state under its own owner
+before the VIP owner releases it, and is refused if Part 4 has isolated the car since; Part 5's
+fire latch ends on `FireAlarmCleared` or the firefighter reset, while recovery stays gated by
+`car_states.safety_active()` until the FM confirms. Events published:
 `PriorityTripStarted/Ended`, `GoodsMoveScheduled/Ended`, `AlertRaised`, `PanelMessage`. Staff
 actions are authorised from `access.permission(card).roles`; no credential id in records or alerts.
 
