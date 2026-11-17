@@ -1,0 +1,9 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,5,card-L5-001,,,emp-own-floor,,,,delivered,60,UC-01 FR-40 employee rides to own floor
+10,1,18,card-L5-002,,,emp-no-access,,,,refused,,FR-46 floor not allowed for this card
+20,1,12,visitor:12,,,visitor-host,,,,delivered,60,UC-03 FR-41 visitor pass to host floor
+30,1,3,visitor:12,,,visitor-wrong,,,,refused,,FR-41 visitor pass is for one floor only
+40,1,25,staff-security-1,,,security,,,,delivered,60,FR-60 security card reaches every floor
+50,1,8,,true,,accessible,,,,delivered,60,FR-08 accessible passenger
+60,1,5,unknown-card,,,unknown,,,,refused,,FR-46 card not known to the ACS
+70,5,1,card-L5-001,,,emp-down,,,,delivered,60,BR-07 the way down to the lobby is open
