@@ -24,7 +24,7 @@ class CeilingMixin:
                 continue
             plan = replay(status, self.riders_of(car_id), self.waiting_of(car_id),
                           self.capacity_of(status), self.extra_load_of(status))
-            for cid in list(ids):
+            for cid in sorted(ids):
                 rec = self.calls[cid]
                 eta = plan.pickup.get(cid)
                 if eta is not None:
