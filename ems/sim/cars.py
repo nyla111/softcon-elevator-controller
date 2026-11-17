@@ -53,7 +53,7 @@ from enum import Enum
 from typing import Callable, Optional
 
 from ems.contracts import config
-from ems.contracts.events import (CallAssigned, CallCancelled, CallReassigned, CarStatusUpdated,
+from ems.contracts.events import (AccessRefused, CallAssigned, CallCancelled, CallRequested, CallReassigned, CarStatusUpdated,
                                   ControllerFault, ControllerFaultCleared, DoorsOpened,
                                   FireAlarm, FireAlarmCleared, FirefighterService,
                                   GeneratorReady, MainsLost, MainsRestored, OverloadDetected,
@@ -483,6 +483,7 @@ class Simulator:
         self.cars: dict[CarId, SimCar] = {}
         self.passengers: dict[str, Passenger] = {}
         self.waiting: dict[str, Passenger] = {}        # arrival order
+        self.unadmitted: dict[str, list[str]] = {}     # panel -> arrivals Access has not answered
         self.command_log: list[tuple] = []             # (t, car_id, command, args, accepted)
         self.ems_down = False                          # set by failover.py
         self.fallback_active = False                   # controllers serve passengers themselves
@@ -500,6 +501,8 @@ class Simulator:
             for car_id in g.cars:
                 self.cars[car_id] = SimCar(self, car_id, g.name, list(g.floors), g.rated_persons)
         ctx.bus.subscribe(PassengerArrived, self.on_arrived)
+        ctx.bus.subscribe(CallRequested, self.on_admitted)
+        ctx.bus.subscribe(AccessRefused, self.on_refused)
         ctx.bus.subscribe(CallAssigned, self.on_assigned)
         ctx.bus.subscribe(CallReassigned, self.on_reassigned)
         ctx.bus.subscribe(CallCancelled, self.on_cancelled)
@@ -516,8 +519,25 @@ class Simulator:
                       ev.accessible, ev.vip, ev.t)
         self.passengers[p.passenger_id] = p
         self.waiting[p.passenger_id] = p
+        self.unadmitted.setdefault(ev.panel_id, []).append(p.passenger_id)
         if self.fallback_active:
             self._fallback_assign(p)
+
+    def on_admitted(self, ev: CallRequested) -> None:
+        for pending in self.unadmitted.values():
+            if ev.call.call_id in pending:
+                pending.remove(ev.call.call_id)
+                return
+
+    def on_refused(self, ev: AccessRefused) -> None:
+        """AccessRefused carries no passenger id: Access answers each arrival at once, so the
+        refused person is the latest unanswered arrival at that panel."""
+        pending = self.unadmitted.get(ev.panel_id)
+        if not pending:
+            return
+        p = self.waiting.pop(pending.pop(), None)
+        if p is not None:
+            p.state = PassengerState.REFUSED
 
     def on_assigned(self, ev: CallAssigned) -> None:
         p = self.waiting.get(ev.call_id)
