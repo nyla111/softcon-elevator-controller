@@ -58,42 +58,12 @@
         <label>rate/min <input id="rate" placeholder="default" size="6"></label>
         <label>seed <input id="seed" value="1" size="4"></label>
       </div>
-
-# Access Panel
-<div class="row">
-  <button id="start">Start</button>
-  <button id="play">Play</button>
-  <button class="spd on" data-s="1">1x</button>
-  <button class="spd" data-s="10">10x</button>
-  <button class="spd" data-s="60">60x</button>
-</div>
-
-<!-- Access Control Panel -->
-<h3>Access Control</h3>
-<div class="row">
-  <a
-    href="/panel/"
-    target="_blank"
-    rel="noopener noreferrer"
-    style="
-      display: block;
-      width: 100%;
-      padding: 10px 12px;
-      background: #2054a6;
-      color: white;
-      border: 2px solid #4cb3ff;
-      border-radius: 6px;
-      text-align: center;
-      text-decoration: none;
-      font-weight: 700;
-    "
-  >
-    Open Access Control Panel
-  </a>
-</div>
-
-<h3>Faults</h3>
-
+      <div class="row"><button id="start">Start</button><button id="play">Play</button>
+        <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
+        <button class="spd" data-s="60">60x</button></div>
+      <h3>Access control</h3>
+      <div class="row"><a href="/panel/" target="_blank" rel="noopener noreferrer">Open the lobby destination panel</a></div>
+      <h3>Faults</h3>
       <div class="row"><label>car <select id="car">
         <option>A</option><option>B</option><option>C</option><option>D</option>
         <option>E</option><option>F</option><option>G</option><option>H</option><option>S</option>
