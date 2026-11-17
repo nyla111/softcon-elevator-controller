@@ -32,8 +32,11 @@ def test_safety_subcriteria_on_real_scenarios(sid, seed):
     actual = {c["criterion"]: c for c in result["criteria"]}
     assert SAFETY_CRITERIA[sid] <= actual.keys()
     assert all(actual[c]["passed"] for c in SAFETY_CRITERIA[sid]), result["criteria"]
-    # Honest negative evidence: cross-part acceptance is still incomplete.
-    assert any(not c["passed"] for c in actual.values())
+    # Honest negative evidence: cross-part acceptance is still incomplete. SIM-13 and SIM-15
+    # only waited for Part 2 (re-assignment), which is real now: some seeds pass every
+    # criterion, so the negative check stays for SIM-08 and SIM-14 only.
+    if sid in ("SIM-08", "SIM-14"):
+        assert any(not c["passed"] for c in actual.values())
 
 
 def test_sim_17_is_blocked_without_fabricating_panel_behavior():
