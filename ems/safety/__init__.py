@@ -7,11 +7,9 @@ from __future__ import annotations
 
 
 def register(ctx) -> None:
-    """Subscribe to events and put your service(s) into ctx.services.
-    Until you do, stubs from ems/contracts/stubs.py are used."""
-    # Example:
-    #   from ems.contracts.events import CallRequested
-    #   service = MyService(ctx)
-    #   ctx.bus.subscribe(CallRequested, service.on_call_requested)
-    #   ctx.services["car_states"] = service
-    pass
+    """Install the authoritative state service; dependencies are resolved lazily."""
+    from .service import SafetyService
+
+    service = SafetyService(ctx)
+    ctx.services["car_states"] = service
+    service.subscribe()

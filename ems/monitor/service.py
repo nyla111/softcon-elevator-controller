@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from collections import defaultdict, deque
 from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
@@ -9,10 +10,11 @@ from typing import Any
 from ems.contracts import config
 from ems.contracts.events import (
     AlertRaised, CallAssigned, CallCancelled, CallReassigned, CallRequested, CameraEvent,
-    CarStateChanged, CarStatusUpdated, ControllerFault, Event, ModeChanged, PanelMessage, PassengerAlighted,
-    PassengerBoarded, PriorityTripEnded, PriorityTripStarted, TripCompleted,
+    CarStateChanged, CarStatusUpdated, ControllerFault, Event, ModeChanged, OverloadDetected,
+    PanelMessage, PassengerAlighted, PassengerBoarded, PriorityTripEnded,
+    PriorityTripStarted, TripCompleted,
 )
-from ems.contracts.types import CallPriority, Mode, Role
+from ems.contracts.types import CallPriority, CarState, Mode, Role
 
 ENERGY_KWH_PER_RUN_HOUR = 12.0
 DAY = 86400.0
@@ -22,6 +24,19 @@ RETENTION = {"security": 90 * DAY, "camera_unconfirmed": 30 * DAY,
 CAMERA_KINDS = frozenset({"door_held", "bulky_item", "repeated_overload", "smoking",
                           "vandalism", "lying_still", "tailgating"})
 SAFETY_CAMERA_KINDS = frozenset({"lying_still", "smoking"})
+OUT_OF_GROUP_STATES = frozenset({CarState.FAULTED, CarState.MAINTENANCE,
+                                 CarState.INDEPENDENT_SERVICE, CarState.FIRE_RECALL,
+                                 CarState.EMERGENCY_POWER})
+ROLE_PERMISSIONS = {
+    Role.FM: frozenset({"reports.read", "configuration.read", "configuration.write",
+                        "mode.change", "schedule.change", "vip.change", "car_state.change"}),
+    Role.SECURITY: frozenset({"incidents.read", "incidents.review"}),
+    Role.TECHNICIAN: frozenset({"diagnostics.read", "car_state.change"}),
+    Role.TENANT_ADMIN: frozenset({"tenant_report.read"}),
+    Role.OWNER: frozenset({"reports.read", "audit.read", "configuration.read"}),
+    Role.SYSADMIN: frozenset({"reports.read", "incidents.read", "audit.read",
+                              "configuration.read", "configuration.write"}),
+}
 
 
 def _nearest_rank(values: list[float], percentile: float) -> float:
@@ -42,15 +57,24 @@ class MonitorService:
         self.fault_history: list[dict[str, Any]] = []
         self.mode_history: list[dict[str, Any]] = []
         self.run_slices: list[dict[str, Any]] = []
+        self.state_periods: list[dict[str, Any]] = []
+        self._state_started: dict[str, tuple[CarState, float]] = {}
+        self.vip_periods: list[dict[str, Any]] = []
+        self._vip_started: dict[str, float] = {}
+        self._overloads: dict[str, deque[float]] = defaultdict(deque)
         self._last_status_t: dict[str, float] = {}
         self._bulky_voice_events: set[str] = set()
         building = ctx.services.get("building")
+        groups = ({g.name: {"cars": list(g.cars), "floors": list(g.floors)}
+                   for g in building.groups} if building else {})
         self.configuration: dict[str, Any] = {
-            "building": building.as_dict() if building else {}, "public_floors": [config.LOBBY],
-            "panels": [], "tenants": {},
+            "building": building.as_dict() if building else {}, "groups": groups,
+            "public_floors": [config.LOBBY], "panels": [], "tenants": {},
             "house_rule_limits": {"item_kg": 25, "item_length_m": 1.5,
                                   "cart_width_m": 0.6},
-            "confirmed_clip_days": 365,
+            "confirmed_clip_days": 365, "camera_event_types": sorted(CAMERA_KINDS),
+            "camera_notice_en": "Camera monitoring for safety and house rules; clips retained 30 days unless confirmed.",
+            "camera_notice_vi": "Camera giám sát an toàn và nội quy; video lưu 30 ngày trừ khi được xác nhận.",
         }
         ctx.clock.every(DAY, self.purge_expired)
 
@@ -85,6 +109,8 @@ class MonitorService:
                                       "cause": event.cause})
         elif isinstance(event, CameraEvent):
             self._camera_event(event)
+        elif isinstance(event, OverloadDetected):
+            self._overload(event)
         elif isinstance(event, CarStatusUpdated):
             previous = self._last_status_t.get(event.status.car_id)
             self._last_status_t[event.status.car_id] = event.t
@@ -99,9 +125,29 @@ class MonitorService:
             self.fault_history.append({"t": event.t, "car_id": event.car_id,
                                        "code": event.code,
                                        "between_floors": event.between_floors})
-        elif isinstance(event, (CarStateChanged, PriorityTripStarted, PriorityTripEnded)):
+        elif isinstance(event, CarStateChanged):
+            self._car_state_changed(event)
+        elif isinstance(event, PriorityTripStarted):
+            if event.kind == "vip":
+                self._vip_started[event.car_id] = event.t
             self.security_log.append({"t": event.t, "kind": type(event).__name__,
                                       "detail": asdict(event)})
+        elif isinstance(event, PriorityTripEnded):
+            if event.kind == "vip" and event.car_id in self._vip_started:
+                self.vip_periods.append({"start": self._vip_started.pop(event.car_id),
+                                         "end": event.t, "car_id": event.car_id})
+            self.security_log.append({"t": event.t, "kind": type(event).__name__,
+                                      "detail": asdict(event)})
+
+    def _car_state_changed(self, event: CarStateChanged) -> None:
+        previous = self._state_started.pop(event.car_id, None)
+        if previous and previous[0] in OUT_OF_GROUP_STATES:
+            self.state_periods.append({"car_id": event.car_id, "state": previous[0].name,
+                                       "start": previous[1], "end": event.t})
+        if event.new in OUT_OF_GROUP_STATES:
+            self._state_started[event.car_id] = (event.new, event.t)
+        self.security_log.append({"t": event.t, "kind": type(event).__name__,
+                                  "detail": asdict(event)})
 
     def _complete_trip(self, event: PassengerAlighted) -> None:
         state = self.calls.pop(event.call_id, None)
@@ -134,16 +180,12 @@ class MonitorService:
         return sorted(set(candidates))
 
     def _camera_event(self, event: CameraEvent) -> None:
-        if event.kind not in CAMERA_KINDS:
+        if event.kind not in set(self.configuration["camera_event_types"]):
             return
         safety = event.kind in SAFETY_CAMERA_KINDS
-        row = {"event_id": event.event_id, "t": event.t, "kind": event.kind,
-               "car_id": event.car_id, "people_count": event.people_count,
-               "clip_ref": event.clip_ref,
-               "candidate_credentials": self._candidate_credentials(event),
-               "status": "safety_alert" if safety else "pending", "reviewer": None,
-               "reviewed_at": None, "evidence": None, "responsible_credential": None}
-        self.incidents[event.event_id] = row
+        self._record_incident(event.event_id, event.t, event.kind, event.car_id,
+                              event.people_count, event.clip_ref,
+                              self._candidate_credentials(event), safety)
         self.security_log.append({"t": event.t, "kind": "camera_event",
                                   "event_id": event.event_id, "car_id": event.car_id})
         if safety:
@@ -155,18 +197,48 @@ class MonitorService:
                                              ["security"],
                                              f"Camera safety event {event.kind} in car {event.car_id}",
                                              event.car_id, floor))
-        if event.kind == "bulky_item" and event.event_id not in self._bulky_voice_events:
-            self._bulky_voice_events.add(event.event_id)
-            self.ctx.bus.publish(PanelMessage(event.t, f"car:{event.car_id}",
+        if event.kind == "bulky_item":
+            self._bulky_message(event.event_id, event.t, event.car_id)
+
+    def _record_incident(self, event_id: str, t: float, kind: str, car_id: str,
+                         people_count: int, clip_ref: str | None,
+                         candidates: list[str], safety: bool = False) -> dict:
+        row = {"event_id": event_id, "t": t, "kind": kind, "car_id": car_id,
+               "people_count": people_count, "clip_ref": clip_ref,
+               "candidate_credentials": candidates,
+               "status": "safety_alert" if safety else "pending", "reviewer": None,
+               "reviewed_at": None, "evidence": None, "responsible_credential": None}
+        self.incidents[event_id] = row
+        return row
+
+    def _bulky_message(self, event_id: str, t: float, car_id: str) -> None:
+        if event_id not in self._bulky_voice_events:
+            self._bulky_voice_events.add(event_id)
+            self.ctx.bus.publish(PanelMessage(t, f"car:{car_id}",
                 "Heavy items must use the service car",
                 "Hàng nặng phải sử dụng thang máy dịch vụ", True))
+
+    def _overload(self, event: OverloadDetected) -> None:
+        window = self._overloads[event.car_id]
+        window.append(event.t)
+        while window and event.t - window[0] > 300:
+            window.popleft()
+        if len(window) >= 3:
+            event_id = f"overload-{event.car_id}-{int(event.t)}"
+            if event_id not in self.incidents:
+                self._record_incident(event_id, event.t, "repeated_overload", event.car_id,
+                                      0, None, [])
+                self.security_log.append({"t": event.t, "kind": "overload_pattern",
+                                          "event_id": event_id, "car_id": event.car_id})
+                self._bulky_message(event_id, event.t, event.car_id)
+            window.clear()
 
     def review_incident(self, event_id: str, decision: str, reviewer: str,
                         evidence: str, responsible_credential: str | None = None) -> dict:
         if decision not in {"confirmed", "dismissed"}:
             raise ValueError("decision must be confirmed or dismissed")
         row = self.incidents[event_id]
-        if row["status"] not in {"pending", "safety_alert"}:
+        if row["status"] != "pending":
             raise ValueError("incident has already been reviewed")
         if responsible_credential and responsible_credential not in row["candidate_credentials"]:
             raise ValueError("responsible credential must be a candidate from the same trip")
@@ -177,6 +249,17 @@ class MonitorService:
                                   "reviewer": reviewer,
                                   "attributed": responsible_credential is not None})
         self.audit(reviewer, Role.SECURITY, "camera.review", event_id, "pending", decision)
+        if decision == "confirmed" and responsible_credential:
+            try:
+                permission = self.ctx.get("acs").lookup(responsible_credential)
+                destination = ([f"tenant_admin:{permission.tenant_id}"]
+                               if permission.tenant_id else ["visitor_reception"])
+            except Exception:
+                destination = ["visitor_reception"]
+            self.ctx.get("notifier").send(
+                destination, f"Confirmed elevator incident {event_id}",
+                f"Security confirmed {row['kind']} after human review. "
+                "Building staff decide any action under the house rules.")
         return dict(row)
 
     def audit(self, user: str, role: Role, action: str, target: str,
@@ -186,10 +269,15 @@ class MonitorService:
 
     def update_configuration(self, key: str, value: Any, user: str, role: Role) -> dict:
         if key not in {"public_floors", "panels", "tenants", "house_rule_limits",
-                       "confirmed_clip_days"}:
+                       "confirmed_clip_days", "camera_event_types", "camera_notice_en",
+                       "camera_notice_vi"}:
             raise ValueError("configuration key is not editable")
         if key == "confirmed_clip_days" and not (1 <= int(value) <= 365):
             raise ValueError("confirmed clip retention must be 1..365 days")
+        if key == "camera_event_types":
+            unknown = set(value) - CAMERA_KINDS
+            if unknown or not value:
+                raise ValueError(f"unknown or empty camera event types: {sorted(unknown)}")
         old = self.configuration.get(key)
         self.configuration[key] = value
         self.audit(user, role, "configuration.update", key, old, value)
@@ -223,6 +311,23 @@ class MonitorService:
         for item in slices:
             run_by_car[item["car_id"]] = run_by_car.get(item["car_id"], 0.0) + item["seconds"]
         total_run = sum(run_by_car.values())
+        vip_windows = [(p["start"], p["end"]) for p in self.vip_periods]
+        vip_windows += [(start, self.ctx.clock.now()) for start in self._vip_started.values()]
+        ordinary = [r for r in rows if r["priority"] != CallPriority.VIP.name]
+        during_vip = [r["wait_s"] for r in ordinary
+                      if any(start <= r["picked_up_at"] <= end for start, end in vip_windows)]
+        outside_vip = [r["wait_s"] for r in ordinary
+                       if not any(start <= r["picked_up_at"] <= end for start, end in vip_windows)]
+        out_by_car: dict[str, float] = {}
+        periods = list(self.state_periods)
+        periods += [{"car_id": car, "state": state.name, "start": started,
+                     "end": self.ctx.clock.now()}
+                    for car, (state, started) in self._state_started.items()]
+        for item in periods:
+            out_by_car[item["car_id"]] = out_by_car.get(item["car_id"], 0.0) + \
+                max(0.0, item["end"] - item["start"])
+        vip_mean = sum(during_vip) / len(during_vip) if during_vip else 0.0
+        baseline_mean = sum(outside_vip) / len(outside_vip) if outside_vip else 0.0
         return {"trips": len(rows),
                 "average_wait_s": sum(waits) / len(waits) if waits else 0.0,
                 "p95_wait_s": _nearest_rank(waits, .95),
@@ -233,6 +338,10 @@ class MonitorService:
                 "ceiling_breaches": sum(1 for r in rows
                     if r["wait_s"] > config.MODE_TARGETS[Mode(r["mode"])][1]),
                 "vip_trips": sum(1 for r in rows if r["priority"] == CallPriority.VIP.name),
+                "vip_effect_on_ordinary_wait_s": vip_mean - baseline_mean,
+                "ordinary_wait_during_vip_s": vip_mean,
+                "ordinary_wait_outside_vip_s": baseline_mean,
+                "out_of_group_service_by_car_s": out_by_car,
                 "degraded_trips": sum(1 for r in rows if r["degraded"])}
 
     def kpis(self, *, mode: str | None = None) -> dict[str, Any]:
@@ -256,6 +365,26 @@ class MonitorService:
         slices = [s for s in self.run_slices if same_period(s["t"])
                   and (mode is None or s["mode"] == mode)]
         return {"period": period, "mode": mode, "wait_and_run_time": self._kpis_for(rows, slices)}
+
+    def tenant_report(self, tenant_id: str) -> dict[str, Any]:
+        floors = set(self.configuration.get("tenants", {}).get(tenant_id, []))
+        rows = [r for r in self.trips if r["origin"] in floors or r["destination"] in floors]
+        return {"tenant_id": tenant_id, "floors": sorted(floors),
+                "wait_and_run_time": self._kpis_for(rows),
+                "privacy": "aggregate trip data only; no credential or person identifiers"}
+
+    def record_human_change(self, user: str, role: Role, action: str, target: str,
+                            old: Any, new: Any) -> dict:
+        required = {"mode.change": Role.FM, "schedule.change": Role.FM,
+                    "vip.change": Role.FM}
+        if action in required and role is not required[action]:
+            raise PermissionError(f"{action} requires facility_manager")
+        if action == "car_state.change" and role not in {Role.FM, Role.TECHNICIAN}:
+            raise PermissionError("car_state.change requires facility_manager or technician")
+        if action not in {*required, "car_state.change"}:
+            raise ValueError("unsupported audited change")
+        self.audit(user, role, action, target, old, new)
+        return self.audit_log[-1]
 
     def monthly_report(self) -> dict[str, Any]:
         current = self.ctx.clock.now_dt()

@@ -13,6 +13,7 @@ class PassengerState(Enum):
     RIDING = "riding"
     DONE = "done"            # has left the car at the destination
     CANCELLED = "cancelled"
+    REFUSED = "refused"      # Access refused the destination: the person goes to reception
 
 
 @dataclass
