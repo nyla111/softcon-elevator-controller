@@ -13,8 +13,11 @@ row) or JSON (a list of objects). Every column except t is optional:
     vip          true/false; empty = taken from the employee (false for other cards)
     passenger_id empty = S0001, S0002, ... in arrival order
     event        an event row instead of a passenger: a live fault kind (fire_alarm, mains_loss,
-                 car_fault, link_loss, acs_outage, ...; see live.FAULT_KINDS), or "check" for a
-                 check that needs no event
+                 car_fault, link_loss, acs_outage, ...; see live.FAULT_KINDS), "check" for a
+                 check that needs no event, or a medical trip event (FR-127, done by security):
+                 medical (uses origin and destination), medical_depart (the patient is in the
+                 car), medical_finish (the car returns to service); the last two act on the
+                 trip of the latest medical row
     car          car id, for events that need one
     duration     seconds, for events that end by themselves (link_loss, acs_outage, plugin_crash)
     expect       passenger rows: delivered | refused | cancelled | evacuated | waiting
@@ -49,6 +52,8 @@ _TRUE = {"true", "1", "yes", "y"}
 _FALSE = {"false", "0", "no", "n", ""}
 OUTCOMES = ("delivered", "refused", "cancelled", "evacuated", "waiting")
 CLEAR_S = 1800.0                     # time allowed after the last row for everyone to arrive
+MEDICAL_EVENTS = ("medical", "medical_depart", "medical_finish")
+SECURITY_CARD = "staff-security-1"
 
 
 @dataclass(frozen=True)
@@ -124,10 +129,18 @@ def parse(rows: Iterable[dict]) -> list[ScriptedTrip]:
             raise ValueError(f"row {i}: t is required and must be >= 0")
         event, expect = _text(row.get("event")), _text(row.get("expect"))
         if event is not None:
-            if event != "check" and event not in FAULT_KINDS:
+            if event != "check" and event not in FAULT_KINDS and event not in MEDICAL_EVENTS:
                 raise ValueError(f"row {i}: unknown event {event!r}")
             _check_expect(expect, True, i)
-            trips.append(ScriptedTrip(t, event=event, car=_text(row.get("car")),
+            origin = destination = None
+            if event == "medical":
+                origin = _number(row.get("origin"), "origin", i)
+                destination = _number(row.get("destination"), "destination", i)
+                if origin is None or destination is None:
+                    raise ValueError(f"row {i}: a medical row needs origin and destination")
+                origin, destination = int(origin), int(destination)
+            trips.append(ScriptedTrip(t, origin, destination, event=event,
+                                      car=_text(row.get("car")),
                                       duration=_number(row.get("duration"), "duration", i),
                                       expect=expect, row=i))
             continue
@@ -171,6 +184,7 @@ class ScriptedTraffic:
         self.arrivals = [self._resolve(n, trip) for n, trip in enumerate(people, start=1)]
         self._arrival_of = {id(trip): a for trip, a in zip(people, self.arrivals)}
         self.count = 0
+        self.medical_trip: Optional[str] = None     # trip id of the latest medical row
 
     def start(self) -> None:
         for trip in self.trips:
@@ -233,9 +247,25 @@ class ScriptedTraffic:
             group=a["group"], credential_id=a["card"], accessible=a["accessible"], vip=a["vip"]))
 
     def _apply(self, trip: ScriptedTrip) -> None:
-        if trip.event != "check":
+        if trip.event in MEDICAL_EVENTS:
+            self._medical(trip)
+        elif trip.event != "check":
             from .live import apply_fault
             apply_fault(self.ctx, trip.event, trip.car, trip.duration)
+
+    def _medical(self, trip: ScriptedTrip) -> None:
+        """FR-127 through Part 5, as security would do it. A refused request raises the
+        medical_no_car alert, which an expect column can check."""
+        priority = self.ctx.services["priority"]
+        if trip.event == "medical":
+            out = priority.request_medical(SECURITY_CARD, trip.origin, trip.destination)
+            self.medical_trip = out.ref if out.ok else None
+        elif self.medical_trip is not None:
+            if trip.event == "medical_depart":
+                priority.medical_depart(SECURITY_CARD, self.medical_trip)
+            else:
+                priority.finish_trip(SECURITY_CARD, self.medical_trip)
+                self.medical_trip = None
 
     # ---------- expected outcomes ----------
     def evaluate(self) -> list[Check]:
