@@ -56,6 +56,12 @@ class CarStates(Protocol):                  # Part 4 (only writer of car state)
     def safety_active(self) -> bool:
         """True during fire recall / emergency power: no ordinary dispatch."""
         ...
+    def report_safety_clear(self, clear: bool) -> None:
+        """Controllers (Part 1): all fire and power inputs are clear and the fire reset is done."""
+        ...
+    def report_controller_normal(self, car_id: CarId, normal: bool) -> None:
+        """Controllers (Part 1): this car is back under normal control (FR-55)."""
+        ...
 
 
 class Dispatcher(Protocol):                 # Part 2

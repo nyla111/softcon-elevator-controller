@@ -495,6 +495,9 @@ class Simulator:
         self.generator_ready = False
         self.rescue_failed: set[CarId] = set()         # cars whose rescue device is silent
         self.rescue_stuck: set[CarId] = set()          # cars that report "stuck"
+        self.reports_to_safety = True                  # False: controllers never report (tests)
+        self._reported_clear: bool | None = None       # last FR-55 report sent to Part 4
+        self._reported_normal: dict[CarId, bool] = {}
         self.building = ctx.services.get("building") or BuildingSpec.reference()
         self.service_groups = self.building.service_groups   # fire service / goods cars
         for g in self.building.groups:
@@ -662,6 +665,24 @@ class Simulator:
         for car in self.cars.values():
             if not car.link_lost:
                 self.ctx.bus.publish(CarStatusUpdated(self.ctx.clock.now(), car.status()))
+        self._report_to_safety()
+
+    def _report_to_safety(self) -> None:
+        """FR-55: the controllers tell Part 4 when they are back to normal (after a fire reset
+        or when power is back), so the FM can confirm recovery. Only changes are reported."""
+        if not self.reports_to_safety:
+            return
+        states = self.ctx.get("car_states")
+        clear = not (self.fire_alarm_active or self.fire_needs_reset or self.mains_lost)
+        if clear != self._reported_clear:
+            self._reported_clear = clear
+            states.report_safety_clear(clear)
+        for car in self.cars.values():
+            normal = (clear and car.operational() and not car.rescue_pending
+                      and not car.link_lost and not car.heartbeat_lost)
+            if normal != self._reported_normal.get(car.car_id):
+                self._reported_normal[car.car_id] = normal
+                states.report_controller_normal(car.car_id, normal)
 
     # ---------- fault injection (used by faults.py, the harness and tests) ----------
     def inject_fault(self, car_id: CarId, code: str = "F-01", between_floors: bool = False,
