@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Optional, Protocol
 
 from .types import (Call, CallId, CarId, CarState, CarStatus, CredentialId,
-                    Floor, GroupId, Mode, Permission)
+                    Floor, GroupId, Mode, Permission, WearReport)
 
 
 class ControllerAdapter(Protocol):          # Part 1 (simulator implements it)
@@ -88,6 +88,14 @@ class PriorityService(Protocol):           # Part 5
     def door_dwell_s(self, call: Call) -> float:
         """FR-08: pass as register_stop(..., min_dwell_s=...)."""
         ...
+
+
+class UsageCounters(Protocol):             # Part 5 (FR-31 counters + CR-01)
+    """ctx.services["usage"]. Floors travelled per car, from car telemetry. The period
+    counters reset every WEAR_PERIOD_MONTHS counting months (WEAR_MONTH_S each) from t=0; the
+    reset happens on the first floor counted after the boundary, so a report taken exactly at
+    the end of a period still shows that period. FR-31 totals are never reset."""
+    def wear_report(self) -> WearReport: ...
 
 
 class Database(Protocol):                   # Part 1 (trip database with buffering, FR-107)

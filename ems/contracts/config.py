@@ -45,6 +45,12 @@ HEARTBEAT_TIMEOUT_S = 3             # FR-104
 RESCUE_REPORT_DEADLINE_S = 60       # FR-110
 GENERATOR_WAIT_S = 15               # FR-110
 MAINS_STABLE_S = 120                # FR-111
+
+# --- CR-01 / NFR-W1 wear balance (docs/CHANGE_REQUESTS.md) ---
+WEAR_MONTH_S = 30 * 86400.0          # one counting month
+WEAR_PERIOD_MONTHS = 6               # period counters reset after this many months
+WEAR_MONTH_LIMIT = 0.02              # (max - min) / max per group, every month
+WEAR_PERIOD_LIMIT = 0.05             # (max - min) / max per group, over the period
 VIP_MAX_PER_HOUR = 6                # FR-72
 VIP_EMPTY_CAR_ETA_S = 30            # FR-71
 SPAM_ACTIONS_PER_60S = 5            # FR-121

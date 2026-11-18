@@ -137,3 +137,14 @@ class CarStatus:
     rescue_status: Optional[str] = None   # "rescued_at_floor" | "stuck" | None
     disconnected: bool = False
     pending_stops: list[Floor] = field(default_factory=list)
+
+
+@dataclass
+class WearReport:
+    """CR-01 / NFR-W1: floors travelled per car in the current 6-month counter period.
+    months[i] covers [period_start + i * month_s, period_start + (i + 1) * month_s); the last
+    entry is the month in progress. period = the sum over all months of the period."""
+    period_start: float                       # sim seconds; the counters were last reset here
+    month_s: float
+    months: list[dict[CarId, float]] = field(default_factory=list)
+    period: dict[CarId, float] = field(default_factory=dict)

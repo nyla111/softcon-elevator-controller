@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .config import GROUPS, LOBBY, SIM
+from .config import GROUPS, LOBBY, SIM, WEAR_MONTH_S
 from .types import (Call, CallId, CarId, CarState, CarStatus, CredentialId,
-                    Direction, DoorState, Floor, GroupId, Mode, Permission, Role)
+                    Direction, DoorState, Floor, GroupId, Mode, Permission, Role,
+                    WearReport)
 
 
 class StubControllers:
@@ -74,6 +75,12 @@ class StubNotifier:
         self.inbox.append((list(recipients), subject, body))
 
 
+class StubUsage:
+    """Counts nothing: SIM-19 stays not ready until Part 5 registers "usage"."""
+    def wear_report(self) -> WearReport:
+        return WearReport(0.0, WEAR_MONTH_S)
+
+
 class StubDatabase:
     """In-memory, always available, writes are persisted at once."""
     def __init__(self) -> None: self._rows: list[dict] = []
@@ -85,5 +92,5 @@ class StubDatabase:
 STUBS = {
     "controllers": StubControllers, "acs": StubAcs, "notifier": StubNotifier,
     "access": StubAccess, "car_states": StubCarStates, "dispatcher": StubDispatcher,
-    "priority": StubPriority, "db": StubDatabase,
+    "priority": StubPriority, "db": StubDatabase, "usage": StubUsage,
 }
