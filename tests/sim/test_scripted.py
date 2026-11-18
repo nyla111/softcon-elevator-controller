@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from ems.contracts.events import PassengerArrived
+from ems.contracts.events import PassengerArrived, PriorityTripEnded, PriorityTripStarted
 from ems.core.app import build
 from ems.sim.baseline import install_dispatch_standin
 from ems.sim.harness import run
@@ -29,6 +29,7 @@ def test_csv_and_json_give_the_same_trips():
     ("t,event\n0,earthquake\n", "unknown event"),
     ("t,origin,destination,expect\n0,1,5,arrived\n", "expect must be one of"),
     ("t,event,expect\n0,fire_alarm,delivered\n", "alert:<kind>"),
+    ("t,origin,event\n0,20,medical\n", "medical row needs origin and destination"),
     ("t,origin,destination,vip\n0,1,5,maybe\n", "vip must be true or false"),
 ])
 def test_bad_rows_are_rejected(text, message):
@@ -92,3 +93,23 @@ def test_passenger_list_meets_its_expectations(path):
     failed = [f"row {c.row} {c.subject}: expected {c.expected}, got {c.actual}"
               for c in checks if not c.ok]
     assert not failed, "\n".join(failed)
+
+
+def test_medical_events_start_depart_and_finish_one_trip():
+    trips = loads("t,origin,destination,event,expect\n"
+                  "0,20,1,medical,no_alert:medical_no_car\n"
+                  "60,,,medical_depart,\n"
+                  "150,,,medical_finish,\n")
+    assert trips[0] == ScriptedTrip(0.0, 20, 1, event="medical", expect="no_alert:medical_no_car")
+    ctx, checks = run_list(trips)
+    assert all(c.ok for c in checks), checks
+    started = ctx.bus.of_type(PriorityTripStarted)
+    ended = ctx.bus.of_type(PriorityTripEnded)
+    assert [e.kind for e in started] == ["medical"]
+    assert [e.car_id for e in ended] == [started[0].car_id]
+    assert ended[0].t == 150.0
+
+
+def test_medical_depart_and_finish_without_a_trip_do_nothing():
+    ctx, checks = run_list(loads("t,event\n0,medical_depart\n10,medical_finish\n"))
+    assert ctx.bus.of_type(PriorityTripStarted) == []
