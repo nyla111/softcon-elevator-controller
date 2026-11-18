@@ -1,0 +1,11 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,2,card-L2-007,,,acc-low-up,,,,delivered,60,SIM-11 FR-08 accessible employee from the lobby; doors held at least 10 s
+2,1,2,card-L2-009,true,,acc-low-2,,,,delivered,60,FR-08 accessible flag on the row; second accessible call in the same group
+4,1,9,,,,ordinary-low,,,,delivered,60,BR-10 ordinary call next to accessible ones still served
+6,1,16,card-L16-009,,,acc-high-up,,,,delivered,60,SIM-11 FR-08 accessible employee to the high-rise group
+8,1,17,card-L17-008,,,acc-high-2,,,,delivered,60,FR-08 accessible call while the first high-rise car is busy
+10,1,22,,,,ordinary-high,,,,delivered,60,BR-10 ordinary call in the same group
+60,2,1,card-L2-007,,,acc-low-down,,,,delivered,60,FR-08 accessible trip back to the lobby
+70,16,1,card-L16-009,,,acc-high-down,,,,delivered,60,FR-08 accessible trip down from the high-rise group
+75,17,1,card-L17-064,,,acc-high-3,,,,delivered,60,FR-08 a second accessible call going down
+80,3,1,card-L3-003,,,acc-low-3,,,,delivered,60,FR-08 accessible call from an upper floor
