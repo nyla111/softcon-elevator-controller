@@ -1,0 +1,8 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,23,card-L23-046,,,vip-rider,,,,delivered,60,SIM-18 FR-71 VIP boards an exclusive car at the lobby
+5,1,20,,,,ordinary-up,,,,delivered,120,FR-72 ordinary call served by another car during the VIP trip
+15,20,1,,,,,medical,,,no_alert:medical_no_car,,FR-127 security asks for a medical trip from L20 above the VIP trip (pending: needs the medical event, #37)
+20,25,1,,,,ordinary-down,,,,delivered,120,FR-127 ordinary call while the medical trip runs
+75,,,,,,,medical_depart,,,,,FR-127 security confirms the patient is in the car (pending: needs the medical_depart event, #37)
+150,,,,,,,medical_finish,,,,,FR-127 medical trip finished and the car returns to service (pending: needs the medical_finish event, #37)
+200,23,1,card-L23-046,,,vip-back,,,,delivered,120,FR-127 VIP rider still reaches their own floor and can travel again
