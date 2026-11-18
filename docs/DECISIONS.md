@@ -133,8 +133,8 @@ Balanced (SIM-01, SIM-02, SIM-03, SIM-05). Averages and the Eco targets are unch
    and no dispatching policy removes every long wait. Cost weights, ceiling penalties,
    lobby door holds, two lobby cars in Balanced and moving at-risk calls were all tried
    and measured without fixing the maximum.
-3. A percentile still bounds what almost every passenger experiences, and is how wait
-   targets are usually written for elevator traffic analysis.
+3. A percentile still bounds what almost every passenger experiences, and stays stable
+   enough across seeds to be a fair pass/fail test.
 
 **New criteria:**
 
@@ -151,4 +151,4 @@ The 95th percentile is never set above the SRS ceiling, and Balanced keeps 90 s 
 60 s. These stay visible as failing criteria rather than being relaxed further
 (Appendix B: no silent relaxation of a failed test).
 
-**Evidence:** Part 2 results table in `docs/dispatch.md`.
+**Evidence:** Part 2 results table in `docs/dispatch.md` (PR #19).
