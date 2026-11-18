@@ -1,0 +1,13 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,16,card-L16-001,,,vip-1,,,,delivered,60,SIM-12 FR-71 first VIP call of the high-rise group gets an exclusive car
+10,1,18,card-L18-031,,,vip-2,,,,delivered,60,FR-72 one exclusive car per group: vip-1 still travelling so this one is served as an ordinary call
+20,1,20,,,,ordinary-1,,,,delivered,60,FR-72 ordinary calls of the group keep being served during VIP trips
+300,1,23,card-L23-046,,,vip-3,,,,delivered,60,FR-71 next VIP after vip-1 has arrived
+600,1,27,card-L27-006,,,vip-4,,,,delivered,60,FR-71 VIP call
+900,1,28,card-L28-017,,,vip-5,,,,delivered,60,FR-71 VIP call
+1200,1,29,card-L29-066,,,vip-6,,,,delivered,60,FR-71 VIP call
+1500,16,1,card-L16-001,,,vip-7,,,,delivered,60,FR-72 VIP call
+1800,18,1,card-L18-031,,,vip-8,,,,delivered,60,FR-72 at most 6 exclusive starts per rolling hour: from here the cap may apply and the call is served normally
+2100,23,1,card-L23-046,,,vip-9,,,,delivered,60,FR-72 hourly cap: served as an ordinary call
+2400,27,1,card-L27-006,,,vip-10,,,,delivered,60,FR-72 hourly cap: tenth VIP call within the hour is still delivered
+2410,1,25,,,,ordinary-2,,,,delivered,60,FR-72 ordinary call after the VIP calls

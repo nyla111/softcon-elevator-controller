@@ -1,0 +1,9 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,20,,,,ordinary-first,,,,delivered,60,BR-10 ordinary call made first
+0,1,23,card-L23-046,,true,vip-second,,,,delivered,60,BR-10 VIP ranks above ordinary
+0,1,17,card-L17-008,true,,accessible-third,,,,delivered,60,BR-10 accessible ranks above VIP
+1,1,24,,,,ordinary-last,,,,delivered,60,BR-10 ordinary call made last
+5,1,6,,,,low-ordinary,,,,delivered,60,BR-10 the order applies per group: low-rise call not delayed
+5,1,3,card-L3-003,,,low-accessible,,,,delivered,60,BR-10 accessible call in the low-rise group
+30,20,1,,,,down-ordinary,,,,delivered,60,BR-10 ordinary call going down
+30,17,1,card-L17-008,,,down-accessible,,,,delivered,60,BR-10 accessible call going down at the same time
