@@ -3,15 +3,15 @@ from ems.sim.traffic import SRS_ORIGINAL_PEAK_RATE
 
 OWNERS = {2: ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-10"], 3: ["SIM-07"],
           4: ["SIM-08", "SIM-13", "SIM-14", "SIM-15", "SIM-17"],
-          5: ["SIM-06", "SIM-11", "SIM-12", "SIM-18"], 1: ["SIM-09", "SIM-16"]}
+          5: ["SIM-06", "SIM-11", "SIM-12", "SIM-18"], 1: ["SIM-09", "SIM-16", "SIM-19"]}
 
 
-def test_all_18_scenarios_with_the_right_owner_part():
-    assert list(SCENARIOS) == [f"SIM-{i:02d}" for i in range(1, 19)]
+def test_all_19_scenarios_with_the_right_owner_part():
+    assert list(SCENARIOS) == [f"SIM-{i:02d}" for i in range(1, 20)]
     for part, ids in OWNERS.items():
         for sid in ids:
             assert SCENARIOS[sid].owner_part == part, sid
-    assert sum(len(v) for v in OWNERS.values()) == 18
+    assert sum(len(v) for v in OWNERS.values()) == 19
 
 
 def test_ready_scenarios_have_complete_acceptance_integrations():
@@ -21,6 +21,8 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
         if not s.ready:
             if s.owner_part == 4:
                 assert callable(s.check) and s.waiting_for
+            elif s.runner is not None:          # SIM-19: Part 1 check, waits for Part 5 counters
+                assert callable(s.check) and "Part 5" in s.waiting_for
             else:
                 assert s.check is None and s.waiting_for == f"Part {s.owner_part} check"
         else:
@@ -82,7 +84,8 @@ def test_every_scenario_has_title_criteria_and_requirement_ids():
 
 def test_fault_notes_only_where_appendix_b_gives_them():
     with_notes = sorted(s.id for s in SCENARIOS.values() if s.notes)
-    assert with_notes == ["SIM-07", "SIM-08", "SIM-12", "SIM-13", "SIM-14", "SIM-18"]
+    assert with_notes == ["SIM-07", "SIM-08", "SIM-12", "SIM-13", "SIM-14", "SIM-18",
+                          "SIM-19"]
 
 
 # Appendix B traffic setup: scenario -> [(profile name, mode)] in run order
@@ -97,6 +100,7 @@ SETUP = {
     "SIM-13": [("up_peak", "fixed")], "SIM-14": [("up_peak", "fixed")],
     "SIM-15": [("up_peak", "fixed")], "SIM-16": [("up_peak", "fixed")],
     "SIM-17": [("balanced", "fixed")], "SIM-18": [("up_peak", "fixed")],
+    "SIM-19": [],                       # own runner: 180 days (ems/sim/long_run.py)
 }
 
 

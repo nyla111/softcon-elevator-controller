@@ -1,8 +1,8 @@
-"""Scenario registry: SIM-01 .. SIM-18 (Appendix B) in one place, shared by tests and the runner.
+"""Scenario registry: SIM-01 .. SIM-19 (Appendix B + CR-01) in one place, shared by tests and the runner.
 
 Each Scenario says what to run (profile, rate, faults, run lengths) and, once an owner has
 written it, how to judge the run (`check`). Ownership:
-    Part 1: SIM-09, SIM-16 (checks below)
+    Part 1: SIM-09, SIM-16, SIM-19 (checks below)
     Part 2: SIM-01 02 03 04 05 10     Part 3: SIM-07
     Part 4: SIM-08 13 14 15 17        Part 5: SIM-06 11 12 18
 HOW A PART ADDS ITS SCENARIO: edit the entry in SCENARIOS (below), set `faults`, write a function
@@ -35,6 +35,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from ems.contracts import config
 from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarStatusUpdated,
                                   EmsServerDown, EmsServerUp, HeartbeatLost, HeartbeatRestored,
                                   PassengerAlighted)
@@ -103,6 +104,7 @@ class Scenario:
     srs_criteria: str = ""                      # SRS pass criteria (text only, not checked here)
     verifies: str = ""                          # requirement ids
     notes: str = ""                             # Appendix B fault-injection notes
+    runner: Optional[Callable] = None           # own run instead of runs: runner(seed, out_dir)
 
     def __post_init__(self) -> None:
         if not self.runs and self.profile is not None:
@@ -222,6 +224,28 @@ def _part5(name: str) -> Callable:
     return call
 
 
+# ---------------------------------------------------------------- SIM-19 (Part 1, CR-01)
+SIM19_DAYS = round(config.WEAR_PERIOD_MONTHS * config.WEAR_MONTH_S / 86400.0)   # 180
+
+
+def run_sim_19(seed: int, out_dir=None):
+    """Six counting months of weekday and weekend traffic (ems/sim/long_run.py)."""
+    from .long_run import run_long
+    return run_long(SIM19_DAYS, seed, out_dir=out_dir, keep_ctx=True)
+
+
+def check_sim_19(result, ctx) -> Criteria:
+    """NFR-W1: per passenger group, (max - min) / max floors travelled < 2% in every month
+    and <= 5% over the 6-month period (docs/CHANGE_REQUESTS.md, CR-01)."""
+    if not result.imbalance:
+        return [("wear counters available (ctx.services['usage'])", False, "no figures")]
+    return [(f"{r['group']} {r['window']}: imbalance "
+             f"{'<' if r['window'] != 'period' else '<='} {r['limit']:.0%}",
+             r["imbalance"] < r["limit"] if r["window"] != "period"
+             else r["imbalance"] <= r["limit"],
+             f"{r['imbalance']:.2%}") for r in result.imbalance]
+
+
 def _todo(sid: str, title: str, part: int, profile: Optional[str], srs: str, verifies: str,
           notes: str = "", waiting_for: Optional[str] = None, **kw) -> Scenario:
     return Scenario(sid, title, part, profile, waiting_for=waiting_for or f"Part {part} check",
@@ -266,6 +290,14 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
         srs_criteria='Car marked Disconnected in 3 s; fallback rule assigns all calls', verifies='FR-104, FR-105'),
     _todo("SIM-17", 'Conditional: duplicate/uncertain calls and 20 card actions', 4, "balanced", 'Only proven duplicates/cancelled calls removed; uncertain calls retained; sixth ordinary action starts limit; exits and assistance exempt', 'FR-120, FR-121, FR-125, BR-07'),
     Scenario("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "up_peak", setup=_part5("setup_sim_18"), check=_part5("check_sim_18"), ready=True, srs_criteria='VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', verifies='FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
+    Scenario("SIM-19", 'Six months of weekday and weekend traffic: wear balance', 1, None,
+             runner=run_sim_19, check=check_sim_19, ready=False,
+             waiting_for="Part 5 wear counters (ctx.services['usage'], CR-01)",
+             srs_criteria='Per group, (max - min) / max floors travelled under 2% every month '
+                          'and at most 5% over 6 months; period counters reset every 6 months',
+             verifies='NFR-W1 (CR-01)',
+             notes='180 simulated days from Monday 00:00; weekends follow WEEKEND_SCHEDULE. '
+                   'Run headless: python -m ems.sim.long_run --months 6'),
 ]}
 
 # Full acceptance remains blocked; metrics_only runs exercise available Safety behavior.
@@ -353,6 +385,13 @@ def run_scenario(scenario_id: str, seed: int, out_dir=None, metrics_only: bool =
     if not_ready and not (metrics_only and s.runs):
         return base | {"ready": False, "passed": None, "metrics": None, "criteria": [],
                        "runs": [], "message": f"not ready: waiting for {s.waiting_for}"}
+    if s.runner is not None:
+        long = s.runner(seed, out_dir)
+        criteria = [{"criterion": c, "passed": bool(ok), "detail": str(d)}
+                    for c, ok, d in s.check(long, long.ctx)]
+        passed = bool(criteria) and all(c["passed"] for c in criteria)
+        return base | {"ready": True, "passed": passed, "metrics": {"days": long.days},
+                       "criteria": criteria, "runs": [], "message": "PASS" if passed else "FAIL"}
     results = [run_setup(r, seed, out_dir) for r in s.runs]
     runs = [_run_summary(r, x) for r, x in zip(s.runs, results)]
     if not_ready:
