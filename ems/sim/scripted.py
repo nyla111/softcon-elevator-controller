@@ -18,6 +18,8 @@ row) or JSON (a list of objects). Every column except t is optional:
                  medical (uses origin and destination), medical_depart (the patient is in the
                  car), medical_finish (the car returns to service); the last two act on the
                  trip of the latest medical row
+                 or fm_confirm: the facility manager confirms recovery after a fire or power
+                 loss (FR-55); refused while recovery_eligible() is False
     car          car id, for events that need one
     duration     seconds, for events that end by themselves (link_loss, acs_outage, plugin_crash)
     expect       passenger rows: delivered | refused | cancelled | evacuated | waiting
@@ -44,7 +46,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from ems.contracts.events import AlertRaised, PassengerArrived
-from ems.contracts.types import Floor
+from ems.contracts.types import Floor, Role
 
 from .passengers import PassengerState
 
@@ -53,6 +55,7 @@ _FALSE = {"false", "0", "no", "n", ""}
 OUTCOMES = ("delivered", "refused", "cancelled", "evacuated", "waiting")
 CLEAR_S = 1800.0                     # time allowed after the last row for everyone to arrive
 MEDICAL_EVENTS = ("medical", "medical_depart", "medical_finish")
+OTHER_EVENTS = ("check", "fm_confirm")
 SECURITY_CARD = "staff-security-1"
 
 
@@ -129,7 +132,7 @@ def parse(rows: Iterable[dict]) -> list[ScriptedTrip]:
             raise ValueError(f"row {i}: t is required and must be >= 0")
         event, expect = _text(row.get("event")), _text(row.get("expect"))
         if event is not None:
-            if event != "check" and event not in FAULT_KINDS and event not in MEDICAL_EVENTS:
+            if event not in OTHER_EVENTS and event not in FAULT_KINDS and event not in MEDICAL_EVENTS:
                 raise ValueError(f"row {i}: unknown event {event!r}")
             _check_expect(expect, True, i)
             origin = destination = None
@@ -249,6 +252,8 @@ class ScriptedTraffic:
     def _apply(self, trip: ScriptedTrip) -> None:
         if trip.event in MEDICAL_EVENTS:
             self._medical(trip)
+        elif trip.event == "fm_confirm":
+            self.ctx.get("car_states").confirm_recovery(Role.FM)
         elif trip.event != "check":
             from .live import apply_fault
             apply_fault(self.ctx, trip.event, trip.car, trip.duration)
