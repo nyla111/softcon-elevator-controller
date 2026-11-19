@@ -1,12 +1,14 @@
 """HTTP API for Part 6. Identity is simulated with X-User and X-Role headers."""
 from __future__ import annotations
 
+from dataclasses import asdict
+from datetime import timedelta
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from ems.contracts.types import Role
+from ems.contracts.types import Mode, Role
 from ems.monitor.service import ROLE_PERMISSIONS
 
 router = APIRouter(prefix="/api/monitor", tags=["monitor"])
@@ -56,6 +58,32 @@ class ChangeBody(BaseModel):
     new: Any
 
 
+class ManualModeBody(BaseModel):
+    credential_id: str
+    mode: str
+    group: str | None = None
+    duration_s: float | None = None
+
+
+class RecoveryBody(BaseModel):
+    credential_id: str
+
+
+class RemovalDecisionBody(BaseModel):
+    credential_id: str
+    approve: bool = True
+
+
+def _credential_has(credential_id: str, role: Role) -> bool:
+    if _context is None:
+        return False
+    try:
+        permission = _context().get("access").permission(credential_id)
+    except Exception:
+        return False
+    return bool(permission.valid and role in permission.roles)
+
+
 @router.get("/report")
 def report(period: str = "month", mode: str | None = None,
            x_user: str | None = Header(None), x_role: str | None = Header(None)):
@@ -88,6 +116,79 @@ def diagnostics(x_user: str | None = Header(None), x_role: str | None = Header(N
     return {"fault_history": _service().fault_history}
 
 
+@router.get("/recovery")
+def recovery_status(x_user: str | None = Header(None), x_role: str | None = Header(None)):
+    _allow(_identity(x_user, x_role), {Role.FM})
+    return _context().get("car_states").recovery_status()
+
+
+@router.post("/recovery/confirm")
+def confirm_recovery(body: RecoveryBody, x_user: str | None = Header(None),
+                     x_role: str | None = Header(None)):
+    user, role = _allow(_identity(x_user, x_role), {Role.FM})
+    if not _credential_has(body.credential_id, Role.FM):
+        raise HTTPException(403, "a valid facility-manager credential is required")
+    states = _context().get("car_states")
+    before = states.recovery_status()
+    if not states.confirm_recovery(Role.FM):
+        raise HTTPException(409, {"message": "recovery is not eligible",
+                                  "blockers": before["blockers"]})
+    _service().audit(user, role, "safety.recovery.confirm", "building", before,
+                     states.recovery_status())
+    return {"confirmed": True, "status": states.recovery_status()}
+
+
+@router.post("/mode")
+def set_manual_mode(body: ManualModeBody, x_user: str | None = Header(None),
+                    x_role: str | None = Header(None)):
+    user, role = _allow(_identity(x_user, x_role), {Role.FM})
+    if not _credential_has(body.credential_id, Role.FM):
+        raise HTTPException(403, "a valid facility-manager credential is required")
+    try:
+        mode = Mode(body.mode)
+    except ValueError:
+        raise HTTPException(400, "mode must be rush, balanced or eco")
+    ctx = _context()
+    if body.group is not None and body.group not in ctx.get("building").group_names:
+        raise HTTPException(400, "unknown elevator group")
+    if body.duration_s is not None and body.duration_s <= 0:
+        raise HTTPException(400, "duration_s must be positive")
+    dispatcher = ctx.get("dispatcher")
+    groups = [body.group] if body.group else list(ctx.get("building").group_names)
+    old = {group: dispatcher.current_mode(group).value for group in groups}
+    until = (ctx.clock.now_dt() + timedelta(seconds=body.duration_s)
+             if body.duration_s is not None else None)
+    dispatcher.set_manual_mode(mode, body.group, until)
+    new = {group: dispatcher.current_mode(group).value for group in groups}
+    _service().audit(user, role, "mode.change", body.group or "all", old, new)
+    return {"mode": mode.value, "group": body.group, "until": until, "old": old, "new": new}
+
+
+@router.get("/maintenance/requests")
+def removal_requests(x_user: str | None = Header(None), x_role: str | None = Header(None)):
+    _allow(_identity(x_user, x_role), {Role.FM})
+    requests = _context().get("priority").maintenance.requests.values()
+    return [asdict(request) for request in requests if request.status == "pending"]
+
+
+@router.post("/maintenance/requests/{request_id}")
+def decide_removal(request_id: str, body: RemovalDecisionBody,
+                   x_user: str | None = Header(None), x_role: str | None = Header(None)):
+    user, role = _allow(_identity(x_user, x_role), {Role.FM})
+    if not _credential_has(body.credential_id, Role.FM):
+        raise HTTPException(403, "a valid facility-manager credential is required")
+    maintenance = _context().get("priority").maintenance
+    request = maintenance.requests.get(request_id)
+    old = asdict(request) if request else None
+    outcome = (maintenance.approve_removal if body.approve else maintenance.deny_removal)(
+        body.credential_id, request_id)
+    if not outcome.ok:
+        raise HTTPException(409, {"reason": outcome.reason, "request_id": request_id})
+    _service().audit(user, role, "car_state.change", request_id, old,
+                     asdict(maintenance.requests[request_id]))
+    return asdict(outcome)
+
+
 @router.post("/changes")
 def human_change(body: ChangeBody, x_user: str | None = Header(None),
                  x_role: str | None = Header(None)):
@@ -99,6 +200,8 @@ def human_change(body: ChangeBody, x_user: str | None = Header(None),
         raise HTTPException(403, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
 @router.get("/incidents")
 def incidents(x_user: str | None = Header(None), x_role: str | None = Header(None)):
     _allow(_identity(x_user, x_role), {Role.SECURITY, Role.SYSADMIN})
