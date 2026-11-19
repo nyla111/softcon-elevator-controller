@@ -1,0 +1,10 @@
+t,origin,destination,card,event,car,duration,expect,max_wait_s,note
+0,1,10,card-L10-001,,,,waiting,,FR-55 passenger remains tracked during controller fault
+12,,,,car_fault,A,,alert:fault,,FR-30 controller fault reaches dashboard and contractor/FM
+12,,,,check,,,alert:entrapment,,FR-44 occupied car fault raises entrapment alert
+20,,,,link_loss,B,60,alert:disconnected,,FR-42 lost heartbeat is visible on dashboard
+25,,,,plugin_crash,,60,alert:dispatch_fallback,,FR-105 fallback activation is visible to FM
+26,1,12,card-L12-001,,,,delivered,60,FR-105 fallback still assigns and serves the passenger
+30,,,,acs_outage,,60,alert:acs_down,,FR-87 ACS outage alerts security after an access request
+31,1,5,card-L5-001,,,,refused,,FR-87 uncached private-floor call is refused during ACS outage
+35,,,,bulky_item,C,,alert:bulky_item,,FR-84 bulky item raises dashboard alert and bilingual car message
