@@ -49,6 +49,8 @@ class StubCarStates:
     def release(self, car_id, from_state, by) -> bool: return True
     def dispatchable(self, group: GroupId) -> list[CarId]: return list(GROUPS[group]["cars"])
     def safety_active(self) -> bool: return False
+    def report_safety_clear(self, clear: bool) -> None: pass
+    def report_controller_normal(self, car_id, normal: bool) -> None: pass
 
 
 class StubDispatcher:

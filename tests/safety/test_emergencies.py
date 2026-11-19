@@ -47,6 +47,7 @@ def test_fire_latches_until_physical_reset_attestations_and_fm(source):
 
 def test_normal_telemetry_cannot_replace_missing_controller_and_safety_reports():
     ctx, safety, sim = make()
+    sim.reports_to_safety = False  # controllers that have not reported yet
     ctx.services["devices"].fire.alarm()
     ctx.services["devices"].fire.clear()
     sim.reset_fire()
