@@ -211,6 +211,11 @@ class Dispatcher(AssignMixin, PauseMixin, CeilingMixin, PolicyMixin):
         known = sum(self.calls[c].call.party_size for c in self.riders.get(status.car_id, ()))
         return max(0, status.passengers - known)
 
+    def wear_distance(self, car_id: CarId) -> int:
+        """Current NFR-W1 period distance; zero while the additive service is absent."""
+        usage = self.ctx.services.get("usage")
+        return 0 if usage is None else int(usage.distance(car_id))
+
     def elapsed(self, call_id: str) -> float:
         rec = self.calls.get(call_id)
         return 0.0 if rec is None else max(0.0, self._now() - rec.call.created_at)

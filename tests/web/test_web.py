@@ -94,10 +94,11 @@ def test_fire_alarm_then_reset_through_the_api(client):
 
 def test_scenario_list(client):
     rows = client.get("/api/scenarios").json()
-    assert [r["id"] for r in rows] == [f"SIM-{i:02d}" for i in range(1, 19)]
+    assert [r["id"] for r in rows] == [f"SIM-{i:02d}" for i in range(1, 20)]
     assert [r["id"] for r in rows if r["ready"]] == ["SIM-01", "SIM-02", "SIM-03", "SIM-04",
                                                      "SIM-05", "SIM-06", "SIM-09", "SIM-10",
-                                                     "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
+                                                     "SIM-11", "SIM-12", "SIM-16", "SIM-18",
+                                                     "SIM-19"]
     assert next(r for r in rows if r["id"] == "SIM-07")["waiting_for"] == "Part 3 check"
 
 
@@ -168,6 +169,16 @@ def test_facility_manager_can_switch_mode_with_a_real_staff_credential(client):
     assert app.state.ctx.services["dispatcher"].current_mode("LOW").value == "rush"
     body["credential_id"] = "staff-technician-1"
     assert client.post("/api/monitor/mode", json=body, headers=fm).status_code == 403
+
+
+def test_wear_report_is_role_protected_and_included_in_monthly_report(client):
+    fm = {"X-Role": "facility_manager", "X-User": "fm-1"}
+    security = {"X-Role": "security", "X-User": "guard-1"}
+    wear = client.get("/api/monitor/wear", headers=fm)
+    assert wear.status_code == 200 and set(wear.json()["groups"]) == {"LOW", "HIGH", "SERVICE"}
+    assert client.get("/api/monitor/wear", headers=security).status_code == 403
+    report = client.get("/api/monitor/report", headers=fm).json()
+    assert report["wear"]["monthly_limit"] == 0.02
 
 
 def test_facility_manager_recovery_status_and_confirmation(client):

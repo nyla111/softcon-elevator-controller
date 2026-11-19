@@ -46,6 +46,19 @@ function renderRecovery(status) {
   q('#confirm-recovery').disabled = !status.eligible;
 }
 
+function renderWear(report) {
+  const rows = [];
+  const summaries = [];
+  Object.entries(report.groups).forEach(([group, data]) => {
+    const monthClass = data.monthly_pass ? 'ok' : 'fault';
+    const periodClass = data.period_pass ? 'ok' : 'fault';
+    summaries.push(`<b>${group}</b>: <span class="${monthClass}">month ${fmt(100 * data.monthly_imbalance)}%</span>, <span class="${periodClass}">period ${fmt(100 * data.period_imbalance)}%</span>`);
+    Object.entries(data.cars).forEach(([car, distance]) => rows.push(`<tr><td>${group}</td><td><b>${car}</b></td><td>${distance.month_floors} floors</td><td>${distance.period_floors} floors</td></tr>`));
+  });
+  q('#wear-summary').innerHTML = `${report.month}; limits: month &lt; ${fmt(100 * report.monthly_limit)}%, six months ≤ ${fmt(100 * report.period_limit)}%<br>${summaries.join('<br>')}`;
+  q('#wear-cars').innerHTML = rows.join('');
+}
+
 function renderRemovals(rows) {
   q('#removals').innerHTML = rows.length ? rows.map(item => `<div class="alert"><b>${item.request_id}</b> · car ${item.car_id} · group ${item.group}<br><button data-removal="${item.request_id}" data-approve="true">Approve</button> <button data-removal="${item.request_id}" data-approve="false">Deny</button></div>`).join('') : '<div class="empty">No pending requests</div>';
 }
@@ -66,6 +79,9 @@ async function poll() {
   }
   if (['technician', 'facility_manager', 'system_admin'].includes(selected)) {
     try { const data = await get('/api/monitor/diagnostics'); q('#diagnostics').textContent = `${data.fault_history.length} recorded fault(s)`; } catch (error) { console.error(error); }
+  }
+  if (['owner', 'facility_manager', 'technician', 'system_admin'].includes(selected)) {
+    try { renderWear(await get('/api/monitor/wear')); } catch (error) { console.error(error); }
   }
   if (selected === 'tenant_admin') {
     try { const data = await get('/api/monitor/tenant-report'); q('#tenant-report').textContent = `${data.trips} trip(s), average wait ${fmt(data.average_wait_s)} s`; } catch (error) { console.error(error); }

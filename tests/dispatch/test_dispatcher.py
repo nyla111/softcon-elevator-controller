@@ -63,6 +63,30 @@ def test_prefers_the_car_already_there():
     assert ctx.bus.of_type(CallAssigned)[0].car_id == "C"
 
 
+def test_nfr_w1_prefers_lower_wear_only_when_dispatch_cost_is_close():
+    ctx = build(seed=1)
+    usage = ctx.services["usage"]
+    usage.period.update(A=1000, B=0, C=1000, D=1000)
+    ctx.bus.publish(CallRequested(0.0, call("balanced-wear", 1, 8)))
+    assert ctx.bus.of_type(CallAssigned)[0].car_id == "B"
+
+    # Distance balancing never overrides a materially faster pickup.
+    ctx = build(seed=1)
+    sim, usage = ctx.services["controllers"], ctx.services["usage"]
+    sim.cars["A"].floor = 10
+    usage.period.update(A=1000, B=0, C=1000, D=1000)
+    ctx.bus.publish(CallRequested(0.0, call("fast-car", 10, 1)))
+    assert ctx.bus.of_type(CallAssigned)[0].car_id == "A"
+
+
+def test_nfr_w1_eco_keeps_lower_wear_cars_active():
+    ctx = build(seed=1)                              # midnight schedule is Eco
+    ctx.services["usage"].period.update(A=1000, B=900, C=10, D=20)
+    ctx.clock.run_until(6)
+    assert {"A", "B"} <= ctx.services["dispatcher"].standby
+    assert not ({"C", "D"} & ctx.services["dispatcher"].standby)
+
+
 def test_fault_reassigns_waiting_calls_and_keeps_clock_fr04():
     ctx = build(seed=1)
     ctx.bus.publish(CallRequested(0.0, call("c1", 12, 1)))

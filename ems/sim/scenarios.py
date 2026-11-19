@@ -283,6 +283,19 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
         srs_criteria='Car marked Disconnected in 3 s; fallback rule assigns all calls', verifies='FR-104, FR-105'),
     _todo("SIM-17", 'Conditional: duplicate/uncertain calls and 20 card actions', 4, "balanced", 'Only proven duplicates/cancelled calls removed; uncertain calls retained; sixth ordinary action starts limit; exits and assistance exempt', 'FR-120, FR-121, FR-125, BR-07'),
     Scenario("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "up_peak", setup=_part5("setup_sim_18"), check=_part5("check_sim_18"), ready=True, srs_criteria='VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', verifies='FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
+    Scenario("SIM-19", 'Compressed monthly and six-month wear balance', 2, "balanced",
+             check=_part2("check_sim_19"), ready=True,
+             srs_criteria='Per-group distance imbalance <2% monthly and <=5% per six-month counter period; wait targets remain higher priority',
+             verifies='NFR-W1, NFR-P3',
+             notes='Each run seeds the equal-distance history, then executes a measured final traffic slice.',
+             runs=[
+                 RunSetup("compressed month", "balanced", 10.0, warmup_s=0.0,
+                          measure_s=600.0, clear_s=600.0,
+                          setup=_part2("setup_sim_19_month")),
+                 RunSetup("compressed six months", "balanced", 10.0, warmup_s=0.0,
+                          measure_s=600.0, clear_s=600.0,
+                          setup=_part2("setup_sim_19_period")),
+             ]),
 ]}
 
 # Full acceptance remains blocked; metrics_only runs exercise available Safety behavior.

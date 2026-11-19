@@ -39,6 +39,7 @@ SOFT_CEILING = 0.75            # soft line = 75% of the mode's wait ceiling
 # lengthens trips at peak and the average gets worse, measured on SIM-01/02)
 HARD_PENALTY = {Mode.RUSH: 0.0, Mode.BALANCED: 100.0, Mode.ECO: 0.0}
 QUADRATIC = 1.0                # waits cost w + Q * w^2 / ceiling: long waits weigh more (BR-01)
+WEAR_COST_SLACK = 5.0          # only balance wear among operationally near-equal choices
 
 
 class Book(Protocol):
@@ -49,6 +50,7 @@ class Book(Protocol):
     def extra_load_of(self, status: CarStatus) -> int: ...
     def elapsed(self, call_id: str) -> float: ...
     def pax_of(self, call: Call) -> Pax: ...
+    def wear_distance(self, car_id: CarId) -> int: ...
 
 
 class EtdEngine:
@@ -60,7 +62,7 @@ class EtdEngine:
 
     def choose_car(self, call: Call, cars: list[CarStatus], mode: Mode) -> Optional[CarId]:
         self.last = {}
-        best: Optional[tuple[float, CarId]] = None
+        choices: list[tuple[float, float, int, CarId]] = []
         for status in sorted(cars, key=lambda s: s.car_id):
             if status.group != call.group:
                 continue
@@ -69,9 +71,13 @@ class EtdEngine:
                 continue
             cost, eta = res
             self.last[status.car_id] = (cost, eta)
-            if best is None or cost < best[0] - 1e-9:
-                best = (cost, status.car_id)
-        return best[1] if best else None
+            choices.append((cost, eta, self.book.wear_distance(status.car_id), status.car_id))
+        if not choices:
+            return None
+        best_cost = min(item[0] for item in choices)
+        close = [item for item in choices if item[0] <= best_cost + WEAR_COST_SLACK]
+        # Wait/ride/energy policy decides the shortlist. Wear only breaks close decisions.
+        return min(close, key=lambda item: (item[2], item[0], item[3]))[3]
 
     # ------------------------------------------------------------------ cost
     def evaluate(self, call: Call, status: CarStatus, mode: Mode) -> Optional[tuple[float, float]]:
