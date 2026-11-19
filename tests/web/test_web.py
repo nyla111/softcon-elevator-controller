@@ -119,9 +119,11 @@ def test_pages_are_served(client):
     for path in ("/", "/building/", "/runner/", "/dashboard/"):
         assert client.get(path).status_code == 200
     assert "tower" in client.get("/building/").text and "SIM-" not in client.get("/runner/").text
-    assert "Live cars" in client.get("/dashboard/").text
-    assert "Security incident review" in client.get("/dashboard/").text
-    assert "reviewIncident" in client.get("/dashboard/").text
+    dashboard = client.get("/dashboard/").text
+    script = client.get("/dashboard/app.js").text
+    assert "Live cars" in dashboard and "Security incident review" in dashboard
+    assert 'data-roles="facility_manager"' in dashboard
+    assert "confirmRecovery" in script and "reviewIncident" in script
 
 
 def test_monitor_role_permissions_and_audit(client):
@@ -155,6 +157,48 @@ def test_monitor_all_staff_roles_and_human_change_audit(client):
 
 def test_monitor_requires_identity_headers(client):
     assert client.get("/api/monitor/report").status_code == 401
+
+
+def test_facility_manager_can_switch_mode_with_a_real_staff_credential(client):
+    fm = {"X-Role": "facility_manager", "X-User": "fm-1"}
+    body = {"credential_id": "staff-fm-1", "mode": "rush", "group": "LOW",
+            "duration_s": 300}
+    r = client.post("/api/monitor/mode", json=body, headers=fm)
+    assert r.status_code == 200 and r.json()["new"] == {"LOW": "rush"}
+    assert app.state.ctx.services["dispatcher"].current_mode("LOW").value == "rush"
+    body["credential_id"] = "staff-technician-1"
+    assert client.post("/api/monitor/mode", json=body, headers=fm).status_code == 403
+
+
+def test_facility_manager_recovery_status_and_confirmation(client):
+    fm = {"X-Role": "facility_manager", "X-User": "fm-1"}
+    ctx = app.state.ctx
+    safety = ctx.services["car_states"]
+    safety.recovery_required = True
+    safety.report_safety_clear(True)
+    for car in ctx.services["controllers"].cars:
+        safety.report_controller_normal(car, True)
+    status = client.get("/api/monitor/recovery", headers=fm).json()
+    assert status["eligible"] is True and status["blockers"] == []
+    r = client.post("/api/monitor/recovery/confirm",
+                    json={"credential_id": "staff-fm-1"}, headers=fm)
+    assert r.status_code == 200 and r.json()["confirmed"] is True
+    assert safety.recovery_required is False
+
+
+def test_facility_manager_approves_pending_second_car_removal(client):
+    from ems.priority.maintenance import RemovalRequest
+
+    fm = {"X-Role": "facility_manager", "X-User": "fm-1"}
+    maintenance = app.state.ctx.services["priority"].maintenance
+    maintenance.requests["MR-test"] = RemovalRequest(
+        "MR-test", "B", "LOW", 0, app.state.ctx.clock.now() + 600)
+    rows = client.get("/api/monitor/maintenance/requests", headers=fm).json()
+    assert [row["request_id"] for row in rows] == ["MR-test"]
+    r = client.post("/api/monitor/maintenance/requests/MR-test",
+                    json={"credential_id": "staff-fm-1", "approve": True}, headers=fm)
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert maintenance.requests["MR-test"].status == "entered"
 
 
 def test_scenarios_list_has_runs_with_start_times(client):
