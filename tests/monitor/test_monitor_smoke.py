@@ -87,6 +87,8 @@ def test_fr84_bulky_item_plays_bilingual_voice_once():
     messages = ctx.bus.of_type(PanelMessage)
     assert len(messages) == 1 and messages[0].voice
     assert messages[0].text_en and messages[0].text_vi
+    alerts = [item for item in ctx.bus.of_type(AlertRaised) if item.kind == "bulky_item"]
+    assert len(alerts) == 1 and alerts[0].recipients == ["fm", "security"]
 
 
 def test_ver08_camera_retention_boundary_and_configured_confirmed_limit():

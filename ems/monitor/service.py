@@ -214,6 +214,10 @@ class MonitorService:
     def _bulky_message(self, event_id: str, t: float, car_id: str) -> None:
         if event_id not in self._bulky_voice_events:
             self._bulky_voice_events.add(event_id)
+            self.ctx.bus.publish(AlertRaised(
+                t, "info", "bulky_item", ["fm", "security"],
+                f"Bulky item detected in car {car_id}; direct it to the service car",
+                car_id))
             self.ctx.bus.publish(PanelMessage(t, f"car:{car_id}",
                 "Heavy items must use the service car",
                 "Hàng nặng phải sử dụng thang máy dịch vụ", True))
