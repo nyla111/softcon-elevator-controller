@@ -28,7 +28,10 @@ def test_fire_recovery_opens_only_after_clear_and_reset():
     assert not states.confirm_recovery(Role.SECURITY)
     assert states.confirm_recovery(Role.FM)
     assert not states.safety_active()
-    assert {states.state(c) for c in sim.cars} == {CarState.GROUP_SERVICE}
+    # Recovery removes Safety's fire hold. At this 00:02 Eco time, Part 2 may immediately
+    # place idle cars in Standby; that is normal service, not a recovery failure.
+    assert {states.state(c) for c in sim.cars} <= {
+        CarState.GROUP_SERVICE, CarState.STANDBY}
 
 
 def test_cars_serve_passengers_again_after_fm_confirms():
