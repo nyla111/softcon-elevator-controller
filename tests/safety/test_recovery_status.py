@@ -71,6 +71,7 @@ def test_active_fire_reports_alarm_and_firefighter_blockers(environment):
 
 def test_clear_and_reset_do_not_infer_attestations_from_telemetry(environment):
     ctx, safety, sim, devices = environment
+    sim.reports_to_safety = False
     clear_fire(ctx, sim, devices)
     ctx.clock.run_until(65)
     status = safety.recovery_status()

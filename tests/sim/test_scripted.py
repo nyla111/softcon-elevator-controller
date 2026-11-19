@@ -113,3 +113,18 @@ def test_medical_events_start_depart_and_finish_one_trip():
 def test_medical_depart_and_finish_without_a_trip_do_nothing():
     ctx, checks = run_list(loads("t,event\n0,medical_depart\n10,medical_finish\n"))
     assert ctx.bus.of_type(PriorityTripStarted) == []
+
+
+def test_fm_confirm_event_ends_fire_recovery():
+    ctx, checks = run_list(loads("t,origin,destination,card,event,expect\n"
+                                 "0,,,,fire_alarm,\n"
+                                 "60,,,,fire_clear,\n"
+                                 "70,,,,fm_confirm,\n"
+                                 "75,1,5,card-L5-001,,delivered\n"))
+    assert all(c.ok for c in checks), checks
+    assert not ctx.services["car_states"].safety_active()
+
+
+def test_fm_confirm_before_the_alarm_is_cleared_is_refused():
+    ctx, _ = run_list(loads("t,event\n0,fire_alarm\n30,fm_confirm\n"))
+    assert ctx.services["car_states"].safety_active()
