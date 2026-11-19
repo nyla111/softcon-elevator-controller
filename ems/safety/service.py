@@ -220,23 +220,57 @@ class SafetyService:
         else:
             self.normal.discard(car_id)
 
+    def _recovery_details(self) -> dict[str, object]:
+        required = tuple(car for car in self.table.cars() if not self.table.isolated(car))
+        missing = tuple(car for car in required if car not in self.normal)
+        unhealthy = tuple(car for car in required
+                          if not self._healthy(self.ctx.get("controllers").status(car)))
+        external_holds = tuple(sorted(
+            (car, state.name, owner)
+            for car, holds in self.table.holds.items()
+            for state, owner in holds
+            if state <= CarState.EMERGENCY_POWER and not owner.startswith("safety:")
+        ))
+        mains_stable = (self.power_lost_at is None or
+                        (self.mains_since is not None and
+                         self.ctx.clock.now() - self.mains_since >= config.MAINS_STABLE_S))
+        blockers = tuple(reason for reason, blocked in (
+            ("recovery_not_required", not self.recovery_required),
+            ("fire_active", self.fire),
+            ("firefighter_service_active", bool(self.firefighters)),
+            ("mains_lost", self.mains_lost),
+            ("safety_inputs_not_clear", not self.signals_clear),
+            ("external_emergency_holds", bool(external_holds)),
+            ("mains_not_stable", not mains_stable),
+            ("controller_reports_missing", bool(missing)),
+            ("controllers_unhealthy", bool(unhealthy)),
+        ) if blocked)
+        return {
+            "recovery_required": self.recovery_required,
+            "fire_active": self.fire,
+            "safety_inputs_clear": self.signals_clear,
+            "required_controllers": required,
+            "missing_controller_reports": missing,
+            "unhealthy_controllers": unhealthy,
+            "firefighter_cars": tuple(sorted(self.firefighters)),
+            "mains_lost": self.mains_lost,
+            "mains_stable": mains_stable,
+            "external_emergency_holds": external_holds,
+            "blockers": blockers,
+            "eligible": not blockers,
+        }
+
     def recovery_eligible(self) -> bool:
-        if (not self.recovery_required or self.fire or self.firefighters or self.mains_lost
-                or not self.signals_clear):
-            return False
-        if any(s <= CarState.EMERGENCY_POWER and not by.startswith("safety:")
-               for holds in self.table.holds.values() for s, by in holds):
-            return False
-        if (self.power_lost_at is not None and
-                (self.mains_since is None or
-                 self.ctx.clock.now() - self.mains_since < config.MAINS_STABLE_S)):
-            return False
-        for car in self.table.cars():
-            if self.table.isolated(car):
-                continue
-            if car not in self.normal or not self._healthy(self.ctx.get("controllers").status(car)):
-                return False
-        return True
+        return bool(self._recovery_details()["eligible"])
+
+    def recovery_status(self) -> dict[str, object]:
+        """Internal detached snapshot. Eligibility permits FM confirmation only.
+
+        Tuple values never expose live collections. Blockers explain recovery eligibility,
+        including missing reports when recovery is not required during normal service.
+        Read under the same context lock as recovery actions when used by Monitor/Admin.
+        """
+        return self._recovery_details()
 
     def confirm_recovery(self, role: Role) -> bool:
         """Internal FM entry point. Caller must authenticate the role before invoking this."""
