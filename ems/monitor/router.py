@@ -116,6 +116,15 @@ def diagnostics(x_user: str | None = Header(None), x_role: str | None = Header(N
     return {"fault_history": _service().fault_history}
 
 
+@router.get("/wear")
+def wear(x_user: str | None = Header(None), x_role: str | None = Header(None)):
+    _allow(_identity(x_user, x_role), {Role.OWNER, Role.FM, Role.TECHNICIAN, Role.SYSADMIN})
+    ctx = _context()
+    if "usage" not in ctx.services:
+        raise HTTPException(503, "usage service is not registered")
+    return ctx.get("usage").wear_report()
+
+
 @router.get("/recovery")
 def recovery_status(x_user: str | None = Header(None), x_role: str | None = Header(None)):
     _allow(_identity(x_user, x_role), {Role.FM})

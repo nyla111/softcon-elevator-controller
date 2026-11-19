@@ -220,5 +220,40 @@ def check_sim_10(result, ctx) -> Criteria:
     return out
 
 
+def _seed_wear_history(ctx, floors: int) -> None:
+    """Compress the equal-distance history before SIM-19's measured final slice."""
+    usage = ctx.services["usage"]
+    cars = [car for group in ctx.services["building"].groups for car in group.cars]
+    usage.period.update({car: floors for car in cars})
+    month = ctx.clock.now_dt().strftime("%Y-%m")
+    usage.monthly[month] = {car: floors for car in cars}
+
+
+def setup_sim_19_month(ctx) -> None:
+    _seed_wear_history(ctx, 100_000)       # first 29 compressed days
+
+
+def setup_sim_19_period(ctx) -> None:
+    _seed_wear_history(ctx, 500_000)       # first five compressed months
+
+
+def check_sim_19(results, ctxs) -> Criteria:
+    month = ctxs[0].services["usage"].wear_report()
+    period = ctxs[1].services["usage"].wear_report()
+    passenger_groups = ctxs[0].services["building"].passenger_groups
+    monthly = {g: month["groups"][g]["monthly_imbalance"] for g in passenger_groups}
+    six_month = {g: period["groups"][g]["period_imbalance"] for g in passenger_groups}
+    return [
+        ("every passenger group is under 2% for the compressed month",
+         all(value < month["monthly_limit"] for value in monthly.values()), repr(monthly)),
+        ("every passenger group is at most 5% for the compressed six-month period",
+         all(value <= period["period_limit"] for value in six_month.values()),
+         repr(six_month)),
+        ("wait targets retain priority and every call clears",
+         all(result.metrics["calls_not_cleared"] == 0 for result in results),
+         repr([result.metrics["calls_not_cleared"] for result in results])),
+    ]
+
+
 def _ms(x: Optional[float]) -> str:
     return "n/a" if x is None else f"{x * 1000:.1f} ms"

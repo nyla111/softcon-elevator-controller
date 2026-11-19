@@ -45,7 +45,8 @@ class PolicyMixin:
         active = [s for s in statuses if s.car_id not in self.standby]
         if not active:
             return
-        busy_first = sorted(active, key=lambda s: (self._idle(s), s.car_id))
+        busy_first = sorted(active, key=lambda s: (
+            self._idle(s), self.wear_distance(s.car_id), s.car_id))
         keep = {s.car_id for s in busy_first[:ECO_ACTIVE_CARS]}
         car_states = self._svc("car_states")
         controllers = self._svc("controllers")
@@ -60,7 +61,8 @@ class PolicyMixin:
                 car_states.release(s.car_id, CarState.STANDBY, BY)
 
     def _wake_standby(self, group: GroupId, why: str) -> bool:
-        cars = sorted(c for c in self.standby if self._group_of(c) == group)
+        cars = sorted((c for c in self.standby if self._group_of(c) == group),
+                      key=lambda c: (self.wear_distance(c), c))
         for car_id in cars:
             if self._wake(car_id):
                 return True
