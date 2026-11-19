@@ -15,8 +15,11 @@ def test_all_18_scenarios_with_the_right_owner_part():
 
 
 def test_ready_scenarios_have_complete_acceptance_integrations():
+    # Part 5: SIM-06, 11, 12, 18 (ems/priority/acceptance); Part 2: SIM-01..05, 10
+    # (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
-    assert ready == ["SIM-06", "SIM-09", "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
+    assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-09",
+                     "SIM-10", "SIM-11", "SIM-12", "SIM-16", "SIM-18"]
     for s in SCENARIOS.values():
         if not s.ready:
             if s.owner_part == 4:
@@ -28,9 +31,9 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
 
 
 def test_not_ready_scenario_reports_what_it_waits_for():
-    r = run_scenario("SIM-01", 1)
+    r = run_scenario("SIM-07", 1)
     assert r["ready"] is False and r["passed"] is None and r["criteria"] == []
-    assert r["message"] == "not ready: waiting for Part 2 check"
+    assert r["message"] == "not ready: waiting for Part 3 check"
 
 
 def test_registry_loads_part4_only_when_a_part4_scenario_executes():
@@ -110,7 +113,7 @@ def test_every_scenario_setup_matches_appendix_b():
 def test_sim_10_has_a_design_limit_setup():
     s = SCENARIOS["SIM-10"]
     (r,) = s.runs
-    assert s.waiting_for == "Part 2 check" and not s.ready
+    assert s.waiting_for is None and s.ready
     assert r.building == "design_limit" and r.rate == 400.0 and r.measure_s == 3600.0
     assert r.workload == {"lookups_per_min": 400.0, "camera_per_day": 2000.0,
                           "dashboard_users": 50, "dashboard_requests": 5}
