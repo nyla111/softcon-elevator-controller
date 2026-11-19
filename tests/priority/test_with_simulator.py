@@ -168,7 +168,11 @@ def test_dispatch_standin_asks_the_door_time_for_accessible_calls():
     """#10: the PriorityService answer is passed as register_stop(..., min_dwell_s)."""
     from ems.contracts.events import CallRequested
     from ems.contracts.types import CallPriority
-    r = run("up_peak", 1, setup=install_scenario_standins, keep_ctx=True, out_dir=None,
+    def standins_only(ctx):          # Part 2 is real on main: test the stand-in itself
+        from ems.dispatch import detach
+        detach(ctx)
+        install_scenario_standins(ctx)
+    r = run("up_peak", 1, setup=standins_only, keep_ctx=True, out_dir=None,
             start_hhmm="07:00", measure_s=600.0)
     sim, bus = r.ctx.services["controllers"], r.ctx.bus
     acc = {e.call.call_id for e in bus.of_type(CallRequested)
