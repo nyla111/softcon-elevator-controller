@@ -1,0 +1,10 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+25200,1,15,card-L15-001,false,false,sim15-onboard,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: 07:00 up-peak rider must be onboard A between floors before fault; eventual delivery only after fault clears
+25210,14,1,card-L14-001,false,false,sim15-already-waiting,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: request is waiting before the fault; retain identity and original wait clock while a healthy car completes pickup
+25214,,,,,,,car_fault,A,120,alert:entrapment,,SIM-15 FR-112 NFR-R4 #33 #55: moving occupied A reports between_floors=True automatically; pending because CSV injects generic F-LIVE rather than explicit brake code
+25215,1,5,card-L5-001,false,false,sim15-pending-1,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: retain call identity and original wait clock; healthy cars must serve while A is faulted
+25216,1,7,card-L7-001,false,false,sim15-pending-2,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: retain or reassign waiting call to healthy car; no EMS movement request to A including rejected commands
+25224.000000000004,,,,,,,check,,,no_alert:entrapment,,SIM-15 FR-112 NFR-R4 #33 #55: next representable time after t=25224; paired with fault alert expectation rejects any entrapment later than the 10 s deadline
+25225,1,11,card-L11-001,false,false,sim15-pending-3,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: pending request served during fault without dropping waiting passengers; inspect assignment and command trace
+25335,,,,,,,check,,,no_alert:entrapment,,SIM-15 FR-112 NFR-R4 #33 #55: fault duration ended at t=25334; no commands to A permitted during fault window
+25400,1,6,card-L6-001,false,false,sim15-after-fault,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: service after fault clearance; pending until explicit brake event and bounded assertions exist
