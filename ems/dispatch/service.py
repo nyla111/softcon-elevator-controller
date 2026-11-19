@@ -83,6 +83,7 @@ class Dispatcher(AssignMixin, PauseMixin, CeilingMixin, PolicyMixin):
         self._next_risk = 0.0
         self._next_policy = 0.0
         self._last_breach_alert: dict[GroupId, float] = {}
+        self._claiming_call_id: Optional[CallId] = None  # excluded from its own VIP ceiling check
         self.active = True
 
     # ================================================================ wiring
@@ -158,6 +159,8 @@ class Dispatcher(AssignMixin, PauseMixin, CeilingMixin, PolicyMixin):
         group = status.group
         ceiling = self._ceiling(group)
         for rec in [self.calls[c] for c in sorted(self.open)]:
+            if rec.call.call_id == self._claiming_call_id:
+                continue
             if rec.call.group != group:
                 continue
             if rec.state == "assigned" and rec.car != car_id:

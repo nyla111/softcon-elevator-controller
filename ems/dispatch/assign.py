@@ -29,7 +29,11 @@ class AssignMixin:
         old = rec.car if rec.state == "assigned" else None
         if call.priority is CallPriority.VIP and old is None and rec.state == "pending" \
                 and rec.prev_car is None:
-            car = self._svc("priority").claim_call(call)
+            self._claiming_call_id = call.call_id
+            try:
+                car = self._svc("priority").claim_call(call)
+            finally:
+                self._claiming_call_id = None
             if car is not None:                       # Part 5 runs an exclusive trip
                 rec.state, rec.car = "vip", car
                 self.exclusive.add(car)
