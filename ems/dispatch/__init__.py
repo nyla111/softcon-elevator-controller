@@ -2,16 +2,33 @@
 
 Scope: Call handling 4.1, modes 4.3, FR-100/101 overload re-assign, FR-105 fallback rule.
 Provides ctx.services key(s): dispatcher
+
+Modules:
+  service  Dispatcher (protocol in contracts/interfaces.py): call flow, pending queue, FR-04
+           re-assignment, FR-100 overload, FR-13 ceiling watch, FR-14 Eco step-up, parking and
+           Eco standby, pauses for fire / power loss / EMS server loss
+  engine   EtdEngine, the replaceable DispatchEngine plug-in (FR-06), always called through
+           Part 1's FR-105 guard (ctx.services["dispatch_guard"])
+  model    trip replay: predicted pick-up and arrival times per car
+  modes    ModeManager: schedule (FR-11), manual switch (FR-12), step-up override (FR-14)
+  acceptance  checks for SIM-01..05 and SIM-10 (used by ems/sim/scenarios.py)
 """
 from __future__ import annotations
 
 
 def register(ctx) -> None:
-    """Subscribe to events and put your service(s) into ctx.services.
-    Until you do, stubs from ems/contracts/stubs.py are used."""
-    # Example:
-    #   from ems.contracts.events import CallRequested
-    #   service = MyService(ctx)
-    #   ctx.bus.subscribe(CallRequested, service.on_call_requested)
-    #   ctx.services["dispatcher"] = service
-    pass
+    from .service import Dispatcher
+
+    dispatcher = Dispatcher(ctx)
+    dispatcher.subscribe()
+    ctx.services["dispatcher"] = dispatcher
+
+
+def detach(ctx) -> None:
+    """Turn the real dispatcher off and put the contract stub back (stand-in tests)."""
+    from ems.contracts.stubs import StubDispatcher
+
+    real = ctx.services.get("dispatcher")
+    if hasattr(real, "detach"):
+        real.detach()
+    ctx.services["dispatcher"] = StubDispatcher()
