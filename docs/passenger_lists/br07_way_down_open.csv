@@ -1,0 +1,7 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,5,1,card-L5-001,,,B07_1,,,,delivered,60,BR-07 way down to lobby from floor 5 is open
+10,9,1,card-L9-001,,,B07_2,,,,delivered,60,BR-07 way down to lobby from floor 9 is open
+20,12,1,visitor:12,,,B07_3,,,,delivered,60,BR-07 visitor pass can go down to lobby
+30,8,1,,true,,B07_4,,,,delivered,60,BR-07 accessible passenger descending to lobby
+40,14,1,,false,true,B07_5,,,,delivered,60,BR-07 VIP passenger descending to lobby
+50,3,1,unknown-card,,,B07_6,,,,delivered,60,BR-07 way down to lobby stays open even with unknown card
