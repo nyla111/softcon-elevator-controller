@@ -368,7 +368,11 @@ class MonitorService:
                 and (mode is None or r["mode"] == mode)]
         slices = [s for s in self.run_slices if same_period(s["t"])
                   and (mode is None or s["mode"] == mode)]
-        return {"period": period, "mode": mode, "wait_and_run_time": self._kpis_for(rows, slices)}
+        result = {"period": period, "mode": mode,
+                  "wait_and_run_time": self._kpis_for(rows, slices)}
+        if period == "month" and "usage" in self.ctx.services:
+            result["wear"] = self.ctx.get("usage").wear_report()
+        return result
 
     def tenant_report(self, tenant_id: str) -> dict[str, Any]:
         floors = set(self.configuration.get("tenants", {}).get(tenant_id, []))
@@ -400,7 +404,7 @@ class MonitorService:
                 this_rows.append(row)
             elif (dt.year, dt.month) == (previous.year, previous.month):
                 previous_rows.append(row)
-        return {"period": current.strftime("%Y-%m"),
+        report = {"period": current.strftime("%Y-%m"),
                 "wait_and_run_time": self._kpis_for(this_rows,
                     [s for s in self.run_slices if (self._dt_at(s["t"]).year,
                      self._dt_at(s["t"]).month) == (current.year, current.month)]),
@@ -409,3 +413,6 @@ class MonitorService:
                      self._dt_at(s["t"]).month) == (previous.year, previous.month)]),
                 "targets": {m.value: {"mean_wait_s": v[0], "ceiling_s": v[1]}
                             for m, v in config.MODE_TARGETS.items()}}
+        if "usage" in self.ctx.services:
+            report["wear"] = self.ctx.get("usage").wear_report()
+        return report

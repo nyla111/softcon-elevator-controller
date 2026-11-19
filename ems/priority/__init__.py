@@ -15,11 +15,14 @@ from __future__ import annotations
 
 
 def register(ctx) -> None:
-    from . import goods, maintenance, service
+    from . import goods, maintenance, service, usage
 
     svc = service.PriorityService(ctx)
     svc.maintenance = maintenance.Maintenance(svc)
     svc.goods = goods.GoodsMoves(svc)
     service.subscribe(ctx, svc)
     maintenance.subscribe(ctx, svc.maintenance)
+    usage_service = usage.UsageService(ctx)
+    usage.subscribe(ctx, usage_service)
     ctx.services["priority"] = svc
+    ctx.services["usage"] = usage_service
