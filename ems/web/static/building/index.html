@@ -3,41 +3,45 @@
 <title>Building view</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg:#0a1020; --panel:#121a30; --line:#33415f; --text:#f4f7ff; --dim:#aab6d3;
-          --ok:#37d67a; --warn:#ffc233; --bad:#ff5d5d; --accent:#4cb3ff; }
+  :root { --bg:#15181d; --panel:#1c2027; --line:#2e343e; --text:#e7e9ec; --dim:#8f98a6;
+          --ok:#62b07f; --warn:#d8a446; --bad:#d8665e; --accent:#7aa2cf; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
-               font:16px/1.3 system-ui, "Segoe UI", Arial, sans-serif; }
-  #app { display:grid; grid-template-rows:56px 1fr 92px; height:100vh; }
+               font:15px/1.35 "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif; }
+  #app { display:grid; grid-template-rows:52px 1fr; height:100vh; }
   #top { display:flex; align-items:center; gap:16px; padding:0 14px; background:var(--panel);
          border-bottom:2px solid var(--line); white-space:nowrap; overflow:hidden; }
-  #clock { font-size:24px; font-weight:700; min-width:230px; }
-  .pill { padding:4px 12px; border-radius:14px; font-weight:700; font-size:16px; border:2px solid; }
+  #clock { font-size:21px; font-weight:600; min-width:230px; font-variant-numeric:tabular-nums; }
+  .pill { padding:3px 10px; border-radius:4px; font-weight:600; font-size:14px; border:1px solid; }
   .ok { color:var(--ok); border-color:var(--ok); } .bad { color:var(--bad); border-color:var(--bad); }
   .warn { color:var(--warn); border-color:var(--warn); } .dim { color:var(--dim); border-color:var(--line); }
-  #main { display:grid; grid-template-columns:1fr 330px; min-height:0; }
-  #towerwrap { min-height:0; padding:4px 8px; }
+  #main { display:grid; grid-template-columns:1fr 290px 340px; min-height:0; }
+  #towerwrap { min-height:0; padding:2px 4px; }
   svg { width:100%; height:100%; display:block; }
-  #side { background:var(--panel); border-left:2px solid var(--line); padding:10px 12px;
-          overflow:auto; }
-  #side h3 { margin:10px 0 6px; font-size:15px; color:var(--dim); text-transform:uppercase;
-             letter-spacing:.06em; }
+  #side, #log { background:var(--panel); border-left:1px solid var(--line); padding:10px 12px;
+          overflow:auto; min-height:0; }
+  #side h3, #log h3 { margin:10px 0 6px; font-size:13px; font-weight:600; color:var(--dim);
+             text-transform:uppercase; letter-spacing:.06em; }
   #side label { font-size:14px; color:var(--dim); }
-  select, input, button { font:inherit; font-size:16px; color:var(--text); background:#1b2646;
-          border:2px solid var(--line); border-radius:6px; padding:5px 8px; }
+  select, input, button { font:inherit; font-size:14px; color:var(--text); background:#242a33;
+          border:1px solid var(--line); border-radius:4px; padding:5px 8px; }
   input { width:80px; } select { max-width:150px; }
-  button { cursor:pointer; font-weight:700; } button:hover { border-color:var(--accent); }
-  button.on { background:var(--accent); color:#04101f; border-color:var(--accent); }
+  button { cursor:pointer; font-weight:600; } button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#10151c; border-color:var(--accent); }
+  .controls button { flex:1 1 46%; }
+  button.on { background:#33404f; border-color:var(--accent); }
   .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; }
-  .faults button { flex:1 1 46%; font-size:14px; padding:6px 4px; }
-  #activeFaults div { color:var(--bad); font-weight:700; font-size:15px; }
-  #alertsList div { font-size:14px; color:var(--warn); margin:2px 0; }
-  #ticker { background:#050912; border-top:2px solid var(--line); padding:6px 14px;
-            font:15px/1.35 ui-monospace, Menlo, Consolas, monospace; overflow:hidden; }
-  #ticker div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #ticker div:last-child { color:var(--text); } #ticker div { color:var(--dim); }
+  .faults button { flex:1 1 46%; font-size:13px; padding:5px 4px; }
+  #activeFaults div { color:var(--bad); font-weight:600; font-size:14px; }
+  a { color:var(--accent); }
+  #note { font-size:13px; color:var(--ok); min-height:1.2em; }
+  #alertsList div { font-size:13px; color:var(--warn); margin:2px 0; }
+  #ticker { font:12px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+  #ticker div { color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                border-bottom:1px solid #232830; padding:1px 0; }
+  #ticker div:first-child { color:var(--text); }
   text { fill:var(--text); font-family:system-ui, Arial, sans-serif; }
-  .carlabel { font-size:12px; font-weight:800; paint-order:stroke; stroke:#000; stroke-width:2.5px; }
+  .carlabel { font-size:12px; font-weight:700; paint-order:stroke; stroke:#000; stroke-width:2px; }
 </style></head>
 <body><div id="app">
   <div id="top">
@@ -60,9 +64,13 @@
       </div>
       <div class="row"><label title="CSV or JSON: t, origin, destination, card, accessible, vip, passenger_id. Replaces the random traffic.">passenger list
         <input id="script" type="file" accept=".csv,.json"></label></div>
-      <div class="row"><button id="start">Start</button><button id="play">Play</button>
-        <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
+      <div class="row controls"><button id="start" class="primary" title="Start a new run with these settings. The previous run and its dashboard figures are replaced (save it first).">New run</button>
+        <button id="play">Pause</button>
+        <button id="reset" title="Empty building, no traffic">Reset</button>
+        <button id="save" title="Save this run's figures to the run history">Save run</button></div>
+      <div class="row">speed <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
         <button class="spd" data-s="60">60x</button></div>
+      <div id="note"></div>
       <h3>Access control</h3>
       <div class="row"><a href="/panel/" target="_blank" rel="noopener noreferrer">Open the lobby destination panel</a></div>
       <h3>Faults</h3>
@@ -81,10 +89,12 @@
         <button data-k="overload_burst">Overload burst</button><button data-k="bulky_item">Bulky item</button>
       </div>
       <h3>Active faults</h3><div id="activeFaults"><div style="color:var(--dim)">none</div></div>
-      <h3>Latest alerts</h3><div id="alertsList"></div>
+    </div>
+    <div id="log">
+      <h3>Latest alerts</h3><div id="alertsList"><div style="color:var(--dim)">none</div></div>
+      <h3>Event log (newest first)</h3><div id="ticker"></div>
     </div>
   </div>
-  <div id="ticker"></div>
 </div>
 <script>
 "use strict";
@@ -117,24 +127,24 @@ const cars = {};           // car id -> {g, body, dl, dr, bar, text, stops}
 function buildTower() {
   for (let i = -2; i <= 29; i++) {                     // floor rows
     const y = yOfIdx(i), f = i < 0 ? i : i + 1;
-    el("rect", { x:0, y, width:790, height:ROW, fill: i % 2 ? "#0e1528" : "#111a30" }, svg);
+    el("rect", { x:0, y, width:790, height:ROW, fill: i % 2 ? "#181c22" : "#1c2128" }, svg);
     el("text", { x:6, y:y + 15, "font-size":14, "font-weight":700 }, svg, label(f));
   }
-  el("text", { x:50, y:16, "font-size":13, fill:"#aab6d3" }, svg, "waiting");
-  el("text", { x:50, y:TOP - 2, "font-size":12, fill:"#aab6d3" }, svg, "LOW");
-  el("text", { x:96, y:TOP - 2, "font-size":12, fill:"#aab6d3" }, svg, "HIGH");
+  el("text", { x:50, y:10, "font-size":10, fill:"#8f98a6" }, svg, "waiting");
+  el("text", { x:50, y:TOP - 3, "font-size":10, fill:"#8f98a6" }, svg, "LOW");
+  el("text", { x:92, y:TOP - 3, "font-size":10, fill:"#8f98a6" }, svg, "HIGH");
   waitCells.LOW = {}; waitCells.HIGH = {};
   LOW_FLOORS.forEach(f => waitCells.LOW[f] = el("text", { x:58, y:yOfIdx(idxOf(f)) + 16,
       "font-size":15, "font-weight":800, "text-anchor":"middle" }, svg, ""));
   HIGH_FLOORS.forEach(f => waitCells.HIGH[f] = el("text", { x:104, y:yOfIdx(idxOf(f)) + 16,
       "font-size":15, "font-weight":800, "text-anchor":"middle" }, svg, ""));
   for (const [id, x] of Object.entries(GROUP_X)) {     // shafts
-    el("rect", { x:x - 2, y:TOP, width:CAR_W + 4, height:ROWS * ROW, fill:"#070b16",
-                 stroke:"#33415f", "stroke-width":1 }, svg);
+    el("rect", { x:x - 2, y:TOP, width:CAR_W + 4, height:ROWS * ROW, fill:"#111418",
+                 stroke:"#2e343e", "stroke-width":1 }, svg);
   }
   [["LOW", 160, 418], ["HIGH", 432, 690], ["SERVICE", 704, 758]].forEach(([n, a, b]) =>
     el("text", { x:(a + b) / 2, y:TOP - 6, "font-size":15, "font-weight":800, "text-anchor":"middle",
-                 fill:"#4cb3ff" }, svg, n));
+                 fill:"#7aa2cf" }, svg, n));
   for (const id of Object.keys(GROUP_X)) {             // cars
     const g = el("g", {}, svg);
     const stops = el("g", {}, g);
@@ -177,7 +187,7 @@ function render(s) {
     floors.forEach(f => {
       const n = counts[String(f)] || 0, c = waitCells[g][f];
       c.textContent = n || "·";
-      c.setAttribute("fill", n >= 10 ? "#ff5d5d" : n > 0 ? "#ffc233" : "#445070");
+      c.setAttribute("fill", n >= 10 ? "#d8665e" : n > 0 ? "#d8a446" : "#3a414c");
     });
   }
   for (const c of s.cars) {                            // cars
@@ -206,10 +216,13 @@ function render(s) {
   af.innerHTML = s.active_faults.length ? "" : '<div style="color:var(--dim)">none</div>';
   s.active_faults.forEach(t => { const d = document.createElement("div"); d.textContent = t; af.appendChild(d); });
   const al = document.getElementById("alertsList"); al.replaceChildren();
-  s.alerts.slice(-4).reverse().forEach(a => { const d = document.createElement("div");
-    d.textContent = a.t.toFixed(0) + "s [" + a.severity + "] " + a.kind; al.appendChild(d); });
+  if (!s.alerts.length) al.innerHTML = '<div style="color:var(--dim)">none</div>';
+  s.alerts.slice(-8).reverse().forEach(a => { const d = document.createElement("div");
+    d.textContent = a.t.toFixed(0) + "s [" + a.severity + "] " + a.kind; d.title = a.message || "";
+    al.appendChild(d); });
   const tk = document.getElementById("ticker"); tk.replaceChildren();
-  s.events.slice(-4).forEach(line => { const d = document.createElement("div"); d.textContent = line; tk.appendChild(d); });
+  s.events.slice().reverse().forEach(line => { const d = document.createElement("div");
+    d.textContent = line; d.title = line; tk.appendChild(d); });
 }
 
 // ---------------------------------------------------------------- controls
@@ -231,8 +244,9 @@ async function tick() {
 
 function setPlaying(on) {
   playing = on; const b = document.getElementById("play");
-  b.textContent = on ? "Pause" : "Play"; b.classList.toggle("on", on);
+  b.textContent = on ? "Pause" : "Resume"; b.classList.toggle("on", !on);
 }
+function note(text) { document.getElementById("note").textContent = text; }
 async function startLive(profile, rate, seed) {
   const file = document.getElementById("script").files[0];       // fixed list instead of random
   const script = file ? await file.text() : null;
@@ -240,12 +254,23 @@ async function startLive(profile, rate, seed) {
     await post("/api/live/start", { profile, rate: rate === "" || rate == null ? null : Number(rate),
                                     seed: Number(seed), script });
   } catch (e) { alert(e.message); return; }
-  setPlaying(true);
+  note(""); setPlaying(true);
 }
 document.getElementById("start").onclick = () => startLive(
   document.getElementById("profile").value, document.getElementById("rate").value,
   document.getElementById("seed").value || 1);
 document.getElementById("play").onclick = () => setPlaying(!playing);
+document.getElementById("reset").onclick = async () => {
+  try { await post("/api/reset?seed=" + Number(document.getElementById("seed").value || 1)); }
+  catch (e) { alert(e.message); return; }
+  setPlaying(false); note("Reset: empty building, no traffic.");
+};
+document.getElementById("save").onclick = async () => {
+  const name = prompt("Name for this run (optional):", "");
+  if (name === null) return;
+  try { const r = await post("/api/runs/save", { name: name || null }); note("Saved: " + r.run_id); }
+  catch (e) { alert(e.message); }
+};
 document.querySelectorAll(".spd").forEach(b => b.onclick = () => {
   speed = Number(b.dataset.s);
   document.querySelectorAll(".spd").forEach(x => x.classList.toggle("on", x === b));
@@ -256,6 +281,7 @@ document.querySelectorAll("#faultBtns button").forEach(b => b.onclick = async ()
 });
 document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName === "BODY") { e.preventDefault(); setPlaying(!playing); } });
 
+setPlaying(false);
 const q = new URLSearchParams(location.search);       // ?profile=&rate=&seed=&autostart=1
 if (q.get("profile")) document.getElementById("profile").value = q.get("profile");
 if (q.get("rate")) document.getElementById("rate").value = q.get("rate");
