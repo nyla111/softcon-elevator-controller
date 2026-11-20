@@ -32,8 +32,10 @@ def submit_panel_request(body: PanelInput, request: Request) -> dict:
 
         building = ctx.services["building"]
         group = building.group_of_floor.get(body.destination)
+        if group is None and body.destination in building.parking_floors:
+            group = building.parking_floors[body.destination][0]
         if group is None:
-            raise HTTPException(400, "Choose an existing destination floor above the lobby")
+            raise HTTPException(400, "Choose an existing tenant or parking floor")
 
         panel_id = "demo-lobby-panel"
         call_id = f"panel-demo-{len(ctx.bus.log)}"
