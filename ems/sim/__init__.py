@@ -3,7 +3,7 @@
 Scope: Simulated cars/doors/load, traffic generator, mock ACS, camera, fire panel, power room, notifier test inbox, heartbeat (FR-104), DB buffering (FR-107), failover (NFR-R2).
 Provides ctx.services key(s): controllers, acs, notifier, building (layout of this run)
 
-Modules: cars, traffic, population, harness, baseline, bridge (temporary), devices (mock ACS,
+Modules: cars, traffic, population, harness, baseline, bridge (Part 3 stand-in for partial builds), devices (mock ACS,
 notifier, fire panel, power room, camera), faults, heartbeat, database, failover, building (BuildingSpec), workload (SIM-10 load hooks), dashboard_load, dispatch_guard (FR-105), scenarios (registry), live (demo server helpers).
 Passenger arrivals are produced by TrafficGenerator (traffic.py), started by the harness.
 """
@@ -37,4 +37,4 @@ def register(ctx) -> None:
     ctx.services["failover"] = Failover(ctx, sim, db)
     ctx.services["dispatch_guard"] = DispatchGuard(ctx)   # FR-105: Part 2 calls its engine here
     HeartbeatMonitor(ctx, sim)
-    TemporaryBridge(ctx)       # TEMPORARY until Part 3 merges (see bridge.py)
+    TemporaryBridge(ctx)       # only active without Part 3 (partial builds, see bridge.py)

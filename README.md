@@ -29,8 +29,7 @@ ems/
 tests/
   <part>/      your unit tests
   scenarios/   SIM-xx / VER-xx acceptance tests (Appendix B)
-docs/          contract, scope note for Team 3
-scripts/       create_issues.sh + requirements.csv
+docs/          contract, decisions, change requests, dispatch notes, requirement allocation (requirements.csv), passenger lists
 ```
 
 
