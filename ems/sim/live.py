@@ -8,6 +8,8 @@ them early.
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 from ems.core.app import Context, build
 
 from . import faults as F
@@ -17,6 +19,11 @@ from .scripted import ScriptedTraffic, ScriptedTrip
 from .traffic import PROFILES, TrafficGenerator, with_rate
 
 LIVE_HORIZON_S = 7 * 86400.0       # traffic keeps coming for a simulated week
+LIVE_DAY = datetime(2026, 11, 16)  # a Monday, as in the harness
+# Time of day a live run starts at, so the scheduled mode matches the traffic (WEEKDAY_SCHEDULE):
+# morning peak in Rush, office hours in Balanced, night in Eco. Passenger lists start at 00:00.
+LIVE_START_HHMM = {"up_peak": (7, 30), "lunch": (12, 0), "evening": (17, 15),
+                   "balanced": (10, 0), "eco": (22, 0)}
 
 # kind -> needs a car?
 FAULT_KINDS = {
@@ -33,7 +40,8 @@ def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 
     """A live run with random traffic of one profile, or with a fixed passenger list (script)."""
     if script is None and profile not in PROFILES:
         raise ValueError(f"unknown profile {profile!r}")
-    ctx = build(seed=seed)
+    h, m = (0, 0) if script is not None else LIVE_START_HHMM.get(profile, (0, 0))
+    ctx = build(seed=seed, start=LIVE_DAY.replace(hour=h, minute=m))
     install_dispatch_standin(ctx)
     if script is not None:
         ScriptedTraffic(ctx, script).start()
