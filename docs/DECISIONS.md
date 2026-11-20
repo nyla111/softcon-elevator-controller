@@ -165,3 +165,16 @@ Visitor passes still cover only the host floor. High-rise passengers change at t
 (no direct B1/B2 to L16-L30 trip), as for any trip between groups.
 
 **Evidence:** `docs/passenger_lists/parking_b1_b2.csv` (checked in CI).
+
+**Traffic model (live runs and long runs, `ems/sim/traffic.py`):** 30% of up trips start in
+the B2 car park and 30% of down trips end there; 2% start or end at the B1 loading dock. Most
+staff ride motorbikes and one parking level cannot hold the vehicles of 2,500 people, so the
+rest park outside or are dropped off and enter at the lobby. A basement trip to or from a
+high-rise floor is two rides with a change at the lobby (a 20 s walk); each ride is its own
+call, as at a real destination-dispatch lobby. The Appendix B scenario profiles (SIM-01..18)
+keep their lobby-only mix, so their criteria and results are unchanged.
+
+**Effect (seed 1, up-peak 35/min, Part 2 dispatcher):** average wait 25.9 s -> 29.3 s,
+maximum 108 s -> 129 s, average ride unchanged (71 s). Part of the rise is that a passenger
+who changes at the lobby counts as two calls. Basement service has a cost at the morning
+peak; it is reported, not hidden.
