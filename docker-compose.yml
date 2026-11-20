@@ -4,4 +4,9 @@ services:
     image: ems:latest
     ports:
       - "8000:8000"
+    volumes:
+      - ems-runs:/app/runs        # saved runs survive a restart
     restart: unless-stopped
+
+volumes:
+  ems-runs:

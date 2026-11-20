@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -30,7 +31,7 @@ from .traffic import (PEAK_PROFILES, PROFILES, SRS_ORIGINAL_PEAK_RATE, Profile, 
                       TrafficGenerator, schedule_segments)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNS_DIR = REPO_ROOT / "runs"          # gitignored
+RUNS_DIR = Path(os.environ.get("EMS_RUNS_DIR") or REPO_ROOT / "runs")   # gitignored
 WARMUP_S = 600.0
 MEASURE_S = 3600.0
 CLEAR_S = 1800.0
