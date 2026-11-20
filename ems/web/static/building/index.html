@@ -320,6 +320,12 @@ document.getElementById("cAddTrip").onclick = () => {
     accessible: document.getElementById("cAcc").checked,
     vip: document.getElementById("cVip").checked };
   if (r.origin === r.destination) { alert("From and to are the same floor."); return; }
+  const zone = f => f === 1 ? null : (f <= 15 ? "low-rise (B2-L15)" : "high-rise (L16-L30)");
+  if (zone(r.origin) && zone(r.destination) && zone(r.origin) !== zone(r.destination)) {
+    alert("A trip stays in one group. Add two trips with a change at L1, e.g. " +
+          floorName(r.origin) + " > L1, then L1 > " + floorName(r.destination) + " a bit later.");
+    return;
+  }
   caseRows.push(r); renderCase();
 };
 document.getElementById("cAddEvent").onclick = () => {
