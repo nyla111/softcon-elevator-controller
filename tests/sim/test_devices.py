@@ -30,7 +30,7 @@ def test_acs_knows_staff_cards():
         assert perm.valid and perm.roles == {role} and 30 in perm.allowed_floors
     admin = acs.lookup("staff-admin-T01")
     assert admin.roles == {Role.TENANT_ADMIN} and admin.tenant_id == "T01"
-    assert admin.allowed_floors == frozenset(pop.tenants["T01"]) | {1}
+    assert admin.allowed_floors == frozenset(pop.tenants["T01"]) | {1, -1, -2}   # lobby + B1, B2
     acs.revoke("staff-fm-1")
     assert not acs.lookup("staff-fm-1").valid
 

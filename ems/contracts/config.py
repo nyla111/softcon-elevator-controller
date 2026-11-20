@@ -6,9 +6,10 @@ from __future__ import annotations
 from .types import Mode
 
 # --- Building (SRS 2.4) ---
-LOW_FLOORS = [1] + list(range(2, 16))                 # L1..L15
+PARKING_FLOORS = [-2, -1]                             # B2, B1: open to every employee card
+LOW_FLOORS = PARKING_FLOORS + [1] + list(range(2, 16))  # B2, B1, L1..L15
 HIGH_FLOORS = [1] + list(range(16, 31))               # L1, L16..L30
-SERVICE_FLOORS = [-2, -1] + list(range(1, 31))        # B2..L30
+SERVICE_FLOORS = PARKING_FLOORS + list(range(1, 31))        # B2..L30
 LOBBY = 1
 LOADING_DOCK = -1
 
