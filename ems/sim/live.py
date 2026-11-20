@@ -46,7 +46,10 @@ def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 
     """A live run with random traffic of one profile, or with a fixed passenger list (script)."""
     if script is None and profile not in PROFILES:
         raise ValueError(f"unknown profile {profile!r}")
-    h, m = (0, 0) if script is not None else LIVE_START_HHMM.get(profile, (0, 0))
+    if script is not None:        # a list's own "# start=HH:MM", else 00:00
+        h, m = (int(x) for x in (getattr(script, "start_hhmm", None) or "00:00").split(":"))
+    else:
+        h, m = LIVE_START_HHMM.get(profile, (0, 0))
     ctx = build(seed=seed, start=LIVE_DAY.replace(hour=h, minute=m))
     install_dispatch_standin(ctx)
     if script is not None:
