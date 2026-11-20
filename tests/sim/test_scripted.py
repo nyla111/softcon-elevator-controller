@@ -39,7 +39,7 @@ def test_bad_rows_are_rejected(text, message):
 
 @pytest.mark.parametrize("origin, destination, message", [
     (1, 1, "same floor"),
-    (1, 99, "not the lobby or a tenant floor"),
+    (1, 99, "not the lobby, a tenant floor or a parking floor"),
     (5, 20, "different groups"),
 ])
 def test_trips_are_checked_against_the_building(origin, destination, message):

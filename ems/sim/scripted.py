@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from ems.contracts.events import AlertRaised, PassengerArrived
-from ems.contracts.types import Floor, Role
+from ems.contracts.types import Floor, Role, floor_label
 
 from .passengers import PassengerState
 
@@ -200,17 +200,29 @@ class ScriptedTraffic:
     def _resolve(self, n: int, trip: ScriptedTrip) -> dict:
         """Check the trip against the building and fill the defaults (fails before the run)."""
         lobby, group_of = self.building.lobby, self.building.group_of_floor
+        parking = self.building.parking_floors
         where = f"row {trip.row}" if trip.row else f"trip {n}"
         for floor in (trip.origin, trip.destination):
-            if floor != lobby and floor not in group_of:
-                raise ValueError(f"{where}: floor {floor} is not the lobby or a tenant floor")
+            if floor != lobby and floor not in group_of and floor not in parking:
+                raise ValueError(f"{where}: floor {floor} is not the lobby, a tenant floor "
+                                 "or a parking floor")
         if trip.origin == trip.destination:
             raise ValueError(f"{where}: origin and destination are the same floor")
-        groups = {group_of[f] for f in (trip.origin, trip.destination) if f != lobby}
-        if len(groups) > 1:
+        floors = (trip.origin, trip.destination)
+
+        def serving(f: Floor) -> set:
+            if f == lobby:
+                return set(self.building.passenger_groups)
+            return {group_of[f]} if f in group_of else set(parking[f])
+
+        groups = serving(trip.origin) & serving(trip.destination)
+        if not groups:
             raise ValueError(f"{where}: floors {trip.origin} and {trip.destination} are in "
                              "different groups (no transfers)")
-        tenant_floor = trip.destination if trip.origin == lobby else trip.origin
+        group = sorted(groups)[0]
+        tenant_floors = [f for f in floors if f in group_of]
+        tenant_floor = (tenant_floors[0] if tenant_floors
+                        else self.building.tenant_floors[group][0])   # lobby <-> parking
         card, person = trip.card, None
         if card and card.startswith("visitor:"):
             card = self._visitor_pass(card, where)
@@ -224,7 +236,7 @@ class ScriptedTraffic:
             return value if value is not None else bool(person and getattr(person, attribute))
 
         return {"t": trip.t, "origin": trip.origin, "destination": trip.destination,
-                "group": groups.pop(), "card": card, "passenger_id": trip.passenger_id,
+                "group": group, "card": card, "passenger_id": trip.passenger_id,
                 "accessible": pick(trip.accessible, "accessible"), "vip": pick(trip.vip, "vip")}
 
     def _visitor_pass(self, card: str, where: str) -> str:
@@ -246,7 +258,7 @@ class ScriptedTraffic:
             a["passenger_id"] = f"S{self.count:04d}"
         self.ctx.bus.publish(PassengerArrived(
             t=self.ctx.clock.now(), passenger_id=a["passenger_id"],
-            panel_id=f"panel-L{a['origin']}", origin=a["origin"], destination=a["destination"],
+            panel_id=f"panel-{floor_label(a['origin'])}", origin=a["origin"], destination=a["destination"],
             group=a["group"], credential_id=a["card"], accessible=a["accessible"], vip=a["vip"]))
 
     def _apply(self, trip: ScriptedTrip) -> None:
