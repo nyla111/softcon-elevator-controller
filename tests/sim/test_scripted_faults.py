@@ -66,3 +66,10 @@ def test_generator_failure_and_silent_rescue_devices_bounded_per_car():
             "20,,,,check,A,,no_alert:entrapment,59\n")
     _, checks = run_list(loads(text))
     assert [c.ok for c in checks] == [True, True, True], checks
+
+
+def test_live_run_of_a_list_starts_at_its_start_time():
+    ctx = live.start_live(script=loads("# start=07:00\nt,origin,destination\n0,1,5\n"))
+    assert ctx.clock.now_dt().strftime("%H:%M") == "07:00"
+    ctx = live.start_live(script=loads("t,origin,destination\n0,1,5\n"))
+    assert ctx.clock.now_dt().strftime("%H:%M") == "00:00"
