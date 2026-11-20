@@ -12,6 +12,7 @@ from ems.core.app import Context, build
 
 from . import faults as F
 from .baseline import install_dispatch_standin
+from .run_record import RunRecorder
 from .scripted import ScriptedTraffic, ScriptedTrip
 from .traffic import PROFILES, TrafficGenerator, with_rate
 
@@ -39,6 +40,9 @@ def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 
     else:
         prof = with_rate(profile, rate) if rate else PROFILES[profile]
         TrafficGenerator.fixed(ctx, prof, 0.0, LIVE_HORIZON_S).start()
+    ctx.services["run_record"] = RunRecorder(ctx, {
+        "profile": "scripted" if script is not None else profile, "rate": rate, "seed": seed,
+        "script": f"{len(script)} rows" if script is not None else None})
     return ctx
 
 
@@ -51,6 +55,9 @@ def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
     if FAULT_KINDS[kind] and car_id not in sim.cars:
         raise ValueError(f"{kind} needs a valid car_id")
     now = ctx.clock.now()
+    recorder = ctx.services.get("run_record")
+    if recorder is not None:
+        recorder.note_fault(kind, car_id if FAULT_KINDS[kind] else None)
     dur = duration if duration else DEFAULT_DURATION_S.get(kind)
     devices = ctx.services["devices"]
     if kind == "fire_clear":
