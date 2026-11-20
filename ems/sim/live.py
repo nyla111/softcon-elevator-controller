@@ -39,7 +39,7 @@ def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 
         ScriptedTraffic(ctx, script).start()
     else:
         prof = with_rate(profile, rate) if rate else PROFILES[profile]
-        TrafficGenerator.fixed(ctx, prof, 0.0, LIVE_HORIZON_S).start()
+        TrafficGenerator.fixed(ctx, prof, 0.0, LIVE_HORIZON_S, basements=True).start()
     ctx.services["run_record"] = RunRecorder(ctx, {
         "profile": "scripted" if script is not None else profile, "rate": rate, "seed": seed,
         "script": f"{len(script)} rows" if script is not None else None})
