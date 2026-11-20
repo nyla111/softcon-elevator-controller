@@ -122,3 +122,5 @@ To follow specific passengers instead of random traffic, choose a **passenger li
 
 Lists live in [`docs/passenger_lists/`](docs/passenger_lists/), one per use case or SIM scenario (`demo.csv` for the live demo). Every list there runs in CI and fails the build if any expectation is not met (`tests/sim/test_scripted.py`).
 
+For the wear and tear requirement (CR-01), weeks or months of traffic run headless with weekend traffic: `python -m ems.sim.long_run --days 7` (or `--months 1`, `--months 6`). It prints a summary per day and the per-group wear imbalance of every month and of the period against the 2% / 5% limits, and writes the evidence manifest to `runs/`. Runs start on 2026-12-01 by default so calendar months are whole.
+
