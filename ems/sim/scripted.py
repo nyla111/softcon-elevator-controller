@@ -22,11 +22,21 @@ row) or JSON (a list of objects). Every column except t is optional:
                  loss (FR-55); refused while recovery_eligible() is False
     car          car id, for events that need one
     duration     seconds, for events that end by themselves (link_loss, acs_outage, plugin_crash)
+    params       event rows: fault parameters as key=value pairs separated by ";" (live.FAULT_PARAMS)
+                 mains_loss: generator_failed, generator_delay, failed_rescue_cars, stuck_cars
+                 car_fault:  code, between_floors, doors_stuck
+                 lists of cars are written A|B, e.g. "generator_failed=true;failed_rescue_cars=C"
+    within_s     event rows with alert:/no_alert: the window after t in which the alert must
+                 (or must not) be raised; empty = until the end of the run. With car set, only
+                 alerts about that car count (use a "check" row for a per-car check)
     expect       passenger rows: delivered | refused | cancelled | evacuated | waiting
                  event rows: alert:<kind> (an alert of that kind is raised at or after t)
                  or no_alert:<kind>
     max_wait_s   passenger rows: the passenger boards within this many seconds
     note         free text, ignored
+
+A CSV list may start with a comment line "# start=HH:MM": the run starts at that time of day
+(default 00:00), e.g. "# start=07:00" for a fault during the morning peak.
 
 Example:
     t,origin,destination,card,event,car,expect,note
@@ -73,6 +83,8 @@ class ScriptedTrip:
     duration: Optional[float] = None
     expect: Optional[str] = None
     max_wait_s: Optional[float] = None
+    params: tuple = ()                               # ((key, value), ...) for the fault
+    within_s: Optional[float] = None
     row: int = field(default=0, compare=False)      # line in the list, for messages
 
 
@@ -98,6 +110,37 @@ def _number(value, name: str, row: int) -> Optional[float]:
         return float(text)
     except ValueError:
         raise ValueError(f"row {row}: {name} must be a number, not {value!r}")
+
+
+def _params(value, event: str, row: int) -> tuple:
+    """ "a=1;b=true;cars=A|B" -> (("a", 1.0), ("b", True), ("cars", ("A", "B")))."""
+    text = _text(value)
+    if text is None:
+        return ()
+    from .live import FAULT_PARAMS, check_fault_params
+    out = {}
+    for part in text.split(";"):
+        if not part.strip():
+            continue
+        key, sep, raw = part.partition("=")
+        key, raw = key.strip(), raw.strip()
+        if not sep or not key:
+            raise ValueError(f"row {row}: write params as key=value;key=value, not {part!r}")
+        default = FAULT_PARAMS.get(event, {}).get(key)
+        if isinstance(default, bool):
+            flag = _flag(raw, key, row)
+            out[key] = bool(flag)
+        elif isinstance(default, (int, float)):
+            out[key] = _number(raw, key, row)
+        elif isinstance(default, tuple):
+            out[key] = tuple(c.strip() for c in raw.split("|") if c.strip())
+        else:
+            out[key] = raw
+    try:
+        check_fault_params(event, out)
+    except ValueError as e:
+        raise ValueError(f"row {row}: {e}")
+    return tuple(out.items())
 
 
 def _flag(value, name: str, row: int) -> Optional[bool]:
@@ -142,10 +185,14 @@ def parse(rows: Iterable[dict]) -> list[ScriptedTrip]:
                 if origin is None or destination is None:
                     raise ValueError(f"row {i}: a medical row needs origin and destination")
                 origin, destination = int(origin), int(destination)
+            within = _number(row.get("within_s"), "within_s", i)
+            if within is not None and not expect:
+                raise ValueError(f"row {i}: within_s needs an alert:/no_alert: expect")
             trips.append(ScriptedTrip(t, origin, destination, event=event,
                                       car=_text(row.get("car")),
                                       duration=_number(row.get("duration"), "duration", i),
-                                      expect=expect, row=i))
+                                      expect=expect, params=_params(row.get("params"), event, i),
+                                      within_s=within, row=i))
             continue
         origin = _number(row.get("origin"), "origin", i)
         destination = _number(row.get("destination"), "destination", i)
@@ -160,12 +207,34 @@ def parse(rows: Iterable[dict]) -> list[ScriptedTrip]:
     return sorted(trips, key=lambda trip: trip.t)
 
 
-def loads(text: str) -> list[ScriptedTrip]:
-    """CSV or JSON text -> trips."""
+class ScriptList(list):
+    """The trips of one list, plus the time of day the run starts at ("HH:MM" or None)."""
+    start_hhmm: Optional[str] = None
+
+
+def loads(text: str) -> ScriptList:
+    """CSV or JSON text -> trips. JSON is a list of rows, or {"start": "HH:MM", "rows": [...]}."""
     stripped = text.lstrip()
-    if stripped.startswith("["):
-        return parse(json.loads(stripped))
-    return parse(csv.DictReader(io.StringIO(text)))
+    start = None
+    if stripped.startswith("{"):
+        data = json.loads(stripped)
+        trips, start = parse(data.get("rows", [])), data.get("start")
+    elif stripped.startswith("["):
+        trips = parse(json.loads(stripped))
+    else:
+        lines = text.splitlines()
+        while lines and lines[0].lstrip().startswith("#"):
+            key, _, value = lines.pop(0).lstrip("# ").partition("=")
+            if key.strip() == "start":
+                start = value.strip()
+        trips = parse(csv.DictReader(io.StringIO("\n".join(lines))))
+    out = ScriptList(trips)
+    if start is not None:
+        h, _, m = start.partition(":")
+        if not (h.isdigit() and m.isdigit() and int(h) < 24 and int(m) < 60):
+            raise ValueError(f"start must be HH:MM, not {start!r}")
+        out.start_hhmm = f"{int(h):02d}:{int(m):02d}"
+    return out
 
 
 def load(path: str | Path) -> list[ScriptedTrip]:
@@ -268,7 +337,7 @@ class ScriptedTraffic:
             self.ctx.get("car_states").confirm_recovery(Role.FM)
         elif trip.event != "check":
             from .live import apply_fault
-            apply_fault(self.ctx, trip.event, trip.car, trip.duration)
+            apply_fault(self.ctx, trip.event, trip.car, trip.duration, dict(trip.params))
 
     def _medical(self, trip: ScriptedTrip) -> None:
         """FR-127 through Part 5, as security would do it. A refused request raises the
@@ -294,9 +363,18 @@ class ScriptedTraffic:
             if trip.event is not None:
                 if trip.expect:
                     want, _, kind = trip.expect.partition(":")
-                    seen = any(a.kind == kind and a.t >= trip.t for a in alerts)
-                    checks.append(Check(trip.row, trip.event, trip.expect,
-                                        ("alert:" if seen else "no_alert:") + kind,
+                    t0 = self.start_at + trip.t
+                    t1 = None if trip.within_s is None else t0 + trip.within_s
+                    hits = [a for a in alerts if a.kind == kind and a.t >= t0
+                            and (t1 is None or a.t <= t1)
+                            and (trip.car is None or trip.within_s is None
+                                 or a.car_id == trip.car)]
+                    seen = bool(hits)
+                    expected = trip.expect + (f" within {trip.within_s:g} s" if t1 else "") + \
+                        (f" car {trip.car}" if t1 and trip.car else "")
+                    actual = ("alert:" if seen else "no_alert:") + kind + \
+                        (f" at +{hits[0].t - t0:.1f} s" if seen else "")
+                    checks.append(Check(trip.row, trip.event, expected, actual,
                                         seen == (want == "alert")))
                 continue
             pid = self._arrival_of[id(trip)]["passenger_id"] or "not arrived"
@@ -321,13 +399,18 @@ def _outcome(p) -> str:
             PassengerState.CANCELLED: "cancelled"}.get(p.state, "waiting")
 
 
-def run_list(trips: list[ScriptedTrip], seed: int = 1, clear_s: float = CLEAR_S):
+def run_list(trips: list[ScriptedTrip], seed: int = 1, clear_s: float = CLEAR_S,
+             start_hhmm: Optional[str] = None):
     """Run a list on a fresh context (as the live demo would) until every passenger has arrived
-    or clear_s after the last row. Returns (ctx, checks)."""
+    or clear_s after the last row. The run starts at start_hhmm, else the list's own
+    "# start=HH:MM", else 00:00 (Monday 2026-11-16). Returns (ctx, checks)."""
     from ems.core.app import build
 
     from .baseline import install_dispatch_standin
-    ctx = build(seed=seed)
+    from .harness import START_DATE
+    hhmm = start_hhmm or getattr(trips, "start_hhmm", None) or "00:00"
+    h, m = (int(x) for x in hhmm.split(":"))
+    ctx = build(seed=seed, start=START_DATE.replace(hour=h, minute=m))
     install_dispatch_standin(ctx)
     traffic = ScriptedTraffic(ctx, trips)
     traffic.start()
