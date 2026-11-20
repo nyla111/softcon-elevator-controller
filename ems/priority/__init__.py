@@ -2,7 +2,7 @@
 
 Scope: VIP 4.8 (FR-70/71/72), accessible FR-08, priority order FR-76, medical FR-127/128,
 maintenance 4.5 (FR-30/31/32/33), goods moves and the service car (FR-36/80/81/82).
-Bulky items (FR-84) are Part 6's (scripts/requirements.csv).
+Bulky items (FR-84) are Part 6's (docs/requirements.csv).
 Provides ctx.services key(s): priority
 
 Modules: service (holds, call / rider tracking, voice feedback, faults, emergencies), vip,

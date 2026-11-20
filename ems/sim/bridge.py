@@ -1,9 +1,9 @@
-"""TEMPORARY until Part 3 merges.
+"""Stand-in for Part 3 in partial builds.
 
-Part 3 (access) will check permissions and turn PassengerArrived into CallRequested.
-Until it exists, ctx.services["access"] is the stub (class StubAccess) and this bridge
-publishes CallRequested directly, so the rest of the system can be tested.
-Once the real access service is registered the bridge does nothing.
+Part 3 (access) checks permissions and turns PassengerArrived into CallRequested. Tests that
+build the simulator without Part 3 (build(parts=[...]) with no "access") get the contract stub
+StubAccess; there this bridge publishes CallRequested directly so the rest of the system runs.
+In the full product the real access service is registered and the bridge does nothing.
 """
 from __future__ import annotations
 
