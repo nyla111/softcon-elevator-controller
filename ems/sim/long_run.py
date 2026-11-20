@@ -1,10 +1,10 @@
 """Long runs: weeks or months of simulated traffic, for CR-01 / NFR-W1. Owned by: Part 1.
 
 One run keeps one context for the whole period. Traffic follows config.WEEKDAY_SCHEDULE on
-weekdays and config.WEEKEND_SCHEDULE on Saturdays and Sundays. To keep memory flat, the bus
-keeps no event log, finished passengers are summarised per day and then dropped, and Part 1's
-own histories (command log, ACS lookups, dispatch guard, trip database) keep the last
-RETAIN_S only. Wear figures come from Part 5's ctx.services["usage"].wear_report(), read once
+weekdays and config.WEEKEND_SCHEDULE on Saturdays and Sundays, with basement trips (D-08).
+To keep memory flat, the bus keeps no event log, finished passengers are summarised per day
+and then dropped, and Part 1's own histories (command log, ACS lookups, dispatch guard, trip
+database) keep the last RETAIN_S only. Wear figures come from Part 5's ctx.services["usage"].wear_report(), read once
 per simulated day; the last reading of each calendar month is that month's result.
 
     python -m ems.sim.long_run --days 7 --seed 1
@@ -101,7 +101,7 @@ def run_long(days: int, seed: int = 1, *, start: datetime = LONG_RUN_START,
     sim = ctx.services["controllers"]
     usage = ctx.services.get("usage")
     TrafficGenerator(ctx, schedule_segments(ctx, day_start=0.0, until=days * DAY_S,
-                                            weekends=True)).start()
+                                            weekends=True), basements=True).start()
     summaries: list[DaySummary] = []
     months: dict[str, dict] = {}
     final: dict = {}
