@@ -30,7 +30,7 @@ from ems.contracts.events import AlertRaised, CarStatusUpdated
 from ems.core.app import build
 from ems.access.router import router as access_router
 from ems.monitor.router import bind_context as bind_monitor_context, router as monitor_router
-from ems.sim import live, scenarios, scripted
+from ems.sim import live, run_record, scenarios, scripted
 
 STATIC = Path(__file__).parent / "static"
 MAX_ADVANCE_S = 600.0
@@ -241,6 +241,35 @@ def live_fault(body: LiveFault) -> dict:
             raise HTTPException(400, str(exc))
         app.state.snapshot = None         # a restore may publish no event: rebuild the state
         return {"injected": done, "t": app.state.ctx.clock.now()}
+
+
+# ---------------------------------------------------------------- saved runs
+class RunSave(BaseModel):
+    name: Optional[str] = None
+
+
+@app.post("/api/runs/save")
+def run_save(body: RunSave) -> dict:
+    """Save the current live run (summary + per-minute series) to runs/live/."""
+    with app.state.lock:
+        recorder = app.state.ctx.services.get("run_record")
+        if recorder is None:
+            raise HTTPException(409, "no live run to save: start a run first")
+        path = recorder.save(body.name)
+    return {"run_id": path.stem}
+
+
+@app.get("/api/runs")
+def run_list() -> list[dict]:
+    return run_record.list_runs()
+
+
+@app.get("/api/runs/{run_id}")
+def run_get(run_id: str) -> dict:
+    try:
+        return run_record.load_run(run_id)
+    except FileNotFoundError:
+        raise HTTPException(404, f"unknown run {run_id}")
 
 
 # ---------------------------------------------------------------- scenarios
