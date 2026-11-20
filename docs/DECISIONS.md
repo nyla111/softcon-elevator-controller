@@ -14,6 +14,7 @@ course staff.
 | D-05 | Simulator modelling assumptions | Decided 2026-11-12 |
 | D-06 | Architecture: one Python app, event bus, simulated clock | Decided 2026-11-10 |
 | D-07 | Wait ceilings as percentiles instead of "none over" | Decided 2026-11-18 |
+| D-08 | Low-rise cars serve the B1/B2 car park, open to every employee card | Decided 2026-11-20 |
 
 ---
 
@@ -152,3 +153,15 @@ The 95th percentile is never set above the SRS ceiling, and Balanced keeps 90 s 
 (Appendix B: no silent relaxation of a failed test).
 
 **Evidence:** Part 2 results table in `docs/dispatch.md` (PR #19).
+
+## D-08 Low-rise cars serve the car park
+
+**SRS v0.13:** only the service car S stops at B2 and B1; the passenger groups serve L1 and
+their tenant floors, so employees who park in the basement cannot ride a passenger car down.
+
+**Decision:** the low-rise group (A-D) also serves B2 and B1. The SRS defines no separate
+parking permission, so every employee card and tenant admin card may go to B1 and B2.
+Visitor passes still cover only the host floor. High-rise passengers change at the lobby
+(no direct B1/B2 to L16-L30 trip), as for any trip between groups.
+
+**Evidence:** `docs/passenger_lists/parking_b1_b2.csv` (checked in CI).
