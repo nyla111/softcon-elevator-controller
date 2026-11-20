@@ -34,6 +34,13 @@
   .faults button { flex:1 1 46%; font-size:13px; padding:5px 4px; }
   #activeFaults div { color:var(--bad); font-weight:600; font-size:14px; }
   a { color:var(--accent); }
+  details { margin-top:6px; } summary { cursor:pointer; color:var(--accent); font-size:14px; }
+  #case input[type=number], #case input.n { width:52px; } #case select { max-width:84px; }
+  #case input[type=checkbox] { padding:0; margin:0 4px 0 0; vertical-align:middle; }
+  #case #cCard { width:100%; }
+  #caseRows div { font:12px/1.5 ui-monospace, Menlo, Consolas, monospace; display:flex;
+                  justify-content:space-between; border-bottom:1px solid #232830; }
+  #caseRows button { padding:0 6px; font-size:12px; }
   #note { font-size:13px; color:var(--ok); min-height:1.2em; }
   #alertsList div { font-size:13px; color:var(--warn); margin:2px 0; }
   #ticker { font:12px/1.45 ui-monospace, Menlo, Consolas, monospace; }
@@ -71,6 +78,20 @@
       <div class="row">speed <button class="spd on" data-s="1">1x</button><button class="spd" data-s="10">10x</button>
         <button class="spd" data-s="60">60x</button></div>
       <div id="note"></div>
+      <details id="case"><summary>Build a test case</summary>
+        <div class="row">t <input id="cT" class="n" type="number" value="0" min="0">
+          from <select id="cFrom"></select> to <select id="cTo"></select></div>
+        <div class="row"><input id="cCard" placeholder="card id (empty: an employee of that floor)"></div>
+        <div class="row"><label><input id="cAcc" type="checkbox"> accessible</label>
+          <label><input id="cVip" type="checkbox"> VIP</label>
+          <button id="cAddTrip">Add trip</button></div>
+        <div class="row">t <input id="cEvT" class="n" type="number" value="30" min="0">
+          <select id="cEvent"></select> car <select id="cCar"></select>
+          <button id="cAddEvent">Add event</button></div>
+        <div id="caseRows"></div>
+        <div class="row"><button id="cRun" class="primary">Run case</button>
+          <button id="cCsv">Download CSV</button><button id="cClear">Clear</button></div>
+      </details>
       <h3>Access control</h3>
       <div class="row"><a href="/panel/" target="_blank" rel="noopener noreferrer">Open the lobby destination panel</a></div>
       <h3>Faults</h3>
@@ -260,6 +281,74 @@ document.getElementById("start").onclick = () => startLive(
   document.getElementById("profile").value, document.getElementById("rate").value,
   document.getElementById("seed").value || 1);
 document.getElementById("play").onclick = () => setPlaying(!playing);
+
+// ---- build a test case by hand: rows become a passenger list (ems/sim/scripted.py)
+const CASE_EVENTS = ["fire_alarm", "fire_clear", "mains_loss", "mains_restore", "car_fault",
+  "clear_fault", "link_loss", "link_restore", "acs_outage", "acs_restore", "plugin_crash",
+  "plugin_restore", "ems_crash", "overload_burst", "bulky_item", "fm_confirm"];
+const CAR_EVENTS = ["car_fault", "clear_fault", "link_loss", "link_restore", "overload_burst",
+  "bulky_item"];
+const caseRows = [];
+const floorName = f => f < 1 ? "B" + (-f) : "L" + f;
+function fillSelect(id, values, label) {
+  const sel = document.getElementById(id);
+  values.forEach(v => { const o = document.createElement("option"); o.value = v;
+    o.textContent = label ? label(v) : v; sel.appendChild(o); });
+}
+const ALL_FLOORS = [-2, -1, ...Array.from({length:30}, (_, i) => i + 1)];
+fillSelect("cFrom", ALL_FLOORS, floorName); fillSelect("cTo", ALL_FLOORS, floorName);
+document.getElementById("cTo").value = "5";
+fillSelect("cEvent", CASE_EVENTS);
+fillSelect("cCar", ["A", "B", "C", "D", "E", "F", "G", "H", "S"]);
+function renderCase() {
+  const box = document.getElementById("caseRows"); box.replaceChildren();
+  caseRows.sort((a, b) => a.t - b.t).forEach((r, i) => {
+    const d = document.createElement("div"), x = document.createElement("button");
+    d.textContent = r.event
+      ? `${r.t}s ${r.event}${r.car ? " " + r.car : ""}`
+      : `${r.t}s ${floorName(r.origin)}>${floorName(r.destination)} ${r.card || ""}` +
+        `${r.accessible ? " acc" : ""}${r.vip ? " vip" : ""}`;
+    x.textContent = "x"; x.onclick = () => { caseRows.splice(i, 1); renderCase(); };
+    d.appendChild(x); box.appendChild(d);
+  });
+}
+document.getElementById("cAddTrip").onclick = () => {
+  const r = { t: Number(document.getElementById("cT").value || 0),
+    origin: Number(document.getElementById("cFrom").value),
+    destination: Number(document.getElementById("cTo").value),
+    card: document.getElementById("cCard").value.trim(),
+    accessible: document.getElementById("cAcc").checked,
+    vip: document.getElementById("cVip").checked };
+  if (r.origin === r.destination) { alert("From and to are the same floor."); return; }
+  caseRows.push(r); renderCase();
+};
+document.getElementById("cAddEvent").onclick = () => {
+  const event = document.getElementById("cEvent").value;
+  caseRows.push({ t: Number(document.getElementById("cEvT").value || 0), event,
+    car: CAR_EVENTS.includes(event) ? document.getElementById("cCar").value : "" });
+  renderCase();
+};
+function caseCsv() {
+  const lines = ["t,origin,destination,card,accessible,vip,event,car"];
+  for (const r of caseRows) lines.push(r.event
+    ? `${r.t},,,,,,${r.event},${r.car}`
+    : `${r.t},${r.origin},${r.destination},${r.card},${r.accessible ? "true" : ""},${r.vip ? "true" : ""},,`);
+  return lines.join("\n");
+}
+document.getElementById("cRun").onclick = async () => {
+  if (!caseRows.some(r => !r.event)) { alert("Add at least one trip."); return; }
+  try {
+    await post("/api/live/start", { profile: "up_peak", seed: Number(document.getElementById("seed").value || 1),
+                                    script: caseCsv() });
+  } catch (e) { alert(e.message); return; }
+  note("Test case running: " + caseRows.length + " rows."); setPlaying(true);
+};
+document.getElementById("cCsv").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([caseCsv() + "\n"], { type: "text/csv" }));
+  a.download = "test_case.csv"; a.click();
+};
+document.getElementById("cClear").onclick = () => { caseRows.length = 0; renderCase(); };
 document.getElementById("reset").onclick = async () => {
   try { await post("/api/reset?seed=" + Number(document.getElementById("seed").value || 1)); }
   catch (e) { alert(e.message); return; }
