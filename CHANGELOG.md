@@ -6,11 +6,25 @@ or a major milestone. Decisions referenced here (D-xx, CR-xx) are in `docs/DECIS
 
 ## Unreleased (target v1.0, presentation 2026-11-25)
 
-Planned work is tracked in the GitHub issues: wear balance in the high-rise group (CR-01),
-real multi-week wear runs, basement floors B1/B2 (#25), remaining safety scenarios
-(SIM-07, 08, 13, 14, 15, 17), saved run history, building page layout and controls.
+Still open: wear balance in the high-rise group (CR-01, #58), dispatch notes (#66), VIP
+exclusive trips only in Rush (#65), SIM-07 (#60), safety scenarios SIM-08/13/14/15/17 (#61),
+run history page (#62).
 
-- Passenger list for BR-07 (the way down to the lobby is always open).
+**Simulator and tools (Part 1)**
+- Long runs over weeks and months with weekend traffic and per-month wear rows
+  (`python -m ems.sim.long_run`, #59).
+- Saved live runs: waits by group and mode, per-car wear, events and a per-minute series;
+  `/api/runs` (#62).
+- Building page: New run / Pause / Reset / Save run, event log column, calmer style (#63);
+  test case form (#64). Live runs start at a time of day that fits the profile.
+- Passenger lists: fault parameters, alert checks bounded in time and by car,
+  `# start=HH:MM` (#55).
+
+**Basements (D-08, #25):** low-rise cars serve B2 and B1, every card may go there; live and
+long runs include basement trips with a change at the lobby for high-rise floors.
+
+**Other:** passenger list for BR-07; issue script removed from main, requirement table moved
+to `docs/` (#67).
 
 ## v0.5-phase2-demo (2026-11-20)
 
