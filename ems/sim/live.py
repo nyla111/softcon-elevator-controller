@@ -26,6 +26,12 @@ FAULT_KINDS = {
     "link_restore": True, "acs_restore": False, "plugin_restore": False,
 }
 DEFAULT_DURATION_S = {"link_loss": 300.0, "acs_outage": 900.0, "plugin_crash": 300.0}
+# Optional fault parameters (passenger lists: the params column), with their defaults.
+FAULT_PARAMS = {
+    "mains_loss": {"generator_failed": False, "generator_delay": 15.0,
+                   "failed_rescue_cars": (), "stuck_cars": ()},
+    "car_fault": {"code": "F-LIVE", "between_floors": False, "doors_stuck": False},
+}
 
 
 def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 1,
@@ -47,13 +53,18 @@ def start_live(profile: str = "up_peak", rate: float | None = None, seed: int = 
 
 
 def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
-                duration: float | None = None) -> str:
-    """Inject a fault now. Raises ValueError for an unknown kind or a missing/unknown car."""
+                duration: float | None = None, params: dict | None = None) -> str:
+    """Inject a fault now. Raises ValueError for an unknown kind, a missing/unknown car or a
+    parameter the fault does not take (FAULT_PARAMS)."""
     if kind not in FAULT_KINDS:
         raise ValueError(f"unknown fault kind {kind!r}")
     sim = ctx.services["controllers"]
     if FAULT_KINDS[kind] and car_id not in sim.cars:
         raise ValueError(f"{kind} needs a valid car_id")
+    p = check_fault_params(kind, params)
+    for car in (*p.get("failed_rescue_cars", ()), *p.get("stuck_cars", ())):
+        if car not in sim.cars:
+            raise ValueError(f"{kind}: unknown car {car!r}")
     now = ctx.clock.now()
     recorder = ctx.services.get("run_record")
     if recorder is not None:
@@ -76,8 +87,11 @@ def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
     else:
         fault = {
             "fire_alarm": lambda: F.fire_alarm(now),
-            "mains_loss": lambda: F.mains_loss(now, None),
-            "car_fault": lambda: F.car_fault(car_id, "F-LIVE", now, dur),
+            "mains_loss": lambda: F.mains_loss(now, None, p["generator_failed"],
+                                               p["generator_delay"], p["failed_rescue_cars"],
+                                               p["stuck_cars"]),
+            "car_fault": lambda: F.car_fault(car_id, p["code"], now, dur, p["between_floors"],
+                                             p["doors_stuck"]),
             "link_loss": lambda: F.link_loss(car_id, now, dur),
             "acs_outage": lambda: F.acs_outage(now, dur),
             "ems_crash": lambda: F.ems_server_crash(now),
@@ -88,3 +102,14 @@ def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
         F.schedule_fault(ctx, fault)
         ctx.clock.run_until(now)          # fire it right away
     return f"{kind}" + (f" car {car_id}" if car_id else "") + (f" for {dur:.0f} s" if dur else "")
+
+
+def check_fault_params(kind: str, params: dict | None) -> dict:
+    """The fault's parameters with defaults filled in. Raises ValueError for a parameter the
+    fault does not take."""
+    allowed = FAULT_PARAMS.get(kind, {})
+    unknown = set(params or {}) - set(allowed)
+    if unknown:
+        takes = ", ".join(allowed) if allowed else "no parameters"
+        raise ValueError(f"{kind} does not take {', '.join(sorted(unknown))} ({kind} takes {takes})")
+    return {**allowed, **(params or {})}
