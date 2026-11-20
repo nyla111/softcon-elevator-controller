@@ -10,12 +10,13 @@ Layout (SRS 2.4: about 2,500 workers in 20-30 tenants; low-rise L2-L15, high-ris
 * 2,500 employees are split evenly over the 29 floors (86 per floor; the 6 left over go to
   6 random floors). Card ids look like "card-L18-007": L18 is the employee's HOME floor.
 * default floor = home floor; allowed floors = all floors of the tenant + the public floors
-  (the lobby).
+  (the lobby) + the parking floors (B1, B2). There is no separate parking permission: every
+  employee card may go down to the car park.
 * Exactly round(share x people) employees are accessible (5%) / VIP (1%), picked with rng.sample.
 * Employees may make more than one trip per run (a passenger is drawn with replacement).
 * Visitors are not in this population: they come with a QR pass from the mock ACS.
 * Staff cards (no rng): "staff-security-1", "staff-fm-1", "staff-technician-1" (all floors)
-  and one tenant admin per tenant, "staff-admin-T01".. (that tenant's floors + lobby).
+  and one tenant admin per tenant, "staff-admin-T01".. (that tenant's floors + lobby + parking).
 """
 from __future__ import annotations
 
@@ -81,8 +82,9 @@ def _staff_cards(building: BuildingSpec, tenants: dict[str, list[Floor]]) -> lis
     cards = [StaffCard(f"staff-{name}-1", frozenset({role}), every_floor, building.lobby)
              for name, role in (("security", Role.SECURITY), ("fm", Role.FM),
                                 ("technician", Role.TECHNICIAN))]
+    parking = frozenset(building.parking_floors)
     cards += [StaffCard(f"staff-admin-{t}", frozenset({Role.TENANT_ADMIN}),
-                        frozenset(fl) | PUBLIC_FLOORS, fl[0], t) for t, fl in tenants.items()]
+                        frozenset(fl) | PUBLIC_FLOORS | parking, fl[0], t) for t, fl in tenants.items()]
     return cards
 
 
@@ -130,12 +132,13 @@ class Population:
         total = len(homes)
         accessible = set(rng.sample(range(total), round(accessible_share * total)))
         vip = set(rng.sample(range(total), round(vip_share * total)))
+        parking = frozenset(building.parking_floors)
         people = []
         for i, (floor, n) in enumerate(homes):
             here = on_floor[floor]
             tenant = here[(n - 1) % len(here)]
             people.append(Employee(f"card-L{floor}-{n:03d}", floor, floor, tenant,
-                                   frozenset(tenants[tenant]) | PUBLIC_FLOORS,
+                                   frozenset(tenants[tenant]) | PUBLIC_FLOORS | parking,
                                    i in accessible, i in vip))
         params = {"total_employees": total, "n_tenants": n_tenants, "n_double": n_double,
                   "accessible_share": accessible_share, "vip_share": vip_share,

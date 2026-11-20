@@ -1,6 +1,8 @@
 from ems.core.app import build
 from ems.sim.population import ALL_TENANT_FLOORS, PUBLIC_FLOORS, Population
 
+PARKING = frozenset({-2, -1})                               # B2, B1 (D-08)
+
 
 def pop(seed=1, **kw):
     return Population.build(build(seed=seed, parts=[]).rng, **kw)
@@ -28,11 +30,11 @@ def test_ids_home_floor_and_allowed_floors():
     p = pop()
     e = p.lookup("card-L18-007")
     assert e.home_floor == e.default_floor == 18
-    assert e.allowed_floors == frozenset(p.tenants[e.tenant_id]) | PUBLIC_FLOORS
+    assert e.allowed_floors == frozenset(p.tenants[e.tenant_id]) | PUBLIC_FLOORS | PARKING
     two = next(t for t, fl in p.tenants.items() if len(fl) == 2)
     for e in p.employees:
         if e.tenant_id == two:
-            assert e.allowed_floors == frozenset(p.tenants[two]) | PUBLIC_FLOORS
+            assert e.allowed_floors == frozenset(p.tenants[two]) | PUBLIC_FLOORS | PARKING
     assert p.lookup("card-L1-001") is None
 
 

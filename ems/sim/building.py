@@ -71,6 +71,17 @@ class BuildingSpec:
         return [f for floors in self.tenant_floors.values() for f in floors]
 
     @cached_property
+    def parking_floors(self) -> dict[Floor, list[GroupId]]:
+        """Floors below the lobby, with the passenger groups that serve them."""
+        out: dict[Floor, list[GroupId]] = {}
+        for g in self.groups:
+            if g.passenger:
+                for f in g.floors:
+                    if f < self.lobby:
+                        out.setdefault(f, []).append(g.name)
+        return out
+
+    @cached_property
     def group_of_floor(self) -> dict[Floor, GroupId]:
         return {f: g for g, floors in self.tenant_floors.items() for f in floors}
 
