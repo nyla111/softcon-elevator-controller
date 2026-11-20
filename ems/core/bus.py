@@ -2,7 +2,8 @@
 
 publish() never calls handlers re-entrantly: events published inside a handler
 are queued and delivered after it returns, in FIFO order. Every event is kept
-in bus.log, which Part 6 (reports) and the test harness read.
+in bus.log, which Part 6 (reports) and the test harness read; long runs (months of
+simulated time, ems/sim/long_run.py) set keep_log = False so memory stays flat.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ class EventBus:
         self._pending: deque[Event] = deque()
         self._draining = False
         self.log: list[Event] = []
+        self.keep_log = True
 
     def subscribe(self, event_type: type[E], handler: Callable[[E], None]) -> None:
         self._subs[event_type].append(handler)  # type: ignore[arg-type]
@@ -32,7 +34,8 @@ class EventBus:
         try:
             while self._pending:
                 ev = self._pending.popleft()
-                self.log.append(ev)
+                if self.keep_log:
+                    self.log.append(ev)
                 for cls in type(ev).__mro__:          # subscribers to Event get all
                     for h in list(self._subs.get(cls, ())):
                         h(ev)
