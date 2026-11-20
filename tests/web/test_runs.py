@@ -32,3 +32,14 @@ def test_unknown_or_unsafe_run_id_is_404(tmp_path):
     client = TestClient(app)
     assert client.get("/api/runs/../../etc/passwd").status_code == 404
     assert client.get("/api/runs/nope").status_code == 404
+
+
+def test_live_run_starts_in_the_mode_that_fits_its_profile():
+    client = TestClient(app)
+    expected = {"up_peak": "rush", "lunch": "rush", "evening": "rush", "balanced": "balanced",
+                "eco": "eco"}
+    for profile, mode in expected.items():
+        client.post("/api/live/start", json={"profile": profile, "seed": 1})
+        client.post("/api/advance", params={"seconds": 2})
+        modes = client.get("/api/state").json()["modes"]
+        assert modes["LOW"] == mode and modes["HIGH"] == mode, (profile, modes)
