@@ -7,6 +7,13 @@ trip's tenant floor (destination of "up", origin of "down" and inter-floor trips
 supplies accessible and vip. credential_id is the employee's card, or, for visits to another
 tenant, a visitor QR pass issued through ctx.services["acs"] (valid that day, that floor only).
 Employees can make several trips in one run.
+
+Basements (D-08), with basements=True (live runs and long runs): some "up" trips start in the
+basement and some "down" trips end there (PARKING_SHARE at the B2 car park, DOCK_SHARE at the
+B1 loading dock). The Appendix B scenario profiles keep their lobby-only mix (basements=False).
+Low-rise cars serve B2/B1, high-rise cars do not, so a basement trip to or from a high-rise
+floor is two rides with a change at the lobby: the second ride starts TRANSFER_WALK_S after
+the first one ends.
 """
 from __future__ import annotations
 
@@ -14,12 +21,21 @@ from dataclasses import dataclass, replace
 from datetime import timedelta
 
 from ems.contracts import config
-from ems.contracts.events import PassengerArrived
+from ems.contracts.events import PassengerAlighted, PassengerArrived
 from ems.contracts.types import Mode, floor_label
 
 from .population import ALL_TENANT_FLOORS, PASSENGER_GROUPS, TENANT_FLOORS, Population  # noqa: F401
 
 LOBBY = config.LOBBY
+PARKING = min(config.PARKING_FLOORS)          # B2, the car park
+LOADING_DOCK = config.LOADING_DOCK            # B1
+# D-08 trip mix: an office tower in Hanoi where most staff ride motorbikes. One parking level
+# (B2) cannot hold 2,500 people's vehicles, so most park outside or are dropped off and walk in
+# at the lobby; about 30% start and end their day in B2. The B1 loading dock is used by staff
+# handling deliveries and waste only. Couriers use the service car (FR-85) and are not modelled.
+PARKING_SHARE = 0.30
+DOCK_SHARE = 0.02
+TRANSFER_WALK_S = 20.0
 # Tenant floors per group come from population.py (the people live there).
 GROUP_OF_FLOOR = {f: g for g in PASSENGER_GROUPS for f in TENANT_FLOORS[g]}
 
@@ -77,11 +93,14 @@ class Segment:
 
 class TrafficGenerator:
     def __init__(self, ctx, segments: list[Segment],
-                 population: Population | None = None) -> None:
+                 population: Population | None = None, basements: bool = False) -> None:
         self.ctx = ctx
+        self.basements = basements
         self.segments = segments
         self.population = population       # default: ctx.services["population"]
         self.count = 0
+        self.transfers = 0                  # second rides started after a change at the lobby
+        self._transfers: dict = {}          # first-ride passenger id -> (second ride, person, card)
 
     @classmethod
     def fixed(cls, ctx, profile: Profile, start: float, end: float, **kw) -> "TrafficGenerator":
@@ -101,6 +120,7 @@ class TrafficGenerator:
         if self.population is None:
             self.population = self.ctx.services.get("population") or Population.build(
                 self.ctx.rng)
+        self.ctx.bus.subscribe(PassengerAlighted, self._on_alighted)
         self._schedule_next(self.segments[0].start)
 
     # ---------- internals ----------
@@ -119,12 +139,59 @@ class TrafficGenerator:
 
     def _arrive(self, seg: Segment) -> None:
         origin, destination, person, credential = self._pick_trip(seg.profile)
-        self.count += 1
-        self.ctx.bus.publish(PassengerArrived(
-            t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-{floor_label(origin)}",
-            origin=origin, destination=destination, group=self.population.building.group_of_floor[max(origin, destination)],
-            credential_id=credential, accessible=person.accessible, vip=person.vip))
+        origin, destination = self._with_basement(origin, destination)
+        self._publish(origin, destination, person, credential)
         self._schedule_next(self.ctx.clock.now())
+
+    def _with_basement(self, origin, destination):
+        """Move the lobby end of an up or down trip to B2 or B1 for a share of the trips."""
+        if not self.basements or (origin != LOBBY and destination != LOBBY) \
+                or self._basement_group() is None:
+            return origin, destination
+        r = self.ctx.rng.random()
+        if r < PARKING_SHARE:
+            level = PARKING
+        elif r < PARKING_SHARE + DOCK_SHARE:
+            level = LOADING_DOCK
+        else:
+            return origin, destination
+        return (level, destination) if origin == LOBBY else (origin, level)
+
+    def _basement_group(self):
+        """The passenger group whose cars serve the car park (LOW; zone 1 in SIM-10)."""
+        if not hasattr(self, "_bgroup"):
+            groups = self.population.building.parking_floors.get(PARKING, [])
+            self._bgroup = groups[0] if groups else None
+        return self._bgroup
+
+    def _group_of(self, origin, destination):
+        tenant = max(origin, destination)
+        if tenant > LOBBY:
+            return self.population.building.group_of_floor[tenant]
+        return self._basement_group()
+
+    def _publish(self, origin, destination, person, credential) -> None:
+        """One ride. A basement trip to or from a floor the basement group does not serve rides
+        between the basement and the lobby first and changes there (second ride: _on_alighted)."""
+        self.count += 1
+        pid = f"P{self.count:06d}"
+        if min(origin, destination) < LOBBY and \
+                self._group_of(origin, destination) != self._basement_group():
+            self._transfers[pid] = ((LOBBY, destination), person, credential)
+            destination = LOBBY
+        self.ctx.bus.publish(PassengerArrived(
+            t=self.ctx.clock.now(), passenger_id=pid, panel_id=f"panel-{floor_label(origin)}",
+            origin=origin, destination=destination, group=self._group_of(origin, destination),
+            credential_id=credential, accessible=person.accessible, vip=person.vip))
+
+    def _on_alighted(self, ev: PassengerAlighted) -> None:
+        pending = self._transfers.pop(ev.call_id, None)
+        if pending is None or ev.floor != LOBBY:
+            return
+        (origin, destination), person, credential = pending
+        self.transfers += 1
+        self.ctx.clock.call_later(TRANSFER_WALK_S,
+                                  lambda: self._publish(origin, destination, person, credential))
 
     def _pick_trip(self, prof: Profile):
         """(origin, destination, person, credential id)
