@@ -11,10 +11,11 @@ Employees can make several trips in one run.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import timedelta
 
 from ems.contracts import config
 from ems.contracts.events import PassengerArrived
-from ems.contracts.types import Mode
+from ems.contracts.types import Mode, floor_label
 
 from .population import ALL_TENANT_FLOORS, PASSENGER_GROUPS, TENANT_FLOORS, Population  # noqa: F401
 
@@ -120,7 +121,7 @@ class TrafficGenerator:
         origin, destination, person, credential = self._pick_trip(seg.profile)
         self.count += 1
         self.ctx.bus.publish(PassengerArrived(
-            t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-L{origin}",
+            t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-{floor_label(origin)}",
             origin=origin, destination=destination, group=self.population.building.group_of_floor[max(origin, destination)],
             credential_id=credential, accessible=person.accessible, vip=person.vip))
         self._schedule_next(self.ctx.clock.now())
@@ -158,19 +159,22 @@ class TrafficGenerator:
 
 
 def schedule_segments(ctx, day_start: float | None = None,
-                      until: float | None = None) -> list[Segment]:
+                      until: float | None = None, weekends: bool = False) -> list[Segment]:
     """Weekday-schedule blocks as Segments in sim seconds, covering [now, until). The time of
     day at sim second t is ctx.clock.now_dt() + (t - now), so day_start (the sim second of
-    midnight) follows from it. Blocks wrap over midnight."""
+    midnight) follows from it. Blocks wrap over midnight. weekends=True follows
+    config.WEEKEND_SCHEDULE on Saturdays and Sundays (multi-day runs, SIM-19)."""
     now = ctx.clock.now()
     dt = ctx.clock.now_dt()
     if day_start is None:
         day_start = now - (dt.hour * 3600.0 + dt.minute * 60.0 + dt.second)
     until = now + 86400.0 if until is None else until
-    schedule = config.WEEKDAY_SCHEDULE
     segments: list[Segment] = []
     day = day_start
     while day < until:
+        weekday = (dt + timedelta(seconds=day + 43200.0 - now)).weekday()
+        schedule = (config.WEEKEND_SCHEDULE if weekends and weekday >= 5
+                    else config.WEEKDAY_SCHEDULE)
         for i, (hhmm, mode) in enumerate(schedule):
             end_hhmm = schedule[i + 1][0] if i + 1 < len(schedule) else "24:00"
             seg = Segment(day + _seconds(hhmm), day + _seconds(end_hhmm),

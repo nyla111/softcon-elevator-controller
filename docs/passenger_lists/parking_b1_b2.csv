@@ -1,0 +1,8 @@
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,-1,card-L5-001,,,PK_1,,,,delivered,90,Employee goes from the lobby down to the B1 car park
+10,1,-2,card-L9-001,,,PK_2,,,,delivered,90,Employee goes from the lobby down to the B2 car park
+20,-1,5,card-L5-002,,,PK_3,,,,delivered,90,Employee drives in and rides from B1 straight to the home floor
+30,-2,1,card-L12-001,,,PK_4,,,,delivered,90,Employee rides from B2 up to the lobby
+40,12,-2,card-L12-002,,,PK_5,,,,delivered,90,Employee rides from the home floor down to B2
+50,1,-1,staff-admin-T01,,,PK_6,,,,delivered,90,Tenant admin card also reaches the car park
+60,1,-1,visitor:12,,,PK_7,,,,refused,,A visitor pass covers only the host floor and is refused at B1
