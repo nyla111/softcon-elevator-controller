@@ -15,7 +15,7 @@ from datetime import timedelta
 
 from ems.contracts import config
 from ems.contracts.events import PassengerArrived
-from ems.contracts.types import Mode
+from ems.contracts.types import Mode, floor_label
 
 from .population import ALL_TENANT_FLOORS, PASSENGER_GROUPS, TENANT_FLOORS, Population  # noqa: F401
 
@@ -121,7 +121,7 @@ class TrafficGenerator:
         origin, destination, person, credential = self._pick_trip(seg.profile)
         self.count += 1
         self.ctx.bus.publish(PassengerArrived(
-            t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-L{origin}",
+            t=self.ctx.clock.now(), passenger_id=f"P{self.count:06d}", panel_id=f"panel-{floor_label(origin)}",
             origin=origin, destination=destination, group=self.population.building.group_of_floor[max(origin, destination)],
             credential_id=credential, accessible=person.accessible, vip=person.vip))
         self._schedule_next(self.ctx.clock.now())
