@@ -8,7 +8,7 @@ import pytest
 from ems import priority
 from ems.contracts import config
 from ems.contracts import events as E
-from ems.contracts.types import Call, CallPriority, CallSource, Role
+from ems.contracts.types import Call, CallPriority, CallSource, Mode, Role
 from ems.contracts.types import CarState as S
 from ems.core.app import build
 from ems.priority.standins import RecordingCarStates
@@ -16,9 +16,25 @@ from ems.priority.standins import RecordingCarStates
 SECURITY, FM, ADMIN = "staff-security-1", "staff-fm-1", "staff-admin-T01"
 
 
+class RushModeDispatcher:
+    """Part 2 is not built in these tests (contract stub, always Balanced). VIP exclusive trips
+    start only in Rush (FR-71, #65), so the stub is wrapped to report Rush; the rest is the
+    stub's."""
+
+    def __init__(self, stub) -> None:
+        self.stub = stub
+
+    def current_mode(self, group):
+        return Mode.RUSH
+
+    def __getattr__(self, name):
+        return getattr(self.stub, name)
+
+
 def make():
     ctx = build(parts=["sim", "safety"])
     ctx.services["access"] = SimpleNamespace(permission=ctx.services["acs"].lookup)
+    ctx.services["dispatcher"] = RushModeDispatcher(ctx.services["dispatcher"])
     priority.register(ctx)
     return ctx, ctx.services["priority"], ctx.services["car_states"], ctx.services["controllers"]
 
@@ -171,6 +187,7 @@ def test_fire_recovery_without_a_firefighter_car_reopens_priority_after_fm():
     from ems.sim.building import BuildingSpec
     ctx = build(parts=["sim", "safety"], services={"building": BuildingSpec.design_limit()})
     ctx.services["access"] = SimpleNamespace(permission=ctx.services["acs"].lookup)
+    ctx.services["dispatcher"] = RushModeDispatcher(ctx.services["dispatcher"])
     priority.register(ctx)
     p, safety = ctx.services["priority"], ctx.services["car_states"]
     sim = ctx.services["controllers"]
