@@ -7,7 +7,7 @@ are kept on the archive branch `part5/minh-priority-service-car` (PR #13).
 ## What it does
 | Requirement | Behaviour | Module |
 |---|---|---|
-| FR-70/71/72 VIP | `claim_call(call)`: empty car within 30 s else fastest; 1 exclusive car per group; 6 starts per rolling hour, counted after a successful start; ceiling check; a car is exclusive only if every call waiting for it was moved by Part 2; FM quota / revoke | `vip.py` |
+| FR-70/71/72/73 VIP | `claim_call(call)`: exclusive trips only while the call's group is in Rush (outside Rush: refused as `not_rush`, normal dispatch with VIP queue rank); empty car within 30 s else fastest; 1 exclusive car per group; 6 starts per rolling hour, counted after a successful start; ceiling check; a car is exclusive only if every call waiting for it was moved by Part 2; FM quota / revoke | `vip.py` |
 | FR-76, FR-08 | `rank`, `order`, `car_ok_for` (room after riders who stay and calls already assigned), `door_dwell_s` (10 s accessible); one voice message per accessible assignment | `policy.py`, `service.py` |
 | FR-127/128 | security: medical (VIP trips of the served groups yield, riders keep their destinations), send-to-lobby; doors held on arrival; `finish_trip` | `medical.py` |
 | FR-30/31/32/33 | fault alerts once per episode; telemetry counters and FM-set reminders; technician in / out; 2nd car out in Rush waits for the FM (600 s, late approval refused) | `maintenance.py` |
@@ -26,6 +26,35 @@ fire latch ends on `FireAlarmCleared` or the firefighter reset, while recovery s
 `car_states.safety_active()` until the FM confirms. Events published:
 `PriorityTripStarted/Ended`, `GoodsMoveScheduled/Ended`, `AlertRaised`, `PanelMessage`. Staff
 actions are authorised from `access.permission(card).roles`; no credential id in records or alerts.
+
+## VIP exclusivity only in Rush (FR-71, FR-73, issue #65)
+* **Eligibility.** `claim_call` decides once per call, in the mode Part 2 reports for the call's
+  group at that moment (`dispatcher.current_mode(group)`). Only `Mode.RUSH` (scheduled FR-11
+  or an FM switch FR-12) may start an exclusive trip. Order of the refusal reasons:
+  `emergency` / `ems_down` (safety keeps its own restriction in every mode), then `not_rush`,
+  then `no_destination`, `vip_revoked` / `vip_quota`, `group_exclusive_cap`, `hourly_cap`,
+  `no_car`, `ceiling` / `calls_not_moved` / `refused`.
+* **Outside Rush (Balanced, Eco).** `claim_call` returns `None` with reason `not_rush`: no car
+  state is asked, no controller command is sent, and nothing is counted. The call keeps
+  `CallPriority.VIP`, so Part 2 dispatches it as a normal call (`register_stop`, cars shared
+  with other passengers) and orders its queue with `order()`: VIP before ordinary calls,
+  behind medical and accessible calls (FR-73, BR-10). The passenger is never dropped.
+* **Entering Rush.** A call already decided outside Rush is not promoted: Part 2 asks again
+  when it re-queues the call, and the cached decision (`None`) is returned. A call first
+  decided in Rush goes through every admission check (group cap, hourly cap, ceiling check).
+* **Leaving Rush.** FR-15 / BR-02 (a mode change never cancels a call or a trip; new rules
+  apply to new decisions): an exclusive trip already started keeps its car until its normal
+  end (delivered, not boarded in one door cycle, medical / send-to-lobby preemption, fault,
+  emergency). No cabin is stopped, no rider or stop is removed, and the start is neither
+  counted again nor refunded. VIP calls decided after the change are served as normal calls.
+* **Quota.** The 6 starts per rolling hour stay building-wide and are counted only after a
+  successful start, so `not_rush` refusals (like every other refusal) use no quota.
+* **Medical and safety.** Medical (FR-127) and send-to-lobby (FR-128) are not mode-gated and
+  still take precedence over a running VIP trip, keeping the riders' destination stops. During
+  fire recall, power loss or EMS downtime the reason is `emergency` / `ems_down` in every mode.
+* **Passenger lists.** `sim12_vip_caps.csv` and `sim18_medical_over_vip.csv` start at 07:00
+  (`# start=07:00`, Rush) so they keep showing exclusive trips; `br10_priority_order.csv` runs
+  at 00:00 (Eco), where its VIP is served as a normal call ahead of ordinary calls.
 
 ## For the other parts
 * **Part 2:** for a VIP call call `claim_call(call)` before choosing a car; a car id means publish
@@ -66,6 +95,7 @@ uvicorn ems.web.server:app                                            # /runner/
 
 ## Open questions (SRS text not in the repo)
 VIP quota meaning (FR-70); 6 starts per hour per building or per group (FR-72, built: building);
-VIP yield when medical uses another car (FR-127, built: yes); Rush rule for the service car
+VIP yield when medical uses another car (FR-127, built: yes); VIP trip at the end of Rush
+(built: runs to its end, FR-15 / BR-02); Rush rule for the service car
 (FR-36, built: passenger cars only); FR-31 thresholds and FR-80 limit values (not invented: set by
 the FM); FR-128 workflow (built: security starts and finishes it).
