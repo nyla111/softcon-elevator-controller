@@ -158,6 +158,10 @@ class Env:
     def run_to(self, t):
         self.ctx.clock.run_until(t)
 
+    def rush(self):
+        """Put every group in Rush: VIP exclusive trips start only in Rush (FR-71, #65)."""
+        self.dispatcher.mode = Mode.RUSH
+
     def now(self):
         return self.ctx.clock.now()
 

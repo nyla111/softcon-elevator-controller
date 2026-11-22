@@ -51,6 +51,7 @@ def test_car_already_open_at_origin_counts_as_arrived(env):
 
 
 def test_medical_preempts_vip_in_the_same_group(env):
+    env.rush()                                               # VIP exclusivity needs Rush
     vip = env.call(group="HIGH")
     vip_car = env.p.claim_call(vip)                          # E
     env.publish(PassengerBoarded(env.now(), vip.call_id, vip_car))
@@ -67,6 +68,7 @@ def test_medical_preempts_vip_in_the_same_group(env):
 
 
 def test_medical_may_take_the_vip_car_itself(env):
+    env.rush()                                               # VIP exclusivity needs Rush
     for c in "FGH":
         env.controllers.put(c, fault_code="F-1")
     vip = env.call(group="HIGH")
@@ -154,6 +156,7 @@ def test_accessible_voice_feedback_once_per_call_and_car(env):
 
 
 def test_medical_preempts_vip_of_the_served_group_even_on_the_service_car(env):
+    env.rush()                                               # VIP exclusivity needs Rush
     for c in "ABCDEFGH":
         if c != "C":
             env.controllers.put(c, fault_code="F-1")
@@ -168,6 +171,7 @@ def test_medical_preempts_vip_of_the_served_group_even_on_the_service_car(env):
 def test_medical_over_unboarded_vip_keeps_the_vip_call(env):
     """Regression A1 (conversion): the VIP car becomes the medical car before the VIP boards;
     after the medical trip the car registers the VIP pick-up again."""
+    env.rush()                                               # VIP exclusivity needs Rush
     for c in "FGH":
         env.controllers.put(c, fault_code="F-1")
     env.controllers.put("S", fault_code="F-1")
