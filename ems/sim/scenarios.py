@@ -322,6 +322,8 @@ SCENARIOS["SIM-14"].runs[0].faults = []  # Setup chooses a real occupied silent-
 SCENARIOS["SIM-14"].ready = True
 SCENARIOS["SIM-14"].waiting_for = None
 SCENARIOS["SIM-15"].runs[0].setup = _part4("_setup_safety_brake")
+SCENARIOS["SIM-15"].ready = True
+SCENARIOS["SIM-15"].waiting_for = None
 
 
 def get(scenario_id: str) -> Scenario:

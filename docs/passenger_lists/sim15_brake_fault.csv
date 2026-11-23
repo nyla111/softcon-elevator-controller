@@ -1,0 +1,14 @@
+# start=07:00
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note,params,within_s
+0,,,,,,,car_fault,D,13,,,SIM-15 FR-04/112: real temporary controller faults establish waiting pickup on A; alternatives clear before brake,code=scenario:setup,
+0,,,,,,,car_fault,C,13,,,SIM-15 FR-04/112: real temporary controller faults establish waiting pickup on A; alternatives clear before brake,code=scenario:setup,
+0,,,,,,,car_fault,B,13,,,SIM-15 FR-04/112: real temporary controller faults establish waiting pickup on A; alternatives clear before brake,code=scenario:setup,
+0,1,15,card-L15-001,false,false,sim15-onboard,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: 07:00 up-peak rider must be onboard A between floors before fault,,
+10,14,1,card-L14-001,false,false,sim15-already-waiting,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: request is waiting before the fault,,
+14,,,,,,,car_fault,A,120,alert:entrapment,,SIM-15 FR-112 NFR-R4: actual occupied moving A; explicit brake and per-car alert within10s,code=brake;between_floors=true,10
+15,1,5,card-L5-001,false,false,sim15-pending-1,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: retain call identity and original wait clock,,
+16,1,7,card-L7-001,false,false,sim15-pending-2,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: retain or reassign waiting call to healthy car,,
+24,,,,,,,check,,,no_alert:entrapment,,SIM-15 FR-112 NFR-R4 #33 #55: next representable time after t=25224,,
+25,1,11,card-L11-001,false,false,sim15-pending-3,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: pending request served during fault without dropping waiting passengers,,
+135,,,,,,,check,,,no_alert:entrapment,,SIM-15 FR-112 NFR-R4 #33 #55: fault duration ended at t=25334,,
+200,1,6,card-L6-001,false,false,sim15-after-fault,,,,delivered,60,SIM-15 FR-112: service after explicit brake clearance; companion test captures all command attempts,,

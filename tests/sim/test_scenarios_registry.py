@@ -19,7 +19,7 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
     # (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
     assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-09",
-                     "SIM-10", "SIM-11", "SIM-12", "SIM-14", "SIM-16", "SIM-18", "SIM-19"]
+                     "SIM-10", "SIM-11", "SIM-12", "SIM-14", "SIM-15", "SIM-16", "SIM-18", "SIM-19"]
     for s in SCENARIOS.values():
         if not s.ready:
             if s.owner_part == 4:
@@ -49,7 +49,7 @@ def test_registry_loads_part4_only_when_a_part4_scenario_executes():
         assert module not in sys.modules
         for scenario in SCENARIOS.values():
             describe(scenario)
-        for sid in ("SIM-08", "SIM-13", "SIM-15", "SIM-17"):
+        for sid in ("SIM-08", "SIM-13", "SIM-17"):
             result = run_scenario(sid, 1)
             assert result["ready"] is False and result["passed"] is None
         assert module not in sys.modules
