@@ -50,6 +50,14 @@ FM confirmation are connected. These internal methods are not authenticated UI e
 
 ## Integration dependencies and incomplete acceptance
 
+FR-113 is implemented by the mechanical-fault hold owner: the third independent episode
+in a trailing 30-day window sends the FM a review notice. The exact 30-day boundary is
+included. Duplicate assertions/statuses and link loss do not count; a matching fault
+clear is required before another episode. Further episodes while already at/above three
+do not spam notices; the threshold may notify again after old episodes age out. P5 keeps
+FR-30 per-episode alerts. See `tests/safety/test_fault_review.py`; the window convention
+and cross-owner integration remain subject to owner review in #88.
+
 Part 5 is merged and exercised directly in `tests/integration/test_safety_priority.py`.
 Seven strict xfails track [issue #18](https://github.com/nyla111/softcon-elevator-controller/issues/18):
 PR16-01 owner transfer (2), PR16-02 isolated VIP preemption (2), PR16-03 cached emergency
