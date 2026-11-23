@@ -11,10 +11,10 @@ presentation deadline 25 Nov. Shared proposals are in safety_integration_proposa
 | T3 | NFR-SF3 / FR-50 | P4/P6 | #81; PR #87 episode alert and deduplication | Three red regressions and stale guard; 197 focused passes; CI blocked by confirmed wall-clock fallback divergence #101; review pending |
 | T4 | FR-52 / VER-10 | P4/P1/P2/lead | #46; existing primitive only; concrete shared proposal prepared | Approved commissioning/readiness/permission/ack contract, real runtime and complete boundary evidence |
 | T5 | SIM-08 / FR-50/55 | P4/P3/P5 | #61/#33; full real-service paired acceptance in progress | User approved unchanged default peak plus controlled occupied-VIP companion; both must pass every seed1-10; #92 P3 agreement pending |
-| T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; PR #94/#95 active fixtures and complete registry each pass seeds1-10 | #94 CI passed; #95 latest CI pending; review/merge pending |
-| T7 | SIM-13/15 / FR-100/84/04 | P4/P2/P5/P6 | #61/#32; PR #97/#98/#99 and #95; full all10-seed traces pass | P2/P5 overload and P6 camera-review owner agreement; CI/review/merge |
+| T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; PR #94/#95 active fixtures and complete registry each pass seeds1-10; CI passed | Required review/merge pending |
+| T7 | SIM-13/15 / FR-100/84/04 | P4/P2/P5/P6 | #61/#32; PR #97/#98/#99 and #95; full all10-seed traces and CI pass | P2/P5 overload and P6 camera-review owner agreement; review/merge |
 | T8 | FR-121 / NFR-P6 | P4/P3 | #82; PR #90 corrected fixed cooldown/calendar episodes; CI passed | Four red regressions; 127 Safety passes; runtime #96; review/merge |
-| T9 | FR-125/120/121/122 / BR-07 / SIM-17 | P3/P2/P4/lead | #61; user selected implementation; runtime draft #96, full acceptance draft #100 | 177 Access/policy tests and all10 SIM-17 seeds pass; P3 owner/interface agreement, CI/review/merge |
+| T9 | FR-125/120/121/122 / BR-07 / SIM-17 | P3/P2/P4/lead | #61; user selected implementation; runtime draft #96, full acceptance draft #100; CI passed | 177 Access/policy tests and all10 SIM-17 seeds pass; P3 owner/interface agreement, review/merge |
 | T10 | FR-113 / VER-15 | P4/P5/team | #61; user selected implementation; PR #91 runtime fault-episode threshold notice; CI passed | Four red regressions; 165 focused passes; review/merge |
 | T11 | Traceability, seeds, CI | P4/P1/P6 | #33/#61; this live matrix | Update fixtures/checkers/docs/requirements; collect raw traces; full pytest+Docker and inspect known gaps |
 
