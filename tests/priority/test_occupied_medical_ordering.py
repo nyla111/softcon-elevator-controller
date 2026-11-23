@@ -50,6 +50,14 @@ def test_pending_request_can_be_cancelled_without_diverting_rider():
     assert ctx.get("controllers").passengers["existing-rider"].alighted_at is not None
 
 
+def test_legitimate_medical_request_notifies_security_within_ten_seconds():
+    ctx = build()
+    outcome = ctx.get("priority").request_medical("staff-security-1", 8, 1)
+    assert outcome.ok
+    received = [n for n in ctx.get("notifier").inbox if "medical_request" in n[2]]
+    assert len(received) == 1 and received[0][0] <= 10 and received[0][1] == ["security"]
+
+
 @pytest.mark.parametrize("emergency", ["fire", "power"])
 def test_emergency_invalidates_pending_start_without_late_commands(emergency):
     ctx = occupied()

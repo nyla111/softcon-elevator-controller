@@ -26,7 +26,12 @@ class MedicalMixin:
             return err
         out = self._start_medical(origin, destination)
         self.record("medical.request", actor, out.ok, out.reason, out.ref, out.car_id)
-        if not out.ok:
+        if out.ok:
+            self.alert("critical", "medical_request", ["security"],
+                       f"Medical priority requested: {floor_label(origin)} -> "
+                       f"{floor_label(destination)}; car {out.car_id} ({out.reason})",
+                       out.car_id, origin)
+        else:
             self.alert("critical", "medical_no_car", ["security"],
                        f"No car for the medical trip {floor_label(origin)} -> "
                        f"{floor_label(destination)} ({out.reason})", floor=origin)
