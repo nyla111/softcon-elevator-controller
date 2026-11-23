@@ -234,7 +234,17 @@ class MonitorService:
                                       0, None, [])
                 self.security_log.append({"t": event.t, "kind": "overload_pattern",
                                           "event_id": event_id, "car_id": event.car_id})
-                self._bulky_message(event_id, event.t, event.car_id)
+                # FR-84: repeated overload asks for camera review. Crowd/load alone
+                # is not bulky-item evidence; only an actual bulky camera report
+                # may redirect goods or attribute that event.
+                self.ctx.bus.publish(AlertRaised(
+                    event.t, "info", "overload_camera_review", ["security"],
+                    "Repeated overload: camera review requested; bulky item unconfirmed",
+                    event.car_id))
+                self.ctx.bus.publish(PanelMessage(
+                    event.t, f"car:{event.car_id}",
+                    "Repeated overload; please reduce the load while camera review is pending",
+                    "Quá tải lặp lại; vui lòng giảm tải trong khi chờ kiểm tra camera", True))
             window.clear()
 
     def review_incident(self, event_id: str, decision: str, reviewer: str,
