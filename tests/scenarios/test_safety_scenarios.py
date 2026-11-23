@@ -28,6 +28,9 @@ SAFETY_CRITERIA = {
 @pytest.mark.parametrize("sid", SAFETY_CRITERIA)
 def test_safety_subcriteria_on_real_scenarios(sid, seed):
     result = run_scenario(sid, seed, metrics_only=True)
+    if sid == "SIM-13":
+        assert result["ready"] is True and result["passed"] is True, result["criteria"]
+        return
     assert result["ready"] is False and result["passed"] is None
     actual = {c["criterion"]: c for c in result["criteria"]}
     assert SAFETY_CRITERIA[sid] <= actual.keys()

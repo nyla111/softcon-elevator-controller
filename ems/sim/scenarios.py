@@ -42,7 +42,7 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarS
 from .baseline import install_dispatch_standin
 from .building import BUILDINGS
 from .faults import (Fault, camera_event, ems_server_crash, fire_alarm, link_loss, mains_loss,
-                     measured, overload_burst, plugin_crash)
+                     measured, plugin_crash)
 from .harness import CLEAR_S, MEASURE_S, WARMUP_S, RunResult, run
 from .traffic import PROFILES, SRS_ORIGINAL_PEAK_RATE, with_rate
 
@@ -312,11 +312,13 @@ for _sid, _check, _waiting in [
 
 SCENARIOS["SIM-08"].runs[0].setup = _part4("_setup_safety_fire")
 SCENARIOS["SIM-08"].runs[0].faults = [fire_alarm(measured(20), 300, reset_after=5)]
+SCENARIOS["SIM-13"].runs[0].setup = _part4("setup_sim_13")
 SCENARIOS["SIM-13"].runs[0].faults = [
-    overload_burst("A", measured(minute)) for minute in (20, 22, 24)
-] + [camera_event("bulky_item", "A", measured(21)),
-     camera_event("bulky_item", "A", measured(23)),
-     camera_event("repeated_overload", "A", measured(24), people_count=20)]
+    camera_event("bulky_item", "A", measured(21)),
+    camera_event("bulky_item", "A", measured(23)),
+    camera_event("repeated_overload", "A", measured(24), people_count=20)]
+SCENARIOS["SIM-13"].ready = True
+SCENARIOS["SIM-13"].waiting_for = None
 SCENARIOS["SIM-14"].runs[0].faults = [
     mains_loss(measured(20), 300, generator_failed=True, failed_rescue_cars=("A",))]
 SCENARIOS["SIM-15"].runs[0].setup = _part4("_setup_safety_brake")
