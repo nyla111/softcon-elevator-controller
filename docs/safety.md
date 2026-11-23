@@ -99,12 +99,17 @@ fire actions remain exempt and consume no quota. Duplicate removal requires same
 proof, waiting status, no boarding and no uncertainty. These policies await Access admission
 integration; Safety does not filter already accepted `CallRequested` events.
 
-`acceptance.py` loads only when a Part 4 scenario executes. SIM-08/13/14/15/17 remain
-`ready=False`; metrics-only runs expose partial criteria with aggregate `passed=None`.
-SIM-08 still needs an active goods setup and full recovery integration; SIM-13 overload
-messages/reassignment; SIM-14 full recovery; SIM-15 reassignment; SIM-17 panel admission
-and duplicate proof. The optional SIM-08 lockdown variant is not integrated. Unit fixtures
-and passing subcriteria do not establish full Appendix B acceptance.
+`acceptance.py` loads only when a Part 4 scenario executes. This SIM-08 branch requires
+both the original peak run and an occupied-VIP quiet companion (DECISIONS D-09).
+Every run uses real Access, Dispatch, Priority, controllers and notification services.
+The combined checker requires all18 criteria, including actual lobby-alighting events
+for every rider onboard at the alarm, zero EMS commands before valid FM recovery and
+no automatic restart of the interrupted VIP. A lobby-bound rider's `evacuated` boolean
+is false by definition because its destination was reached; the actual alighting event
+is the evacuation evidence. The lockdown configuration persists through the draft P3
+interface #92. This branch's readiness is not acceptance on main; all10 paired seeds,
+CI, P3 owner agreement and required review remain gates. Other Safety scenarios retain
+their existing branch-local partial status; separate PRs contain their acceptance work.
 
 ## Run
 
