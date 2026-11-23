@@ -26,12 +26,19 @@ car during a building emergency or locked recovery. Dispatch must consult this a
 | Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
 | Firefighter service | Keep normal service and recovery blocked while active; controllers retain physical authority. |
 | Mains loss | Latch Emergency Power, request waiting-call reassignment, show power messages. Fire Recall still wins. `GeneratorReady` does not reopen EMS dispatch. |
-| Missing/stuck rescue without a ready generator | One critical POSSIBLE ENTRAPMENT alert per affected car by 60 s. |
+| Missing/stuck rescue report | One critical POSSIBLE ENTRAPMENT alert per affected car by 60 s, even after generator readiness or mains restoration. |
 | Fault or heartbeat loss | Independent Faulted holds; only matching clear/restored events release them. Faults under emergency precedence survive recovery. |
 | Occupied between-floor/stuck-door fault; alarm button | Critical entrapment/assistance alerts to security, FM and contractor. Part 5 owns mechanical-fault notifications. |
 
 Timing uses the simulated clock. Older physical assertions/clears are rejected; equal
 timestamps follow bus order because contracts have no episode/sequence identifier.
+
+FR-110 rescue evidence is per car and power episode. Generator readiness and mains
+restoration do not prove rescue. At the 60 s deadline, every car without a current
+`rescued_at_floor` report alerts, including unknown occupancy; a `stuck` report alerts
+immediately. A newer outage supersedes the old timer and resets alert deduplication.
+Late rescue reports do not erase notifications already delivered. Regression evidence:
+`tests/safety/test_rescue_deadline.py` (#46); required notification context remains #80.
 
 ## Recovery gate
 

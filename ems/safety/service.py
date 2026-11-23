@@ -202,7 +202,9 @@ class SafetyService:
             self._alert("critical", "entrapment", "POSSIBLE ENTRAPMENT — rescue not confirmed", car)
 
     def _rescue_deadline(self, epoch: int) -> None:
-        if epoch != self.power_epoch or not self.mains_lost or self.generator_ready:
+        # Restored power/readiness is not per-car rescue proof (FR-110). Only a
+        # newer outage supersedes this timer; current reports decide which cars alert.
+        if epoch != self.power_epoch:
             return
         for car in self.table.cars():
             if car not in self.rescued:
