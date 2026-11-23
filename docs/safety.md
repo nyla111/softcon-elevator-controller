@@ -23,7 +23,7 @@ car during a building emergency or locked recovery. Dispatch must consult this a
 
 | Input | Safety behaviour |
 |---|---|
-| Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
+| Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. I/O loss also sends one `fire_io_loss` notification per recovery episode, including when a panel alarm came first. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
 | Firefighter service | Keep normal service and recovery blocked while active; controllers retain physical authority. |
 | Mains loss | Latch Emergency Power, request waiting-call reassignment, show power messages. Fire Recall still wins. `GeneratorReady` does not reopen EMS dispatch. |
 | Missing/stuck rescue report | One critical POSSIBLE ENTRAPMENT alert per affected car by 60 s, even after generator readiness or mains restoration. |
@@ -32,6 +32,11 @@ car during a building emergency or locked recovery. Dispatch must consult this a
 
 Timing uses the simulated clock. Older physical assertions/clears are rejected; equal
 timestamps follow bus order because contracts have no episode/sequence identifier.
+
+The fire-I/O notification is emitted after fire holds are established. Clear/reset alone
+does not reset its deduplication: only successful FR-55 FM recovery ends the episode.
+`tests/safety/test_fire_io_alert.py` checks actual inbox delivery, repeated/stale signals,
+panel-first loss, recovery and every attempted controller command (NFR-SF3, #81).
 
 FR-110 rescue evidence is per car and power episode. Generator readiness and mains
 restoration do not prove rescue. At the 60 s deadline, every car without a current
