@@ -16,6 +16,9 @@ from .records import BY
 
 BALANCED_LOBBY_CARS = 1          # Balanced: idle cars parked at the lobby (rest near demand)
 ECO_ACTIVE_CARS = 2              # Eco: cars per group kept in service (4.3: "at least 1")
+ECO_ROTATE_S = 900.0              # avoid switching idle cars every policy tick
+ECO_ROTATE_FLOORS = 20           # meaningful distance gap before rotating
+ECO_ROTATE_POSITION = 10.0      # exchange only nearby cars to preserve coverage
 
 
 class PolicyMixin:
@@ -42,6 +45,7 @@ class PolicyMixin:
 
     def _eco_standby(self, group: GroupId, statuses: list[CarStatus]) -> None:
         """Eco: at least one car per group in service, the rest in Standby (4.3 table)."""
+        self._rotate_eco(group, statuses)
         active = [s for s in statuses if s.car_id not in self.standby]
         if not active:
             return
@@ -59,6 +63,41 @@ class PolicyMixin:
                 self.standby.add(s.car_id)
             else:
                 car_states.release(s.car_id, CarState.STANDBY, BY)
+
+    def _rotate_eco(self, group: GroupId, statuses: list[CarStatus]) -> None:
+        """Exchange idle active and standby cars when their travel distances diverge."""
+        last = getattr(self, "_last_eco_rotate", {})
+        if self._now() - last.get(group, -ECO_ROTATE_S) < ECO_ROTATE_S:
+            return
+        in_service = [s for s in statuses if s.car_id not in self.standby]
+        # Rotate only in a genuinely quiet window; a busy active car or queued call
+        # keeps the current capacity and location in place.
+        if not in_service or any(not self._idle(s) for s in in_service):
+            return
+        if any(self.calls[c].call.group == group for c in self.open):
+            return
+        active = in_service
+        resting = [s for s in statuses if s.car_id in self.standby and self._idle(s)]
+        if not active or not resting:
+            return
+        pairs = [(self.wear_distance(a.car_id) - self.wear_distance(b.car_id), a, b)
+                 for a in active for b in resting
+                 if abs(a.position - b.position) <= ECO_ROTATE_POSITION]
+        if not pairs:
+            return
+        gap, worn, fresh = max(pairs, key=lambda item: (item[0], item[1].car_id, item[2].car_id))
+        if gap < ECO_ROTATE_FLOORS:
+            return
+        if not self._wake(fresh.car_id):
+            return
+        car_states, controllers = self._svc("car_states"), self._svc("controllers")
+        if car_states.request(worn.car_id, CarState.STANDBY, BY):
+            if controllers.set_standby(worn.car_id, True):
+                self.standby.add(worn.car_id)
+            else:
+                car_states.release(worn.car_id, CarState.STANDBY, BY)
+        last[group] = self._now()
+        self._last_eco_rotate = last
 
     def _wake_standby(self, group: GroupId, why: str) -> bool:
         cars = sorted((c for c in self.standby if self._group_of(c) == group),

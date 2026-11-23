@@ -39,7 +39,9 @@ SOFT_CEILING = 0.75            # soft line = 75% of the mode's wait ceiling
 # lengthens trips at peak and the average gets worse, measured on SIM-01/02)
 HARD_PENALTY = {Mode.RUSH: 0.0, Mode.BALANCED: 100.0, Mode.ECO: 0.0}
 QUADRATIC = 1.0                # waits cost w + Q * w^2 / ceiling: long waits weigh more (BR-01)
-WEAR_COST_SLACK = 5.0          # only balance wear among operationally near-equal choices
+WEAR_COST_SLACK = 15.0         # permit a small ETD trade-off for the least-used car
+ECO_WEAR_COST_SLACK = 5.0      # Eco is more sensitive to active-car location
+WEAR_PICKUP_SLACK_S = 5.0      # never add more than five predicted pickup seconds for wear
 
 
 class Book(Protocol):
@@ -74,9 +76,13 @@ class EtdEngine:
             choices.append((cost, eta, self.book.wear_distance(status.car_id), status.car_id))
         if not choices:
             return None
-        best_cost = min(item[0] for item in choices)
-        close = [item for item in choices if item[0] <= best_cost + WEAR_COST_SLACK]
-        # Wait/ride/energy policy decides the shortlist. Wear only breaks close decisions.
+        best = min(choices, key=lambda item: (item[0], item[1], item[3]))
+        best_cost, best_eta = best[:2]
+        slack = ECO_WEAR_COST_SLACK if mode is Mode.ECO else WEAR_COST_SLACK
+        close = [item for item in choices
+                 if item[0] <= best_cost + slack
+                 and item[1] <= best_eta + WEAR_PICKUP_SLACK_S]
+        # Preserve the mode cost and pickup bound; select the least-worn feasible car.
         return min(close, key=lambda item: (item[2], item[0], item[3]))[3]
 
     # ------------------------------------------------------------------ cost
