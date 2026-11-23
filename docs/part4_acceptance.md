@@ -7,19 +7,36 @@ presentation deadline 25 Nov. Shared proposals are in safety_integration_proposa
 | Package | Requirements | Owner | Implementation / tracking | Remaining verification / dependencies |
 |---|---|---|---|---|
 | T1 | FR-110 / VER-10 | P4 | PR #85, 15739ff, CI test+Docker passed; review requested from P1 | Required approval and authorized squash merge; 36 new / 269 focused tests, 22 scenario+Priority tests pass; context in T2 |
-| T2 | FR-53/110 / NFR-R4 | P4/P6 | #80; timestamped notification context implemented in isolated branch | Six red regressions; 205 focused tests now pass; full suite running; PR/review/CI/merge pending |
-| T3 | NFR-SF3 / FR-50 | P4/P6 | #81; fire-I/O episode alert implemented in isolated branch | Three red regressions and stale guard; 197 focused tests pass; full suite running; PR/review/CI/merge pending |
+| T2 | FR-53/110 / NFR-R4 | P4/P6 | #80; PR #86 timestamped scalar notification snapshots; CI passed | Six red regressions; 205 focused passes; review/merge pending |
+| T3 | NFR-SF3 / FR-50 | P4/P6 | #81; PR #87 episode alert and deduplication | Three red regressions and stale guard; 197 focused passes; latest CI/review pending; weekday digest failure under investigation |
 | T4 | FR-52 / VER-10 | P4/P1/P2/lead | #46; existing primitive only; concrete shared proposal prepared | Approved commissioning/readiness/permission/ack contract, real runtime and complete boundary evidence |
-| T5 | SIM-08 / FR-50/55 | P4/P3/P5 | #61/#33; partial registry | Actual goods/VIP/onboard/Rush/fire/FM/recovery journey; P3 lockdown #83 owner review |
-| T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; additive runner injection already exists | Convert fixtures, companion full command/occupancy/queue/recovery traces and seeds1-10 |
-| T7 | SIM-13/15 / FR-100/84/04 | P4/P2/P6 | #61/#32; partial checks | Nonempty waiting sets; natural overload candidate/ownership investigation; prompt/voice/bulky/crowd proof |
-| T8 | FR-121 / NFR-P6 | P4/P3 | #82; correction in progress | Cooldown/calendar episodes/message contract, independent regressions, runtime linked to T9 |
-| T9 | FR-125/120/121/122 / BR-07 / SIM-17 | P3/P2/P4/lead | #61; pre-admission proposal prepared | Approved interface/optional scope; real entry-point exemption and duplicate/uncertain/no-show evidence |
-| T10 | FR-113 / VER-15 | P4/P5/team | #61; implementation-versus-deferral proposal prepared | Explicit team scope/history/window decision, then corresponding implementation or honest deferral evidence |
+| T5 | SIM-08 / FR-50/55 | P4/P3/P5 | #61/#33; full real-service paired acceptance in progress | User approved unchanged default peak plus controlled occupied-VIP companion; both must pass every seed1-10; #92 P3 agreement pending |
+| T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; PR #94/#95 active fixtures and complete registry each pass seeds1-10 | Corrected HTTP readiness tests pushed; latest CI/review/merge pending |
+| T7 | SIM-13/15 / FR-100/84/04 | P4/P2/P5/P6 | #61/#32; PR #97/#98/#99 and #95; full all10-seed traces pass | P2/P5 overload and P6 camera-review owner agreement; CI/review/merge |
+| T8 | FR-121 / NFR-P6 | P4/P3 | #82; PR #90 corrected fixed cooldown/calendar episodes; CI passed | Four red regressions; 127 Safety passes; runtime #96; review/merge |
+| T9 | FR-125/120/121/122 / BR-07 / SIM-17 | P3/P2/P4/lead | #61; user selected implementation; runtime draft #96, full acceptance draft #100 | 177 Access/policy tests and all10 SIM-17 seeds pass; P3 owner/interface agreement, CI/review/merge |
+| T10 | FR-113 / VER-15 | P4/P5/team | #61; user selected implementation; PR #91 runtime fault-episode threshold notice; CI passed | Four red regressions; 165 focused passes; review/merge |
 | T11 | Traceability, seeds, CI | P4/P1/P6 | #33/#61; this live matrix | Update fixtures/checkers/docs/requirements; collect raw traces; full pytest+Docker and inspect known gaps |
 
 External: #83 effective lockdown (P3); #84 occupied medical ordering (P5/P2/P1).
 No external defect is resolved solely by this matrix. No other owner's existing branch is edited.
+
+Owner-review drafts: #92 lockdown (162 Access passes), #93 occupied medical ordering
+(155 focused passes, then56 joined notification passes), #96 admission (177 passes),
+#97 overloaded VIP pickup (55 joined passes), #98 camera-review distinction (24 Monitor
+passes). User explicitly approved draft publication; owner implementation/interface
+agreement remains required before merge.
+
+New branch evidence: full SIM-13 (#99), SIM-14 (#94), SIM-15 (#95) and SIM-17 (#100)
+each pass all10 seeds locally. This updates branch evidence only; the audited main
+classifications below remain unchanged until integrated acceptance. SIM-08 paired
+runs are still pending and receive no promotion.
+
+PR #87 preserves the weekday digest assertion and real dispatch timeout. Two local
+full-day runs have identical digests without fallback; CI root cause is not confirmed.
+Added diagnostics retain actual fallback reasons and maximum compute time. One local
+full suite had846 passes,2 skips,21 xfails,3 xpasses and37 temporary-folder permission
+errors: this is not a clean pass. Subsequent local full suites need workspace basetemp.
 
 ## Acceptance classifications carried forward pending new evidence
 
@@ -44,6 +61,7 @@ No external defect is resolved solely by this matrix. No other owner's existing 
 | 17 | BLOCKED conditional | Optional scope + approved real admission integration; FR125 mandatory |
 | 18 | PARTIALLY VERIFIED | #84 delivery-before-reassignment ordering |
 
-FR-52 remains unimplemented at runtime. FR-55 gate/unit/adapter behavior is implemented
-and partially integrated, with complete08/14 journey still unverified. VER-10 is partial
+FR-52 remains unimplemented at runtime and fail-closed pending tech lead/P1/P2/P4
+commissioning and interface approval requested in #46. FR-55 now has full SIM-14
+branch journey evidence; SIM-08 paired evidence remains pending. VER-10 is partial
 until generator limited operation and the full command/notification/recovery matrix pass.
