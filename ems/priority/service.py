@@ -36,17 +36,19 @@ from .auth import AccessAuthorizer, Actor, Authorizer
 from .medical import MedicalMixin
 from .model import Hold, Outcome, Trip, VipGrant
 from .vip import VipMixin
+from .overload import OverloadMixin
 
 __all__ = ["PriorityService", "Outcome", "subscribe"]
 
 
-class PriorityService(VipMixin, MedicalMixin):
+class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
     def __init__(self, ctx, authorizer: Optional[Authorizer] = None) -> None:
         self.ctx = ctx
         self.authorizer: Authorizer = authorizer or AccessAuthorizer(ctx)
         self.holds: dict[CarId, Hold] = {}
         self.trips: dict[str, Trip] = {}               # active priority trips
         self.finished: list[Trip] = []
+        self.overloaded_pickups = {}
         self.vip_starts: list[float] = []              # successful exclusive VIP starts (FR-72)
         self.vip_grants: dict[CredentialId, VipGrant] = {}
         self.claims: dict[CallId, Optional[CarId]] = {}
@@ -439,6 +441,9 @@ class PriorityService(VipMixin, MedicalMixin):
 
 def subscribe(ctx, service: PriorityService) -> None:
     bus = ctx.bus
+    from ems.contracts.events import CarStatusUpdated, OverloadDetected
+    bus.subscribe(OverloadDetected, service.on_overload)
+    bus.subscribe(CarStatusUpdated, service.on_overload_status)
     for event, handler in [
             (CallRequested, service.on_call_requested), (CallAssigned, service.on_assigned),
             (CallReassigned, service.on_reassigned), (CallCancelled, service.on_call_cancelled),

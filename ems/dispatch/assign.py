@@ -190,6 +190,8 @@ class AssignMixin:
         once the boarding in progress is over (the controller boards first come first)."""
         here = [self.calls[c] for c in self.waiting.get(ev.car_id, set())
                 if self.calls[c].call.origin == ev.floor]
+        here += [rec for rec in self.calls.values() if rec.state == "vip"
+                 and rec.car == ev.car_id and rec.call.origin == ev.floor]
         nxt = None
         if here and self._may_dispatch():
             first = min(here, key=lambda r: (r.call.created_at, r.call.call_id))
