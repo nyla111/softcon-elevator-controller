@@ -132,4 +132,7 @@ for pickup while ordinary riders are onboard. Both runs independently require go
 cancellation, zero EMS commands during fire handling, actual onboard evacuation, no
 restart of the interrupted VIP, isolated-car exclusion, retained lockdown configuration
 and explicit FM recovery followed by real service. Neither run substitutes for the other.
-No production rule or safety assertion is relaxed. Paired results remain pending.
+No production rule or safety assertion is relaxed. Draft #102 now has all20 required
+runs passing (180criteria), paired diagnostic42 and183 focused Safety/integration passes.
+Its fixed request lead is22s for peak and29s for quiet, using real P5 pickup/no-show rules.
+P3 owner agreement, CI, required review and integration remain gates.

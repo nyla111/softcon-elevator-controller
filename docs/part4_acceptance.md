@@ -10,7 +10,7 @@ presentation deadline 25 Nov. Shared proposals are in safety_integration_proposa
 | T2 | FR-53/110 / NFR-R4 | P4/P6 | #80; PR #86 timestamped scalar notification snapshots; CI passed | Six red regressions; 205 focused passes; review/merge pending |
 | T3 | NFR-SF3 / FR-50 | P4/P6 | #81; PR #87 episode alert and deduplication | Three red regressions and stale guard; 197 focused passes; CI blocked by confirmed wall-clock fallback divergence #101; review pending |
 | T4 | FR-52 / VER-10 | P4/P1/P2/lead | #46; existing primitive only; concrete shared proposal prepared | Approved commissioning/readiness/permission/ack contract, real runtime and complete boundary evidence |
-| T5 | SIM-08 / FR-50/55 | P4/P3/P5 | #61/#33; full real-service paired acceptance in progress | User approved unchanged default peak plus controlled occupied-VIP companion; both must pass every seed1-10; #92 P3 agreement pending |
+| T5 | SIM-08 / FR-50/55 | P4/P3/P5 | #61/#33; draft #102 dc70751; all20 paired real-service runs pass,180 criteria plus paired diagnostic42 | Unchanged35/min peak plus occupied-VIP companion; #92 P3 owner agreement, CI/review/integration pending |
 | T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; PR #94/#95 active fixtures and complete registry each pass seeds1-10; CI passed | Required review/merge pending |
 | T7 | SIM-13/15 / FR-100/84/04 | P4/P2/P5/P6 | #61/#32; PR #97/#98/#99 and #95; full all10-seed traces and CI pass | P2/P5 overload and P6 camera-review owner agreement; review/merge |
 | T8 | FR-121 / NFR-P6 | P4/P3 | #82; PR #90 corrected fixed cooldown/calendar episodes; CI passed | Four red regressions; 127 Safety passes; runtime #96; review/merge |
@@ -29,10 +29,10 @@ agreement remains required before merge.
 
 New branch evidence: full SIM-13 (#99), SIM-14 (#94), SIM-15 (#95) and SIM-17 (#100)
 each pass all10 seeds locally. This updates branch evidence only; the audited main
-classifications below remain unchanged until integrated acceptance. SIM-08 paired
-runs are still pending and receive no promotion. All10 occupied-VIP companion runs pass;
-default peak seed1 passes, with remaining default runs in progress. Full checker diagnostic
-seed42 additionally passes for SIM-13, SIM-14, SIM-15 and SIM-17.
+classifications below remain unchanged until integrated acceptance. SIM-08 draft #102
+now passes both full real-service runs for every seed1–10 (20runs,180criteria), and paired
+diagnostic42. It remains pending P3 agreement/CI/review/integration, with no main promotion.
+Full checker diagnostic seed42 also passes for SIM-13, SIM-14, SIM-15 and SIM-17.
 
 PR #87 preserves the weekday digest assertion and real dispatch timeout. New CI evidence
 confirms the repeated seed1 run triggered FR-105 fallback at1.579471202s, whereas the
@@ -66,6 +66,6 @@ errors: this is not a clean pass. Subsequent local full suites need workspace ba
 | 18 | PARTIALLY VERIFIED | #84 delivery-before-reassignment ordering |
 
 FR-52 remains unimplemented at runtime and fail-closed pending tech lead/P1/P2/P4
-commissioning and interface approval requested in #46. FR-55 now has full SIM-14
-branch journey evidence; SIM-08 paired evidence remains pending. VER-10 is partial
+commissioning and interface approval requested in #46. FR-55 now has full SIM-08/14
+branch journey evidence; required review/integration remains pending. VER-10 is partial
 until generator limited operation and the full command/notification/recovery matrix pass.
