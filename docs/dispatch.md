@@ -62,6 +62,11 @@ An additional seven-day run on seed 1 (2026-12-01 through 2026-12-07) measured L
 the full monthly and six-month windows are still being measured. Weekday average waits
 were 22.4–23.1 s; the weekend days averaged 8.3–13.2 s.
 
+`.github/workflows/wear-month.yml` runs the full seed-1 month on GitHub Actions when
+the workflow is first pushed to `part2/wear-balance-58`. Its `nfr-w1-month-seed1` artifact
+keeps the JSON manifest and console log even if the balance threshold fails. After the
+workflow reaches the default branch it can also be started manually.
+
 For a new call each candidate car is replayed with and without it. Cost:
 
 ```
