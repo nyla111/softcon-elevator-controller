@@ -9,6 +9,7 @@ from ems.contracts import config
 from ems.contracts import events as ev
 from ems.contracts.types import CarId, CarState, CarStatus, GroupId, Role
 
+from .fault_review import FaultReviews
 from .states import StateTable
 
 
@@ -16,6 +17,7 @@ class SafetyService:
     def __init__(self, ctx) -> None:
         self.ctx = ctx
         self.table = StateTable(ctx)
+        self.fault_reviews = FaultReviews()
         self.fire = False
         self.firefighters: set[CarId] = set()
         self.mains_lost = False
@@ -302,6 +304,12 @@ class SafetyService:
         changed = self.table.set(car, CarState.FAULTED, owner, active)
         self.normal.discard(car)
         if active and changed:
+            if owner == "safety:fault" and self.fault_reviews.started(car, self.ctx.clock.now()):
+                self.ctx.bus.publish(ev.AlertRaised(
+                    self.ctx.clock.now(), "info", "fault_review", ["fm"],
+                    f"Car {car}: three independent mechanical faults in 30 days; FM review required",
+                    car,
+                ))
             self.ctx.get("dispatcher").reassign_calls_of(car, owner)
             # FR-30 mechanical fault notifications belong to Part 5 Maintenance.
             if owner == "safety:disconnected":
