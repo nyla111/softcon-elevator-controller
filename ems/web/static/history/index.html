@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>EMS saved runs</title>
+  <style>
+    :root{font-family:Inter,Segoe UI,sans-serif;color:#172033;background:#f4f6fa}*{box-sizing:border-box}
+    body{margin:0}header{background:#14213d;color:white;padding:18px 24px}header a{color:white;margin-right:18px}
+    main{max-width:1200px;margin:auto;padding:20px}section{background:white;border:1px solid #dde3ed;border-radius:12px;padding:16px;margin-bottom:16px}
+    .runs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}.run{border:1px solid #cbd5e1;border-radius:8px;padding:10px}
+    .muted{color:#667085;font-size:13px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #edf0f4}
+    .scroll{overflow-x:auto}button{background:#14213d;color:white;border:0;border-radius:7px;padding:9px 14px;cursor:pointer}button:disabled{background:#94a3b8}
+    svg{width:100%;height:220px;background:#f8fafc;border:1px solid #edf0f4;border-radius:8px}.legend span{display:inline-block;margin-right:18px}
+  </style>
+</head>
+<body><header><a href="/dashboard/">Dashboard</a><a href="/building/">Building</a><strong>Saved run history</strong></header>
+<main>
+  <section><h1>Compare saved runs</h1><p class="muted">Save a live run from the building view, then select 2 or 3 runs here. Figures are from saved snapshots.</p>
+    <div id="status" role="status">Loading runs…</div><div id="runs" class="runs"></div><p><button id="compare" disabled>Compare selected runs</button></p></section>
+  <section id="comparison" hidden><h2>Comparison</h2><div id="metadata" class="scroll"></div>
+    <h3>Waiting time by group</h3><div id="group-waits" class="scroll"></div>
+    <h3>Waiting time by mode</h3><div id="waits" class="scroll"></div>
+    <h3>Wear by group</h3><p class="muted">Distance is floors traveled during this saved run. Imbalance = (max − min) / max within each group.</p><div id="wear" class="scroll"></div>
+    <h3>Operating modes and incidents</h3><div id="events" class="scroll"></div>
+    <h3>Waiting trend</h3><p class="muted">Rolling five-minute average wait, sampled once per simulated minute.</p><svg id="trend" viewBox="0 0 900 220" role="img" aria-label="Rolling wait time by run"></svg><p id="legend" class="legend"></p>
+  </section>
+</main><script src="/history/app.js"></script></body></html>
