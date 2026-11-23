@@ -7,6 +7,7 @@ from ems.contracts.types import CarState
 from ems.sim.baseline import install_dispatch_standin
 from ems.sim.faults import measured
 from ems.sim.harness import RunResult
+from ems.sim.scripted import ScriptedTraffic, ScriptedTrip
 
 Criteria = list  # of (criterion, passed, detail)
 
@@ -59,14 +60,51 @@ def _setup_safety_fire(ctx):
 
 
 def _setup_safety_brake(ctx):
-    install_dispatch_standin(ctx)
+    ctx.services["safety_brake_evidence"] = {}
 
     def inject():
         sim = ctx.services["controllers"]
-        occupied = [s for s in sim.all_status() if s.passengers > 0 and not s.fault_code]
+        dispatcher = ctx.get("dispatcher")
+        occupied = [s for s in sim.all_status()
+                    if s.passengers > 0 and not s.fault_code and s.position != s.floor
+                    and s.car_id in ctx.get("car_states").dispatchable(s.group)
+                    and s.passengers < ctx.get("building").group(s.group).rated_persons]
         if not occupied:
-            return  # the check fails without an occupied fault; never invent passengers
+            if ctx.clock.now() < measured(21):
+                ctx.clock.call_later(0.25, inject)
+            return  # Full checker fails without real occupied/waiting preconditions.
         car = occupied[0].car_id
+        if not dispatcher.waiting.get(car):
+            spec = ctx.get("building").group(occupied[0].group)
+            states = ctx.get("car_states")
+            held = [other for other in spec.cars if other != car
+                    and states.request(other, CarState.MAINTENANCE, "scenario:brake_precondition")]
+            origin = max(spec.floors) if occupied[0].position < max(spec.floors) - 1 else min(spec.floors)
+            destination = min(spec.floors) if origin == max(spec.floors) else max(spec.floors)
+            ScriptedTraffic(ctx, [ScriptedTrip(ctx.clock.now(), origin, destination,
+                card="staff-fm-1", accessible=False, vip=False,
+                passenger_id="sim15-waiting-precondition")]).start()
+
+            def after_admission():
+                for other in held:
+                    states.release(other, CarState.MAINTENANCE, "scenario:brake_precondition")
+                complete(car)
+            ctx.clock.call_later(0.001, after_admission)
+            return
+        complete(car)
+
+    def complete(car):
+        sim, dispatcher = ctx.get("controllers"), ctx.get("dispatcher")
+        status = sim.status(car)
+        if not (status.passengers > 0 and status.position != status.floor
+                and dispatcher.waiting.get(car)):
+            return  # The checker rejects incomplete actual preconditions.
+        ctx.services["safety_brake_evidence"].update(
+            t=ctx.clock.now(), car=car, position=status.position,
+            passengers=status.passengers,
+            waits={cid: dispatcher.calls[cid].call.created_at
+                   for cid in dispatcher.waiting[car]},
+        )
         sim.inject_fault(car, "brake", between_floors=True)
         ctx.clock.call_later(300, lambda: sim.clear_fault(car))
     ctx.clock.call_later(measured(20), inject)
@@ -188,11 +226,33 @@ def check_sim_15(result: RunResult, ctx) -> Criteria:
                       if e.car_id == fault.car_id and e.t >= fault.t), ctx.clock.now() + 1)
         commands += [c for c in ctx.services["controllers"].command_log
                      if c[1] == fault.car_id and fault.t <= c[0] < clear]
+    proof = ctx.services.get("safety_brake_evidence", {})
+    waits = proof.get("waits", {})
+    moved = {e.call_id for e in ctx.bus.of_type(safety_events.CallReassigned)
+             if e.from_car == proof.get("car") and e.t >= proof.get("t", float("inf"))
+             and e.to_car != proof.get("car")}
+    boarded = set()
+    invalid = []
+    for event in ctx.bus.log:
+        if isinstance(event, safety_events.PassengerBoarded):
+            boarded.add(event.call_id)
+        elif isinstance(event, safety_events.CallReassigned) and event.call_id in boarded:
+            invalid.append(event.call_id)
+    retained = bool(waits) and waits.keys() <= moved and not invalid and all(
+        ctx.get("dispatcher").calls[cid].call.created_at == t for cid, t in waits.items())
+    inbox = ctx.get("notifier").inbox
+    delivered = bool(qualified) and all(any(
+        f"entrapment car {f.car_id}" in n[2] and f.t <= n[0] <= f.t + 10
+        and {"security", "contractor"} <= set(n[1]) for n in inbox) for f in qualified)
     return [
         ("occupied between-floor brake fault exercised", bool(qualified), f"{len(qualified)} faults"),
         ("urgent entrapment alert and contractor call-out within 10 s", bool(qualified) and timely,
          f"{len(qualified)} occupied faults checked"),
-        _reassignment_check(ctx, faults),
+        ("waiting calls reassigned without reassigning boarded passengers", retained,
+         f"{len(set(waits) & moved)}/{len(waits)} original waits; boarded moved={invalid}"),
+        ("actual moving occupied precondition and delivered urgent notification",
+         proof.get("passengers", 0) > 0 and proof.get("position", 0) % 1 != 0 and delivered,
+         f"car={proof.get('car')}; delivered={delivered}"),
         ("no EMS command to the faulted car", bool(faults) and not commands,
          f"{len(commands)} attempted commands"),
     ]

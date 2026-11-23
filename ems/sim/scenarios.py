@@ -320,6 +320,8 @@ SCENARIOS["SIM-13"].runs[0].faults = [
 SCENARIOS["SIM-14"].runs[0].faults = [
     mains_loss(measured(20), 300, generator_failed=True, failed_rescue_cars=("A",))]
 SCENARIOS["SIM-15"].runs[0].setup = _part4("_setup_safety_brake")
+SCENARIOS["SIM-15"].ready = True
+SCENARIOS["SIM-15"].waiting_for = None
 
 
 def get(scenario_id: str) -> Scenario:
