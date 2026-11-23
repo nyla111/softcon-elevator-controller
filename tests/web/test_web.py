@@ -97,7 +97,7 @@ def test_scenario_list(client):
     assert [r["id"] for r in rows] == [f"SIM-{i:02d}" for i in range(1, 20)]
     assert [r["id"] for r in rows if r["ready"]] == ["SIM-01", "SIM-02", "SIM-03", "SIM-04",
                                                      "SIM-05", "SIM-06", "SIM-09", "SIM-10",
-                                                     "SIM-11", "SIM-12", "SIM-16", "SIM-18",
+                                                     "SIM-11", "SIM-12", "SIM-15", "SIM-16", "SIM-18",
                                                      "SIM-19"]
     assert next(r for r in rows if r["id"] == "SIM-07")["waiting_for"] == "Part 3 check"
 
