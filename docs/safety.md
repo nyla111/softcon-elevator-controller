@@ -38,7 +38,14 @@ restoration do not prove rescue. At the 60 s deadline, every car without a curre
 `rescued_at_floor` report alerts, including unknown occupancy; a `stuck` report alerts
 immediately. A newer outage supersedes the old timer and resets alert deduplication.
 Late rescue reports do not erase notifications already delivered. Regression evidence:
-`tests/safety/test_rescue_deadline.py` (#46); required notification context remains #80.
+`tests/safety/test_rescue_deadline.py` (#46).
+
+Car-specific notifications include the last timestamped, connected controller report's
+floor, load, passenger estimate and telemetry time/age in delivered message text, plus
+the structured floor when known (FR-53/110, #80). Cached values are scalar snapshots;
+older/future reports and disconnected payloads cannot overwrite them. With no report,
+context is explicitly unknown; no adapter timestamp or occupancy is invented. See
+`tests/safety/test_alert_context.py` for notifier-inbox evidence.
 
 ## Recovery gate
 

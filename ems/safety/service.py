@@ -32,6 +32,8 @@ class SafetyService:
         self.fault_alerted: set[CarId] = set()
         self.recovery_log: list[tuple[float, str]] = []
         self._signal_times: dict[tuple[str, CarId | None], float] = {}
+        # Scalar snapshots: bus payloads/adapter status objects may be mutable.
+        self.telemetry: dict[CarId, tuple[float, int, float, int]] = {}
 
     def subscribe(self) -> None:
         for event, handler in {
@@ -91,8 +93,18 @@ class SafetyService:
         return not status.disconnected and status.fault_code is None
 
     def _alert(self, severity: str, kind: str, message: str, car_id=None) -> None:
+        floor = None
+        if car_id is not None:
+            sample = self.telemetry.get(car_id)
+            if sample is None:
+                context = "floor=unknown; load=unknown; passengers=unknown; telemetry_t=unknown"
+            else:
+                t, floor, load, passengers = sample
+                context = (f"last reported floor={floor}; load={load:g}%; passengers={passengers}; "
+                           f"telemetry_t={t:g}s; age={self.ctx.clock.now() - t:g}s")
+            message = f"{message}; car={car_id}; {context}"
         self.ctx.bus.publish(ev.AlertRaised(self.ctx.clock.now(), severity, kind,
-                                           ["security", "fm", "contractor"], message, car_id))
+                                           ["security", "fm", "contractor"], message, car_id, floor))
 
     def _display(self, en: str, vi: str) -> None:
         for car in self.table.cars():
@@ -322,6 +334,11 @@ class SafetyService:
 
     def on_status(self, event: ev.CarStatusUpdated) -> None:
         s = event.status
+        previous = self.telemetry.get(s.car_id)
+        if (s.car_id in self.table.cars() and not s.disconnected
+                and 0 <= event.t <= self.ctx.clock.now()
+                and (previous is None or event.t >= previous[0])):
+            self.telemetry[s.car_id] = (event.t, s.floor, s.load_pct, s.passengers)
         fault_current = self._accept_signal("fault", event, s.car_id) if s.fault_code else False
         if fault_current:
             self._fault_hold(s.car_id, "safety:fault", True)
