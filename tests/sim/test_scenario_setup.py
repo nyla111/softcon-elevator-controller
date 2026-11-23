@@ -44,11 +44,23 @@ def test_schedule_segments_follow_the_clock_not_t0():
 
 @pytest.mark.slow
 def test_weekday_run_blocks_stranded_and_determinism():
+    from ems.contracts.events import AlertRaised
+    diagnostics = []
+
+    def observe(ctx):
+        install_dispatch_standin(ctx)
+        row = {"fallbacks": []}
+        diagnostics.append(row)
+        ctx.bus.subscribe(AlertRaised, lambda event: row["fallbacks"].append(event.message)
+                          if event.kind == "dispatch_fallback" else None)
+        ctx.clock.call_at(86400, lambda: row.update(
+            max_compute_s=max(ctx.get("dispatch_guard").compute_s, default=0)))
+
     results = [run("weekday", seed, traffic="weekday", warmup_s=0, measure_s=86400,
-                   setup=install_dispatch_standin, out_dir=None) for seed in (1, 2)]
+                   setup=observe, out_dir=None) for seed in (1, 2)]
     again = run("weekday", 1, traffic="weekday", warmup_s=0, measure_s=86400,
-                setup=install_dispatch_standin, out_dir=None)
-    assert again.event_digest == results[0].event_digest and again.blocks == results[0].blocks
+                setup=observe, out_dir=None)
+    assert again.event_digest == results[0].event_digest and again.blocks == results[0].blocks, diagnostics
     for r in results:
         assert r.passed
         assert [b["label"] for b in r.blocks] == [
