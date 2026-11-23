@@ -1,7 +1,7 @@
 """Seeds 1-10 exercise real simulator behavior, with acceptance blockers kept explicit.
 
-Passing these tests proves only the named Safety subcriteria. Full SIM acceptance stays
-BLOCKED in the registry, and metrics_only never returns passed=True.
+SIM-08 enforces both complete runs. Other scenarios retain their named subcriteria
+and explicit branch-local acceptance blockers.
 """
 import pytest
 
@@ -28,14 +28,18 @@ SAFETY_CRITERIA = {
 @pytest.mark.parametrize("sid", SAFETY_CRITERIA)
 def test_safety_subcriteria_on_real_scenarios(sid, seed):
     result = run_scenario(sid, seed, metrics_only=True)
+    if sid == "SIM-08":
+        assert result["ready"] is True and result["passed"] is True, result["criteria"]
+        assert len(result["runs"]) == 2 and len(result["criteria"]) == 18
+        return  # Both complete runs must pass; no selected-subcriterion waiver.
     assert result["ready"] is False and result["passed"] is None
     actual = {c["criterion"]: c for c in result["criteria"]}
     assert SAFETY_CRITERIA[sid] <= actual.keys()
     assert all(actual[c]["passed"] for c in SAFETY_CRITERIA[sid]), result["criteria"]
     # Honest negative evidence: cross-part acceptance is still incomplete. SIM-13 and SIM-15
     # only waited for Part 2 (re-assignment), which is real now: some seeds pass every
-    # criterion, so the negative check stays for SIM-08 and SIM-14 only.
-    if sid in ("SIM-08", "SIM-14"):
+    # criterion, so the negative check stays for SIM-14 only on this branch.
+    if sid == "SIM-14":
         assert any(not c["passed"] for c in actual.values())
 
 

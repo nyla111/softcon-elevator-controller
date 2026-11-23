@@ -32,7 +32,7 @@ Context (bus log, services).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Optional
 
 from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarStatusUpdated,
@@ -312,6 +312,13 @@ for _sid, _check, _waiting in [
 
 SCENARIOS["SIM-08"].runs[0].setup = _part4("_setup_safety_fire")
 SCENARIOS["SIM-08"].runs[0].faults = [fire_alarm(measured(20), 300, reset_after=5)]
+# Acceptance pairing explicitly approved by the task owner: preserve peak traffic
+# and independently require an occupied VIP through the same real fire/recovery path.
+SCENARIOS["SIM-08"].runs.append(replace(
+    SCENARIOS["SIM-08"].runs[0], label="occupied-VIP fire companion", profile="eco_quiet",
+    setup=_part4("_setup_occupied_safety_fire")))
+SCENARIOS["SIM-08"].ready = True
+SCENARIOS["SIM-08"].waiting_for = None
 SCENARIOS["SIM-13"].runs[0].faults = [
     overload_burst("A", measured(minute)) for minute in (20, 22, 24)
 ] + [camera_event("bulky_item", "A", measured(21)),

@@ -1,0 +1,1073 @@
+{
+  "baseline": "2885a9e",
+  "required_runs": 20,
+  "status": "branch evidence only; P3 owner agreement, CI and review required",
+  "peak_vip_lead_s": 22,
+  "occupied_vip_lead_s": 29,
+  "raw_trace_directories": [
+    "part4-sim08-peak-v3-evidence",
+    "part4-sim08-occupied-v4-evidence"
+  ],
+  "runs": [
+    {
+      "run": "peak",
+      "seed": 1,
+      "event_digest": "483433e22e571d5a62fec0e25fbad287f142cc7180af668e3f874d3150514bae",
+      "trace_sha256": "051d4e10fc9a88291aed05365b07c01e0a545600d589f17a69fa9650ef65bd31",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 29, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'H', 'onboard_ids': ['P000926', 'P000932', 'P000934', 'P000941', 'P000951', 'P000954', 'P000955', 'P000958', 'P000971', 'P000975', 'P000976', 'P000983', 'P000990', 'P001004', 'P001006', 'P001009', 'P001010', 'P001012', 'P001014', 'P001020', 'P001025', 'P001027', 'P001031', 'P001033', 'P001038', 'P001040', 'P001042', 'P001043', 'P001049', 'P001050', 'P001051', 'P001052', 'P001055', 'P001056', 'P001057', 'P001058', 'P001059', 'P001060', 'P001062', 'P001063', 'P001064', 'P001065', 'P001068', 'P001071', 'sim08-explicit-vip-1'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=45; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 2,
+      "event_digest": "8d6af503d12bda9cefa1847073de3ee2b7f2c48ce4a3ca157fa8c85d7ca69eff",
+      "trace_sha256": "df13a89451f69d078096c1fe6a5b86bcfe4ff8f06c8ff1d10b67b7c2fa6e9b4e",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000805', 'P000825', 'P000844', 'P000849', 'P000852', 'P000853', 'P000857', 'P000868', 'P000869', 'P000870', 'P000873', 'P000874', 'P000876', 'P000878', 'P000879', 'P000883', 'P000891', 'P000892', 'P000894', 'P000898', 'P000901', 'P000933', 'P000991', 'P001003', 'P001008', 'P001009', 'P001010', 'P001013', 'P001017', 'P001019', 'P001021', 'P001022', 'P001023', 'P001027', 'P001028', 'P001029', 'P001030', 'P001033', 'P001035', 'P001037', 'P001041', 'P001043', 'P001052', 'P001053', 'P001059', 'P001060', 'P001061', 'P001063', 'P001064', 'P001065', 'P001066', 'P001068', 'P001069', 'P001070'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=54; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 3,
+      "event_digest": "6d2e66d97b5f447cee95d132ee8c0c3f3ba8ce3aa181b32a0fb4e9e746f9f96b",
+      "trace_sha256": "42881c3e7c28c3370769039c7f021e9d4c4e5bb785ae1bc0224de953b4b32d88",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'G', 'onboard_ids': ['P000907', 'P000910', 'P000922', 'P000923', 'P000929', 'P000930', 'P000932', 'P000934', 'P000935', 'P000941', 'P000942', 'P000949', 'P000955', 'P000956', 'P000963', 'P000965', 'P000975', 'P000978', 'P000986', 'P000994', 'P001002', 'P001007', 'P001008', 'P001020', 'P001021', 'P001024', 'P001029', 'P001030', 'P001031', 'P001033', 'P001036', 'P001038', 'P001039', 'P001040', 'P001041', 'P001043', 'P001046', 'P001049', 'P001054', 'sim08-explicit-vip-1'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=40; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 4,
+      "event_digest": "2def369018e61c4589b77e5ecb6bfed9fe6dc3ec3f01fed53d0c0eaacf70583f",
+      "trace_sha256": "a2277ca1c8bcc4bbe2c909ba21d6dc2e557fb1abd1fc72c782c3f17ced2ba199",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'G', 'onboard_ids': ['P000838', 'P000853', 'P000859', 'P000870', 'P000875', 'P000889', 'P000898', 'P000900', 'P000901', 'P000907', 'P000914', 'P000915', 'P000919', 'P000922', 'P000924', 'P000926', 'P000932', 'P000939', 'P000940', 'P000942', 'P000946', 'P000966', 'P000974', 'P000975', 'P000976', 'P000984', 'P000985', 'P000986', 'P000989', 'P000991', 'P000992', 'P000993', 'P001001', 'P001002', 'P001006', 'P001010', 'P001013', 'P001015', 'P001017', 'P001018', 'P001032'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=41; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 5,
+      "event_digest": "e4f31546d91e5150a0b69dd78cfa60f5ac2cf2fd93e0f4846a208cbbd6e91ad2",
+      "trace_sha256": "6bc6320f8cc06961010ffb9a3175115ac7d9e5c545aac1afab1a6dc3d2387cbe",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 28, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000905', 'P000909', 'P000912', 'P000917', 'P000920', 'P000922', 'P000926', 'P000930', 'P000932', 'P000935', 'P000939', 'P000940', 'P000943', 'P000945', 'P000948', 'P000949', 'P000951', 'P000952', 'P000954', 'P000956', 'P000957', 'P000961', 'P000963', 'P000964', 'P000965', 'P000966', 'P000968', 'P000969', 'P000970', 'P000971', 'P000972', 'P000973', 'P000974', 'P000975', 'P000976', 'P000977', 'P000978', 'P000979', 'P000981', 'P000982', 'P000983', 'P000984', 'P000985', 'P000986', 'P000987', 'P000988', 'P000989', 'P000990', 'P000991', 'P000992', 'P000993', 'P000994', 'P000995', 'P000999', 'P001001', 'P001004', 'P001008', 'P001009', 'P001010'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=59; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 6,
+      "event_digest": "09ad2df0fba400d4ac7e64aef68c284108f781e3ad5fb34af42c3e3e71f54548",
+      "trace_sha256": "9e498695fa5b41cac78e46dbceccaa2fc180c573caf001167753376bdec6a57c",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000916', 'P000917', 'P000919', 'P000921', 'P000936', 'P000951', 'P000958', 'P000961', 'P000964', 'P000965', 'P000966', 'P000970', 'P000972', 'P000973', 'P000976', 'P000977', 'P000978', 'P000979', 'P000980', 'P000984', 'P000986', 'P000987', 'P000988', 'P000997', 'P000999', 'P001000', 'P001001', 'P001003', 'P001004', 'P001005', 'P001006', 'P001010', 'P001011', 'P001012', 'P001013', 'P001014', 'P001015', 'P001016', 'P001017', 'P001019', 'P001020', 'P001021', 'P001024', 'P001026', 'P001027', 'P001028', 'P001030', 'P001031'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=48; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 7,
+      "event_digest": "16a6c6f798cc790a00079c3b56fe6c51916937dd6d507216f9100f6a0efd928b",
+      "trace_sha256": "5274991a8bc4eb14cf7bdfab4c96d620581193fe139142fb82a99516597b5c9e",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'E', 'onboard_ids': ['P000906', 'P000907', 'P000909', 'P000914', 'P000926', 'P000942', 'P000944', 'P000946', 'P000985', 'P000986', 'P000989', 'P000994', 'P000998', 'P001011', 'P001012', 'P001017', 'P001019', 'P001021', 'P001022', 'P001026', 'P001029', 'P001031', 'P001032', 'P001035', 'P001037', 'P001038', 'P001041', 'P001044', 'P001046', 'sim08-explicit-vip-1', 'P001064'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=31; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 8,
+      "event_digest": "238862cc7dd31b94e1428c7e23cbc330d1cc95c0aa28aac241d0c5a5007980f4",
+      "trace_sha256": "62ddb09f03cb6986b9f25cbddf9b27c8ec243de127c721468b7001e9a1783fd8",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'G', 'onboard_ids': ['P000827', 'P000836', 'P000843', 'P000851', 'P000855', 'P000862', 'P000867', 'P000868', 'P000872', 'P000882', 'P000885', 'P000888', 'P000895', 'P000901', 'P000904', 'P000907', 'P000909', 'P000915', 'P000916', 'P000941', 'P000946', 'P000964', 'P000967', 'P000971', 'P000973', 'P000975', 'P000977', 'P000980', 'P000982', 'P000987', 'P000993', 'P000994', 'P000995', 'P000996', 'P000998', 'P001001', 'P001002', 'P001004', 'P001005', 'P001009', 'P001016', 'P001022', 'P001024', 'P001025', 'P001028', 'P001033', 'P001035', 'P001041', 'P001042', 'P001043', 'P001045', 'P001046', 'P001049', 'P001050', 'P001051', 'P001053', 'P001054', 'P001055', 'P001056', 'P001057', 'P001058', 'P001059', 'P001061', 'P001062', 'P001063', 'P001064', 'P001067', 'P001068', 'P001075'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=69; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 9,
+      "event_digest": "87d15e2f3a9f5b6eaf76744c406b755c678190391f213b2d2b3c6073008208c6",
+      "trace_sha256": "b42b8d648acabb9cb9b54876f7c8ce6081b196f7e572c05b1640e30c0a74f73a",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000900', 'P000907', 'P000913', 'P000916', 'P000919', 'P000920', 'P000922', 'P000923', 'P000927', 'P000931', 'P000932', 'P000935', 'P000940', 'P000941', 'P000942', 'P000944', 'P000948', 'P000949', 'P000951', 'P000976', 'P000977', 'P000980', 'P000981', 'P000983', 'P000988', 'P000992', 'P000995', 'P000996', 'P001000', 'P001003', 'P001004', 'P001005', 'P001006', 'P001016', 'P001018', 'P001020', 'P001021', 'P001024', 'P001026', 'P001029', 'P001031', 'P001032', 'P001033', 'P001035', 'P001036', 'P001037', 'P001038', 'P001039', 'P001044', 'P001045', 'P001046', 'P001053'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=52; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "peak",
+      "seed": 10,
+      "event_digest": "2749d91cabbf0bdaa6a1698aeec8d91198ff8b803c08c92d8d77b2dc39be9e02",
+      "trace_sha256": "e34c2a16159f350a1d3572e158e7033fc0acb5fc55493ecd94e6ac5313c57ab9",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': False, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000906', 'P000915', 'P000919', 'P000921', 'P000926', 'P000929', 'P000930', 'P000931', 'P000932', 'P000933', 'P000935', 'P000937', 'P000940', 'P000941', 'P000942', 'P000943', 'P000944', 'P000945', 'P000946', 'P000947', 'P000948', 'P000949', 'P000950', 'P000951', 'P000952', 'P000953', 'P000955', 'P000956', 'P000957', 'P000958', 'P000959', 'P000960', 'P000961', 'P000962', 'P000964', 'P000965', 'P000966', 'P000967', 'P000968', 'P000969', 'P000970', 'P000971', 'P000972', 'P000973', 'P000974', 'P000975', 'P000976', 'P000977', 'P000980', 'P000981', 'P000982', 'P000986', 'P000994', 'P000995', 'P000998', 'P001002', 'P001005'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=57; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 1,
+      "event_digest": "4488e785482a230135c6a0f58da1c4d801b4ee010b2230dd95ef2e6570f296ba",
+      "trace_sha256": "baf99f4821c484531f6e015ae6a5a3683e8431211de00a33f645e4521358972d",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 29, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000064', 'sim08-explicit-vip-1'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=2; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 2,
+      "event_digest": "ef72a82874147ee0e741d6e79a731a43f3ddc765400d024e00487f2083106044",
+      "trace_sha256": "c86e4de3e14d0b87b15c168ab0bf83ba85c081845ae75741735790c1f917789e",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['P000054', 'sim08-explicit-vip-1', 'P000057'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=3; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 3,
+      "event_digest": "5fa5c5510dab280212ea82a9fef38bb6173c41be1044107992f4f67083c5fe86",
+      "trace_sha256": "c965cd8f835fb47e18d6fd503c4ed470858526337859ffcf2f9c5b13e668c7f1",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'H', 'onboard_ids': ['sim08-explicit-vip-1', 'P000059'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=2; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 4,
+      "event_digest": "2bf5a797a755a177ae482c4045b1014eb7665880ba7a5fe0b2cb2f540e25eef1",
+      "trace_sha256": "abcf5324ebd163bee7f85b5bb629115deceb66dea62e63f1c786e56ef38d16f0",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'H', 'onboard_ids': ['sim08-explicit-vip-1'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=1; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 5,
+      "event_digest": "daef7e9b904e0cb90ee3118d021fb6770903e9bc0ee31787366e0580eae3bbed",
+      "trace_sha256": "430c4768bdb93316d0c304d17c54b01f7f9c5091e2468cd8dea8f497f2531cdc",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 28, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'E', 'onboard_ids': ['sim08-explicit-vip-1'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=1; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 6,
+      "event_digest": "8d2483f4a84e68171ff7461b34ee0ad391e32d64c7ffc28d9f69e8ade84e960c",
+      "trace_sha256": "1756f4408c07148d0236aa1261ca224bcb020a8ae7a0c0e59a441090092c5d8f",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['sim08-explicit-vip-1', 'P000063'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=2; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 7,
+      "event_digest": "2904fc26f8f88f7bf2dc9ad5304a4f4cb02cdcc4a7165e48fe806c50569a3b0e",
+      "trace_sha256": "b17b727dc582043d47e4506c4dff984e4d121461327f60468c3d7f37e81ff8bd",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'E', 'onboard_ids': ['sim08-explicit-vip-1'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=1; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 8,
+      "event_digest": "9547a3be19aabda843ac783dbeb79158cbcec43bc29b437774fba360925751c1",
+      "trace_sha256": "63f51a608afc35ef044cb5d23b0c4ef0345cde3229a68fd99d2dac71ac13a597",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['sim08-explicit-vip-1', 'P000052'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=2; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 9,
+      "event_digest": "a5dfcf694a29fddee92eb80396173fffccb63ce1c7e5d279f6a4e41eea83620c",
+      "trace_sha256": "01e849a20c884e70f9abd88403789f6216f9483c2c7636103f8fdf27986e0c5c",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['sim08-explicit-vip-1', 'P000060', 'P000061'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=3; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    },
+    {
+      "run": "occupied",
+      "seed": 10,
+      "event_digest": "c67f2bf291fcafba4e71ef6bdd42522bdb1ca701cdd4c7d3b68fe3b2d0be128f",
+      "trace_sha256": "cb77a4d957a9e9b504290c19c1dfc6e8c27833867c7eca5ab55f7bb66f9a1439",
+      "criteria": [
+        {
+          "criterion": "fire at 17:00 Rush transition",
+          "passed": true,
+          "detail": "alarm=1800.0"
+        },
+        {
+          "criterion": "real active VIP, onboard passengers and FM-approved goods before alarm",
+          "passed": true,
+          "detail": "{'attempts': [(2101.0, False), (2107.0, True)], 'locked_before': True, 'move': 'gm-0001', 'vip_floor': 30, 'vip_attempts': 1, 'vip_ref': 'sim08-explicit-vip-1', 'onboard_before': True, 'active_vip': True, 'vip_car': 'F', 'onboard_ids': ['sim08-explicit-vip-1', 'P000038'], 'goods_active': True, 'lock_suspended': True, 'locks_restored': True}"
+        },
+        {
+          "criterion": "zero EMS controller commands throughout fire handling",
+          "passed": true,
+          "detail": "attempted=0; assignments=0"
+        },
+        {
+          "criterion": "healthy recovery requires explicit FM confirmation",
+          "passed": true,
+          "detail": "[(2101.0, False), (2107.0, True)]"
+        },
+        {
+          "criterion": "isolated cars remain excluded",
+          "passed": true,
+          "detail": "FaultB; maintenanceC"
+        },
+        {
+          "criterion": "active goods move cancelled without automatic restart",
+          "passed": true,
+          "detail": "1/1 active moves verified using GoodsMoveEnded"
+        },
+        {
+          "criterion": "onboard evacuation and VIP cancellation without automatic restart",
+          "passed": true,
+          "detail": "riders=2; ends=1; restarts=0"
+        },
+        {
+          "criterion": "configured lockdown suspended and restored without erasure",
+          "passed": true,
+          "detail": "P3 draft interface"
+        },
+        {
+          "criterion": "post-confirm healthy service",
+          "passed": true,
+          "detail": "post=True"
+        }
+      ]
+    }
+  ]
+}

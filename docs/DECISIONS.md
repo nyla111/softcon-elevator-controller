@@ -178,3 +178,19 @@ keep their lobby-only mix, so their criteria and results are unchanged.
 maximum 108 s -> 129 s, average ride unchanged (71 s). Part of the rise is that a passenger
 who changes at the lobby counts as two calls. Basement service has a cost at the morning
 peak; it is reported, not hidden.
+
+## D-09 Paired SIM-08 acceptance evidence
+
+23 November 2026: the task owner explicitly approved two required runs per seed1–10.
+The original35/min up-peak run starts16:30 and raises fire at17:00 with real goods,
+an active VIP (possibly awaiting pickup) and ordinary riders onboard. A second full
+real-service quiet run requires that the VIP is actually onboard at the alarm.
+Both independently require actual lobby evacuation, VIP/goods cancellation without
+automatic restart, no EMS commands during fire/recovery, isolated-car exclusion,
+retained lockdown configuration and explicit FM recovery followed by real service.
+Both must pass; this does not lower default traffic or waive any safety assertion.
+The genuine VIP is submitted22s before fire in the peak run to keep the real no-show
+window active; the quiet companion uses29s to allow actual boarding. Each workload's
+lead time is fixed across all seeds. No timer, selection rule or controller is bypassed.
+P3's effective lockdown integration remains an owner-review draft (#92).
+This test-design decision does not approve any FR-52 commissioning value or contract.

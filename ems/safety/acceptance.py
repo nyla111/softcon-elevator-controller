@@ -52,10 +52,13 @@ def _reassignment_check(ctx, incidents):
 
 
 def _setup_safety_fire(ctx):
-    install_dispatch_standin(ctx)
-    states = ctx.services["car_states"]
-    states.request("B", CarState.MAINTENANCE, "scenario:maintenance")
-    states.request("C", CarState.INDEPENDENT_SERVICE, "scenario:independent")
+    from .scenario_fire import setup_sim_08
+    return setup_sim_08(ctx)
+
+
+def _setup_occupied_safety_fire(ctx):
+    from .scenario_fire import setup_occupied_sim_08
+    return setup_occupied_sim_08(ctx)
 
 
 def _setup_safety_brake(ctx):
@@ -95,29 +98,9 @@ def _fire_goods_check(ctx, alarm) -> tuple[str, bool, str]:
             if active else "BLOCKED: no active goods move exercised by this scenario setup")
 
 
-def check_sim_08(result: RunResult, ctx) -> Criteria:
-    alarms = ctx.bus.of_type(safety_events.FireAlarm)
-    clears = ctx.bus.of_type(safety_events.FireAlarmCleared)
-    states = ctx.services["car_states"]
-    sim = ctx.services["controllers"]
-    recovery = states.recovery_log
-    start = alarms[0].t if alarms else float("inf")
-    end = recovery[0][0] if recovery else ctx.clock.now() + 1
-    commands = [c for c in sim.command_log if start <= c[0] < end]
-    return [
-        ("fire at 17:00 Rush transition", bool(alarms) and start == measured(20)
-         and result.start.endswith("16:30:00"), f"alarm t={start}"),
-        ("zero EMS controller commands throughout fire handling", bool(alarms) and not commands,
-         f"{len(commands)} attempted (including refused)"),
-        ("healthy recovery requires explicit FM confirmation", bool(clears) and bool(recovery)
-         and end >= clears[-1].t, "FM UI/controller-normal integration absent" if not recovery
-         else f"confirmed at {end}"),
-        ("isolated cars remain excluded", states.state("B") is not CarState.GROUP_SERVICE
-         and states.state("C") is not CarState.GROUP_SERVICE
-         and not ({"B", "C"} & set(states.dispatchable("LOW"))), "Maintenance B; Independent C"),
-        (_fire_goods_check(ctx, alarms[0]) if alarms else
-         ("active goods move cancelled without automatic restart", False, "no fire exercised")),
-    ]
+def check_sim_08(results, contexts) -> Criteria:
+    from .scenario_fire import check_paired_sim_08
+    return check_paired_sim_08(results, contexts)
 
 
 def check_sim_13(result: RunResult, ctx) -> Criteria:

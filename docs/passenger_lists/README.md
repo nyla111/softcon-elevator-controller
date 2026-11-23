@@ -62,7 +62,7 @@ tests are separate from passenger-list coverage; registry readiness was not chan
 
 | Scenario | File | Status | Remaining acceptance |
 |---|---|---|---|
-| SIM-08 | `pending/sim08_fire_recall.csv` | Preserved from merged [#44](https://github.com/nyla111/softcon-elevator-controller/pull/44) | Historical notes refer to #26; post-FM recovery is absent from this fixture. No duplicate or promotion in this change. |
+| SIM-08 | `sim08_fire_recall.csv` | This branch exercises actual controller reset, explicit FM confirmation and post-confirmation delivery | Complete paired registry tests additionally enforce command windows, VIP/goods cancellation, lockdown and all onboard lobby alighting; all10 paired seeds are required, not just CSV row outcomes. |
 | SIM-14 | `pending/sim14_power_loss.csv` | Blocked by [#55](https://github.com/nyla111/softcon-elevator-controller/issues/55) | FR-110 failed generator and one silent rescue device cannot be selected through CSV. FR-111/FR-55 dispatch windows need trace verification. |
 | SIM-15 | `pending/sim15_brake_fault.csv` | Blocked by [#55](https://github.com/nyla111/softcon-elevator-controller/issues/55) | Generic fault reports between-floor entrapment, but explicit brake code cannot be selected. FR-112/NFR-R4 command windows and queue retention need trace verification. |
 | SIM-16 | `sim16_link_loss.csv` | Active, preserved | Existing FR-104 coverage; no duplicate. |
