@@ -90,6 +90,9 @@ class FloorAccess:
             return
 
         # Step 4: Set priority
+        if not self.actions.admit(event.credential_id, event.panel_id, event.origin,
+                                  event.destination, permission, assistance=event.accessible):
+            return
         if event.accessible:
             priority = CallPriority.ACCESSIBLE
         elif event.vip:

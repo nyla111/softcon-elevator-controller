@@ -67,7 +67,7 @@ class InCarAccess:
 
         return True
 
-    def press_floor(self, car_id, destination):
+    def press_floor(self, car_id, destination, *, action_id=None):
         """Check authorization and register an in-car stop."""
 
         # STEP 1: Check floor number
@@ -147,6 +147,18 @@ class InCarAccess:
                 return False
 
         # STEP 6: Register stop with this car's controller
+        # AccessManager installs the runtime policy; standalone FR-48 component
+        # adapters retain their original constructor contract for owner unit tests.
+        actions = getattr(self.floor_access, "actions", None)
+        if actions is not None:
+            if self.ctx.get("car_states").safety_active():
+                return False  # No EMS request, including an eventual controller refusal.
+            replay = actions.replay(action_id, car_id, destination, credential_id)
+            if replay is not None:
+                return replay
+            origin = self.ctx.get("controllers").status(car_id).floor
+            if not actions.admit(credential_id, f"car:{car_id}", origin, destination, permission):
+                return False
         self.next_stop_id += 1
         stop_id = f"car-{car_id}-{self.next_stop_id}"
 
@@ -160,6 +172,8 @@ class InCarAccess:
 
         if not accepted:
             return False
+        if actions is not None:
+            actions.registered(car_id, destination, credential_id, stop_id, action_id)
 
         # STEP 7: Log accepted credential-based stop
         if (

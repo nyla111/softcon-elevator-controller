@@ -61,6 +61,8 @@ class FloorSelection:
             )
             return None
 
+        if not self.floor_access.actions.admit(credential_id, panel_id, origin, destination, permission):
+            return None
         self.next_panel_call_id += 1
         call_id = f"panel-{self.next_panel_call_id}"
 
@@ -126,6 +128,9 @@ class FloorSelection:
             return False
 
         # Create a replacement, preserving the wait start time
+        if not self.floor_access.actions.admit(old_call.credential_id, old_call.panel_id,
+                                              old_call.origin, new_floor, permission):
+            return False
         new_call = Call(
             call_id=f"{call_id}-replacement",
             origin=old_call.origin,
