@@ -69,8 +69,8 @@ def vip_candidates(statuses: Iterable[CarStatus], origin: Floor,
 
 def medical_candidates(statuses: Iterable[CarStatus], origin: Floor,
                        waiting_here: frozenset | set = frozenset()) -> list[CarStatus]:
-    """FR-127: fastest healthy car; cars without riders first (riders are carried along and
-    delivered afterwards), then cars nobody is waiting for at the medical floor (they would
+    """FR-127: fastest healthy car; empty first (occupied cars must deliver existing riders
+    before medical reassignment), then cars nobody is waiting for at the medical floor (they would
     board while the doors are held for the patient)."""
     return sorted(statuses, key=lambda s: (s.passengers > 0, s.car_id in waiting_here,
                                            eta_s(s, origin), s.car_id))
