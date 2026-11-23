@@ -57,6 +57,11 @@ for the real 24-hour check. Use `python -m ems.sim.long_run --months 1 --seed 1`
 `--months 6` for the calendar-window evidence. The 24-hour run still has a maximum wait of
 196 s, so the existing maximum-wait gap remains open.
 
+An additional seven-day run on seed 1 (2026-12-01 through 2026-12-07) measured LOW
+**0.097%** and HIGH **0.247%** imbalance. Both are below 2% at that point in the month;
+the full monthly and six-month windows are still being measured. Weekday average waits
+were 22.4–23.1 s; the weekend days averaged 8.3–13.2 s.
+
 For a new call each candidate car is replayed with and without it. Cost:
 
 ```
