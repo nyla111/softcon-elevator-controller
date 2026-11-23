@@ -77,8 +77,12 @@ claim (2), PR16-04 fire recovery without a service group (1). These require Part
 | Part 3 Access | Pre-acceptance action ID, kind and exemption classification plus proven duplicate correlation and waiting/boarded status; optional lockdown suspend/resume. |
 | FR-52 generator operation | Approved capacity/allocation, per-car enable acknowledgement and parking completion, readiness withdrawal/failure, and episode-correlated rescue reports. Limited operation/sequential parking is unimplemented; the simulator currently resumes all physical cars on `GeneratorReady`. |
 
-`call_policy.py` independently enforces five ordinary actions per rolling 60 s, rejecting
-the sixth, with exit/assistance/fire exemptions. Duplicate removal requires same-action
+`call_policy.py` independently allows five ordinary actions per rolling 60 s; the sixth
+starts a fixed 60 s block. Denied repeats do not extend it. `evaluate()` returns an
+immutable decision with bilingual refusal text and retry time; `allow()` remains a
+boolean wrapper. The third episode per simulated calendar day invokes the security-log
+owner's callback once. Midnight resets daily counts, not an active block. Exit/assistance/
+fire actions remain exempt and consume no quota. Duplicate removal requires same-action
 proof, waiting status, no boarding and no uncertainty. These policies await Access admission
 integration; Safety does not filter already accepted `CallRequested` events.
 
