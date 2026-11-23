@@ -8,10 +8,10 @@ presentation deadline 25 Nov. Shared proposals are in safety_integration_proposa
 |---|---|---|---|---|
 | T1 | FR-110 / VER-10 | P4 | PR #85, 15739ff, CI test+Docker passed; review requested from P1 | Required approval and authorized squash merge; 36 new / 269 focused tests, 22 scenario+Priority tests pass; context in T2 |
 | T2 | FR-53/110 / NFR-R4 | P4/P6 | #80; PR #86 timestamped scalar notification snapshots; CI passed | Six red regressions; 205 focused passes; review/merge pending |
-| T3 | NFR-SF3 / FR-50 | P4/P6 | #81; PR #87 episode alert and deduplication | Three red regressions and stale guard; 197 focused passes; latest CI/review pending; weekday digest failure under investigation |
+| T3 | NFR-SF3 / FR-50 | P4/P6 | #81; PR #87 episode alert and deduplication | Three red regressions and stale guard; 197 focused passes; CI blocked by confirmed wall-clock fallback divergence #101; review pending |
 | T4 | FR-52 / VER-10 | P4/P1/P2/lead | #46; existing primitive only; concrete shared proposal prepared | Approved commissioning/readiness/permission/ack contract, real runtime and complete boundary evidence |
 | T5 | SIM-08 / FR-50/55 | P4/P3/P5 | #61/#33; full real-service paired acceptance in progress | User approved unchanged default peak plus controlled occupied-VIP companion; both must pass every seed1-10; #92 P3 agreement pending |
-| T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; PR #94/#95 active fixtures and complete registry each pass seeds1-10 | Corrected HTTP readiness tests pushed; latest CI/review/merge pending |
+| T6 | SIM-14/15 / FR-110/111/112 | P4/P1 | #33/#55; PR #94/#95 active fixtures and complete registry each pass seeds1-10 | #94 CI passed; #95 latest CI pending; review/merge pending |
 | T7 | SIM-13/15 / FR-100/84/04 | P4/P2/P5/P6 | #61/#32; PR #97/#98/#99 and #95; full all10-seed traces pass | P2/P5 overload and P6 camera-review owner agreement; CI/review/merge |
 | T8 | FR-121 / NFR-P6 | P4/P3 | #82; PR #90 corrected fixed cooldown/calendar episodes; CI passed | Four red regressions; 127 Safety passes; runtime #96; review/merge |
 | T9 | FR-125/120/121/122 / BR-07 / SIM-17 | P3/P2/P4/lead | #61; user selected implementation; runtime draft #96, full acceptance draft #100 | 177 Access/policy tests and all10 SIM-17 seeds pass; P3 owner/interface agreement, CI/review/merge |
@@ -30,11 +30,15 @@ agreement remains required before merge.
 New branch evidence: full SIM-13 (#99), SIM-14 (#94), SIM-15 (#95) and SIM-17 (#100)
 each pass all10 seeds locally. This updates branch evidence only; the audited main
 classifications below remain unchanged until integrated acceptance. SIM-08 paired
-runs are still pending and receive no promotion.
+runs are still pending and receive no promotion. All10 occupied-VIP companion runs pass;
+default peak seed1 passes, with remaining default runs in progress. Full checker diagnostic
+seed42 additionally passes for SIM-13, SIM-14, SIM-15 and SIM-17.
 
-PR #87 preserves the weekday digest assertion and real dispatch timeout. Two local
-full-day runs have identical digests without fallback; CI root cause is not confirmed.
-Added diagnostics retain actual fallback reasons and maximum compute time. One local
+PR #87 preserves the weekday digest assertion and real dispatch timeout. New CI evidence
+confirms the repeated seed1 run triggered FR-105 fallback at1.579471202s, whereas the
+first run did not; event digests differ. #101 owns P1/P2 investigation of the transient
+slowness and repeatability contract. Two local full-day runs have identical digests
+without fallback; this does not negate CI evidence. One local
 full suite had846 passes,2 skips,21 xfails,3 xpasses and37 temporary-folder permission
 errors: this is not a clean pass. Subsequent local full suites need workspace basetemp.
 
