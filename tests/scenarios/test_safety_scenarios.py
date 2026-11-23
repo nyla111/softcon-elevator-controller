@@ -28,9 +28,9 @@ SAFETY_CRITERIA = {
 @pytest.mark.parametrize("sid", SAFETY_CRITERIA)
 def test_safety_subcriteria_on_real_scenarios(sid, seed):
     result = run_scenario(sid, seed, metrics_only=True)
-    if sid == "SIM-15":
+    if sid in ("SIM-14", "SIM-15"):
         assert result["ready"] is True and result["passed"] is True, result["criteria"]
-        return  # All criteria now enforced, including non-vacuous reassignment.
+        return  # Full checker is now enforced; no selected-subcriterion waiver.
     assert result["ready"] is False and result["passed"] is None
     actual = {c["criterion"]: c for c in result["criteria"]}
     assert SAFETY_CRITERIA[sid] <= actual.keys()
@@ -38,7 +38,7 @@ def test_safety_subcriteria_on_real_scenarios(sid, seed):
     # Honest negative evidence: cross-part acceptance is still incomplete. SIM-13 and SIM-15
     # only waited for Part 2 (re-assignment), which is real now: some seeds pass every
     # criterion, so the negative check stays for SIM-08 and SIM-14 only.
-    if sid in ("SIM-08", "SIM-14"):
+    if sid == "SIM-08":
         assert any(not c["passed"] for c in actual.values())
 
 

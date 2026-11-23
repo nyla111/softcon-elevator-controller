@@ -9,7 +9,17 @@ from ems.sim.faults import measured
 from ems.sim.harness import RunResult
 from ems.sim.scripted import ScriptedTraffic, ScriptedTrip
 
+from . import scenario_power
+
 Criteria = list  # of (criterion, passed, detail)
+
+
+def setup_sim_14(ctx):
+    return scenario_power.setup_sim_14(ctx)
+
+
+def check_sim_14(result, ctx):
+    return scenario_power.check_sim_14(result, ctx)
 
 
 # ---------------------------------------------------------------- Part 4 checks
@@ -174,36 +184,6 @@ def check_sim_13(result: RunResult, ctx) -> Criteria:
          "Part 2 owns overload messages and next-car selection"),
         _reassignment_check(ctx, overloads),
         ("both bulky items flagged by Monitor", flagged, f"{len(bulky)} bulky events"),
-    ]
-
-
-def check_sim_14(result: RunResult, ctx) -> Criteria:
-    losses = ctx.bus.of_type(safety_events.MainsLost)
-    restores = ctx.bus.of_type(safety_events.MainsRestored)
-    reports = ctx.bus.of_type(safety_events.RescueReport)
-    alerts = ctx.bus.of_type(AlertRaised)
-    lost_at = losses[0].t if losses else float("inf")
-    valid = {r.car_id for r in reports if r.status == "rescued_at_floor"
-             and lost_at <= r.t <= lost_at + 60}
-    cars = set(ctx.services["car_states"].table.cars())
-    missing = cars - valid
-    warned = {a.car_id for a in alerts if a.kind == "entrapment" and a.severity == "critical"
-              and "POSSIBLE ENTRAPMENT" in a.message and lost_at <= a.t <= lost_at + 60}
-    service = ctx.services["car_states"]
-    recovery = service.recovery_log
-    premature = [e for e in ctx.bus.of_type(safety_events.CarStateChanged)
-                 if losses and e.t >= lost_at and e.new is CarState.GROUP_SERVICE
-                 and (not recovery or e.t < recovery[0][0])]
-    return [
-        ("failed generator and exactly one rescue report missing", bool(losses) and len(missing) == 1
-         and not ctx.bus.of_type(safety_events.GeneratorReady), f"missing={sorted(missing)}"),
-        ("POSSIBLE ENTRAPMENT for every missing rescue by 60 s", bool(missing) and missing <= warned,
-         f"warned={sorted(warned)}"),
-        ("no automatic healthy recovery", bool(restores) and not premature,
-         f"{len(premature)} premature state changes"),
-        ("FM-confirmed recovery after 120 s continuous mains", bool(recovery) and bool(restores)
-         and recovery[0][0] >= restores[-1].t + 120,
-         "BLOCKED: no FM UI/controller-normal integration" if not recovery else str(recovery)),
     ]
 
 
