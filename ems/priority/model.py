@@ -52,3 +52,12 @@ class VipGrant:
     trips_per_day: Optional[int] = None
     revoked: bool = False
     used: dict = field(default_factory=dict)       # date iso -> exclusive trips started
+
+
+@dataclass
+class PendingMedical:
+    trip_id: str
+    car_id: CarId
+    origin: Floor
+    destination: Floor
+    remaining: dict[CallId, Floor]
