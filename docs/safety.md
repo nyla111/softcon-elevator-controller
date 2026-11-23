@@ -110,3 +110,13 @@ pytest tests/scenarios tests/sim/test_scenarios_registry.py -q
 pytest -q
 ruff check --select E9,F63,F7,F82 .
 ```
+
+## SIM-14 complete failed-generator acceptance
+The registry now enforces the complete seven-criterion real-service SIM-14 checker.
+It selects a genuinely occupied silent-rescue car, delivers current-context entrapment
+by60s, records every attempted command and assignment through FM recovery, retains
+waiting clocks, exercises early refusal/120s stable mains/clear-normal reports, excludes
+a faulted car and proves post-confirm delivery. Seeds1-10 pass individually, with raw
+traces and companion active CSV evidence. See tests/safety/test_sim14_journey.py and
+docs/passenger_lists/issue33_evidence.md. These are branch results pending review/CI/merge;
+FR52 successful-generator limited operation is a separate outstanding requirement.
