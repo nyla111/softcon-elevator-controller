@@ -198,9 +198,11 @@ def check_sim_15(result: RunResult, ctx) -> Criteria:
     ]
 
 
-def check_sim_17(result: RunResult, ctx) -> Criteria:
-    # CallRequested is post-acceptance and has no action id / exemption / duplicate proof.
-    # Local policy unit tests are not evidence that real panels enforce this scenario.
-    return [("proven duplicates, uncertain retention, sixth-action limit and exemptions", False,
-             ("BLOCKED: Access action admission and duplicate-proof contract absent; "
-              "ems.safety.call_policy is independently tested but not connected"))]
+def setup_sim_17(ctx):
+    from .scenario_admission import setup_sim_17 as setup
+    return setup(ctx)
+
+
+def check_sim_17(result, ctx):
+    from .scenario_admission import check_sim_17 as check
+    return check(result, ctx)
