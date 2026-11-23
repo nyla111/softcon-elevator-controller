@@ -86,8 +86,10 @@ flagged. FR-122 cancellation requires an observed full door cycle with reliable 
 that nobody boarded that hall call; uncertainty is retained. Record cancellation once
 as an action under FR-121, exempting exit and assistance.
 
-Decision needed: implement FR-120/122 and this admission interface, or explicitly defer
-those optional features. FR-121 helper correction is requested independently. Mandatory
+Scope decision recorded from the task owner: implement FR-120/122, with actual runtime
+integration and meaningful acceptance tests. Draft #96 implements this proposal; #100
+provides complete SIM-17 seed evidence. P3 owner/interface approval remains a merge gate.
+FR-121 helper correction is requested independently. Mandatory
 FR-125/BR-07 real-entry-point evidence cannot be deferred. SIM-17 is not N/A by default.
 Acceptance: 20 ordinary actions, sixth-action and midnight boundaries, proven and
 uncertain cases, delivered refusal and third-episode notice, real exemption entry points.
@@ -117,6 +119,17 @@ Propose implementation: observe independent mechanical fault episodes, count a n
 episode only after a matching clear ends the previous one, and send FM a review notice
 when the rolling 30-day count crosses from fewer than three to at least three. Duplicate
 fault/telemetry messages do not add episodes. Use the simulated clock and per-car data.
-P5 retains per-episode FR-30 notification ownership. Team must confirm count/window
-boundaries and implementation scope. Alternative: explicit Should deferral under VER-15;
-record it without claiming implementation or confusing it with FR-30.
+P5 retains per-episode FR-30 notification ownership. The task owner selected implementation,
+not deferral: PR #91 implements independent fault episodes and an inclusive rolling30d
+threshold with runtime tests. Review the window/interface in that PR before merge.
+
+## SIM-08 evidence pairing
+
+The task owner explicitly approved two mandatory full real-service runs per seed1–10:
+the default35/min up-peak Rush-transition/fire scenario, and a controlled quiet companion
+requiring an actual occupied VIP at the alarm. The default may have an active VIP waiting
+for pickup while ordinary riders are onboard. Both runs independently require goods
+cancellation, zero EMS commands during fire handling, actual onboard evacuation, no
+restart of the interrupted VIP, isolated-car exclusion, retained lockdown configuration
+and explicit FM recovery followed by real service. Neither run substitutes for the other.
+No production rule or safety assertion is relaxed. Paired results remain pending.
