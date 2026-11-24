@@ -23,15 +23,34 @@ car during a building emergency or locked recovery. Dispatch must consult this a
 
 | Input | Safety behaviour |
 |---|---|
-| Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
+| Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. I/O loss also sends one `fire_io_loss` notification per recovery episode, including when a panel alarm came first. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
 | Firefighter service | Keep normal service and recovery blocked while active; controllers retain physical authority. |
 | Mains loss | Latch Emergency Power, request waiting-call reassignment, show power messages. Fire Recall still wins. `GeneratorReady` does not reopen EMS dispatch. |
-| Missing/stuck rescue without a ready generator | One critical POSSIBLE ENTRAPMENT alert per affected car by 60 s. |
+| Missing/stuck rescue report | One critical POSSIBLE ENTRAPMENT alert per affected car by 60 s, even after generator readiness or mains restoration. |
 | Fault or heartbeat loss | Independent Faulted holds; only matching clear/restored events release them. Faults under emergency precedence survive recovery. |
 | Occupied between-floor/stuck-door fault; alarm button | Critical entrapment/assistance alerts to security, FM and contractor. Part 5 owns mechanical-fault notifications. |
 
 Timing uses the simulated clock. Older physical assertions/clears are rejected; equal
 timestamps follow bus order because contracts have no episode/sequence identifier.
+
+The fire-I/O notification is emitted after fire holds are established. Clear/reset alone
+does not reset its deduplication: only successful FR-55 FM recovery ends the episode.
+`tests/safety/test_fire_io_alert.py` checks actual inbox delivery, repeated/stale signals,
+panel-first loss, recovery and every attempted controller command (NFR-SF3, #81).
+
+FR-110 rescue evidence is per car and power episode. Generator readiness and mains
+restoration do not prove rescue. At the 60 s deadline, every car without a current
+`rescued_at_floor` report alerts, including unknown occupancy; a `stuck` report alerts
+immediately. A newer outage supersedes the old timer and resets alert deduplication.
+Late rescue reports do not erase notifications already delivered. Regression evidence:
+`tests/safety/test_rescue_deadline.py` (#46).
+
+Car-specific notifications include the last timestamped, connected controller report's
+floor, load, passenger estimate and telemetry time/age in delivered message text, plus
+the structured floor when known (FR-53/110, #80). Cached values are scalar snapshots;
+older/future reports and disconnected payloads cannot overwrite them. With no report,
+context is explicitly unknown; no adapter timestamp or occupancy is invented. See
+`tests/safety/test_alert_context.py` for notifier-inbox evidence.
 
 ## Recovery gate
 
@@ -49,6 +68,14 @@ restart. Current demo clear/reset controls therefore leave EMS held until adapte
 FM confirmation are connected. These internal methods are not authenticated UI endpoints.
 
 ## Integration dependencies and incomplete acceptance
+
+FR-113 is implemented by the mechanical-fault hold owner: the third independent episode
+in a trailing 30-day window sends the FM a review notice. The exact 30-day boundary is
+included. Duplicate assertions/statuses and link loss do not count; a matching fault
+clear is required before another episode. Further episodes while already at/above three
+do not spam notices; the threshold may notify again after old episodes age out. P5 keeps
+FR-30 per-episode alerts. See `tests/safety/test_fault_review.py`; the window convention
+and cross-owner integration remain subject to owner review in #88.
 
 Part 5 is merged and exercised directly in `tests/integration/test_safety_priority.py`.
 Seven strict xfails track [issue #18](https://github.com/nyla111/softcon-elevator-controller/issues/18):
@@ -88,3 +115,13 @@ pytest tests/scenarios tests/sim/test_scenarios_registry.py -q
 pytest -q
 ruff check --select E9,F63,F7,F82 .
 ```
+
+## SIM-14 complete failed-generator acceptance
+The registry now enforces the complete seven-criterion real-service SIM-14 checker.
+It selects a genuinely occupied silent-rescue car, delivers current-context entrapment
+by60s, records every attempted command and assignment through FM recovery, retains
+waiting clocks, exercises early refusal/120s stable mains/clear-normal reports, excludes
+a faulted car and proves post-confirm delivery. Seeds1-10 pass individually, with raw
+traces and companion active CSV evidence. See tests/safety/test_sim14_journey.py and
+docs/passenger_lists/issue33_evidence.md. These are branch results pending review/CI/merge;
+FR52 successful-generator limited operation is a separate outstanding requirement.
