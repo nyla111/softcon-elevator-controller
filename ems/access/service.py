@@ -16,6 +16,7 @@ from .group_qr_pass import GroupQR
 from .access_logging import AccessLogging
 
 from .in_car_access import InCarAccess
+from .action_policy import AccessActions
 
 
 class AccessManager:
@@ -31,6 +32,8 @@ class AccessManager:
             self.floor_access,
             self.access_logging
         )
+        self.actions = AccessActions(ctx, self)
+        self.floor_access.actions = self.actions
 
     # API required by the shared AccessService protocol
     def permission(self, credential_id):
@@ -110,7 +113,16 @@ class AccessManager:
         )
 
     # FR-48: Press a floor button inside a car
-    def press_car_floor(self, car_id, destination):
+    def press_car_floor(self, car_id, destination, *, action_id=None):
         return self.in_car_access.press_floor(
-            car_id, destination
+            car_id, destination, action_id=action_id
         )
+
+    def begin_car_action(self, car_id):
+        return self.actions.begin_car_action(car_id)
+
+    def cancel_action(self, credential_id, ref):
+        return self.actions.cancel(credential_id, ref)
+
+    def request_hall_call(self, credential_id, panel_id, origin, destination, group):
+        return self.actions.request_hall(credential_id, panel_id, origin, destination, group)

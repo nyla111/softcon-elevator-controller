@@ -65,7 +65,7 @@ tests are separate from passenger-list coverage; registry readiness was not chan
 
 | Scenario | File | Status | Remaining acceptance |
 |---|---|---|---|
-| SIM-08 | `pending/sim08_fire_recall.csv` | Preserved from merged [#44](https://github.com/nyla111/softcon-elevator-controller/pull/44) | Historical notes refer to #26; post-FM recovery is absent from this fixture. No duplicate or promotion in this change. |
+| SIM-08 | `sim08_fire_recall.csv` | This branch exercises actual controller reset, explicit FM confirmation and post-confirmation delivery | Complete paired registry tests additionally enforce command windows, VIP/goods cancellation, lockdown and all onboard lobby alighting; all10 paired seeds are required, not just CSV row outcomes. |
 | SIM-14 | `sim14_power_loss.csv` | Full fixture + registry checks pass seeds1-10 on the acceptance branch | Actual failed generator/silent occupied car, exact60s context delivery, no attempted commands/assignments before FM,120s stability, early-refusal and isolated-car exclusion; review/CI/merge pending. |
 | SIM-15 | `sim15_brake_fault.csv` | Full fixture/registry checks pass seeds1-10 on acceptance branch | Explicit occupied moving brake, nonempty original waiting set, healthy reassignment and exact command/alert windows; owner review and CI pending. |
 | SIM-16 | `sim16_link_loss.csv` | Active, preserved | Existing FR-104 coverage; no duplicate. |
