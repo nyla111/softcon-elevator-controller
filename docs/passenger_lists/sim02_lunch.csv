@@ -1,0 +1,10 @@
+# start=11:30
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,12,1,,,,lunch-1,,,,delivered,60,SIM-02 FR-10 Rush at lunch: down to the lobby
+5,20,1,,,,lunch-2,,,,delivered,60,SIM-02 FR-10 high-rise down call
+10,1,6,,,,lunch-3,,,,delivered,60,SIM-02 FR-10 up call during the lunch two-way peak
+15,25,1,,,,lunch-4,,,,delivered,60,SIM-02 FR-10 Rush ceiling 60 s
+20,1,17,,,,lunch-5,,,,delivered,60,SIM-02 FR-10 up and down traffic together
+25,9,1,,,,lunch-6,,,,delivered,60,SIM-02 FR-10 Rush ceiling 60 s
+30,1,28,,,,lunch-7,,,,delivered,60,SIM-02 FR-10 Rush ceiling 60 s
+40,14,1,,,,lunch-8,,,,delivered,60,SIM-02 FR-10 Rush ceiling 60 s

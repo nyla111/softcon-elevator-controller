@@ -1,0 +1,12 @@
+# start=07:00
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,5,,,,up-1,,,,delivered,60,SIM-01 FR-10 Rush ceiling 60 s: low-rise lobby call in the morning peak
+4,1,9,,,,up-2,,,,delivered,60,SIM-01 FR-01 destination call to the low-rise group
+8,1,12,,,,up-3,,,,delivered,60,SIM-01 FR-02 one car per hall call
+12,1,18,,,,up-4,,,,delivered,60,SIM-01 FR-01 high-rise group served from the lobby
+15,1,22,,,,up-5,,,,delivered,60,SIM-01 BR-01 grouped with nearby destinations in the high-rise group
+18,1,25,,,,up-6,,,,delivered,60,SIM-01 FR-10 Rush ceiling 60 s
+22,1,7,,,,up-7,,,,delivered,60,SIM-01 FR-10 Rush ceiling 60 s
+26,1,29,,,,up-8,,,,delivered,60,SIM-01 FR-10 Rush ceiling 60 s
+30,8,1,,,,down-1,,,,delivered,60,SIM-01 FR-01 inter-traffic: down call during the up-peak
+40,1,14,,,,up-9,,,,delivered,60,SIM-01 FR-10 Rush ceiling 60 s

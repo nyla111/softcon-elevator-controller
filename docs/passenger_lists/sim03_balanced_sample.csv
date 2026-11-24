@@ -1,0 +1,10 @@
+# start=13:30
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,8,,,,bal-1,,,,delivered,90,SIM-03 FR-10 Balanced ceiling 90 s
+10,15,1,,,,bal-2,,,,delivered,90,SIM-03 FR-10 Balanced down call
+20,1,21,,,,bal-3,,,,delivered,90,SIM-03 FR-10 Balanced high-rise up call
+30,26,1,,,,bal-4,,,,delivered,90,SIM-03 FR-10 Balanced ceiling 90 s
+40,1,11,,,,bal-5,,,,delivered,90,SIM-03 FR-10 Balanced low-rise up call
+50,27,1,,,,bal-6,,,,delivered,90,SIM-03 FR-10 Balanced high-rise down call
+60,1,13,,,,bal-7,,,,delivered,90,SIM-03 FR-10 Balanced ceiling 90 s
+75,22,1,,,,bal-8,,,,delivered,90,SIM-03 FR-10 Balanced ceiling 90 s
