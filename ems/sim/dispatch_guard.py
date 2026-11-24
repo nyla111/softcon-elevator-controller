@@ -18,6 +18,14 @@ use in the EMS: FR-105 is about how long the computation takes on the machine, n
 simulated time, so ctx.clock cannot measure it. It never changes simulated time, but a slow
 machine could in principle turn a normal answer into a fallback.
 
+Timing model (#101): the measured time is the plug-in's own computation. Python's automatic
+cyclic garbage collector is paused while the engine runs and resumed right after, so a full
+collection of the whole process (a 24 h run keeps about 2.7 million objects, mostly the event
+log; one generation-2 pass took 0.24-0.58 s locally and 1.58 s on CI) can no longer land inside
+the timed call and be blamed on the engine. The engine only creates short-lived objects, freed
+by reference counting; anything cyclic is collected after the call. A genuinely slow engine is
+still timed and still replaced by the nearest-car rule after 1 s.
+
 Alerts: the first fallback of an outage publishes AlertRaised(high, "dispatch_fallback", ["fm"]);
 more fallbacks in the same outage are silent. When the engine answers normally again, an info
 AlertRaised "dispatch_recovered" is published. Counters: calls, fallbacks. log has one entry per
@@ -25,6 +33,7 @@ call: (t, call_id, car_id, used_fallback, reason).
 """
 from __future__ import annotations
 
+import gc
 import time
 from typing import Optional
 
@@ -72,12 +81,18 @@ class DispatchGuard:
         """(answer, None) when the engine answered well, else (None, reason)."""
         if self.crashed:
             return None, "plug-in crashed"
+        paused = gc.isenabled()                # timing model, see module docstring
+        if paused:
+            gc.disable()
         started = time.perf_counter()          # real time on purpose, see module docstring
         try:
             answer = engine.choose_car(call, cars, mode)
         except Exception as exc:               # any plug-in failure counts
             self.compute_s.append(time.perf_counter() - started)
             return None, f"plug-in raised {type(exc).__name__}"
+        finally:
+            if paused:
+                gc.enable()
         elapsed = time.perf_counter() - started
         self.compute_s.append(elapsed)
         if elapsed > self.timeout_s:
