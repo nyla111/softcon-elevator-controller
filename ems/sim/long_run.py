@@ -34,7 +34,9 @@ from .traffic import TrafficGenerator, schedule_segments
 
 DAY_S = 86400.0
 MONTH_DAYS = 30
-RETAIN_S = (MONTH_DAYS + 1) * DAY_S
+# Wear counters are held by Part 5; completed per-call diagnostic logs need only the
+# previous day. Keeping a full month of those logs made the monthly run grow in RAM.
+RETAIN_S = DAY_S
 LONG_RUN_START = datetime(2026, 12, 1)
 FINISHED = (PassengerState.DONE, PassengerState.REFUSED, PassengerState.CANCELLED)
 
@@ -145,7 +147,7 @@ def _summarise_day(sim, day: int, start: datetime) -> DaySummary:
 
 
 def _trim_part1(ctx, keep_from: float) -> None:
-    """Drop Part 1 history older than keep_from (sim seconds). Entries are in time order."""
+    """Drop finished simulation diagnostics older than keep_from (sim seconds)."""
     if keep_from <= 0:
         return
     sim, acs, guard, db = (ctx.services.get(k) for k in ("controllers", "acs", "dispatch_guard",
@@ -161,6 +163,12 @@ def _trim_part1(ctx, keep_from: float) -> None:
         del entries[:cut]
     if guard is not None and hasattr(guard, "compute_s"):
         del guard.compute_s[:max(0, len(guard.compute_s) - len(guard.log))]
+    dispatcher = ctx.services.get("dispatcher")
+    calls = getattr(dispatcher, "calls", None)
+    if calls is not None:
+        for call_id, record in list(calls.items()):
+            if record.state in ("done", "cancelled") and record.call.created_at < keep_from:
+                del calls[call_id]
 
 
 def _write_manifest(result: LongRunResult, out_dir: Path) -> Path:

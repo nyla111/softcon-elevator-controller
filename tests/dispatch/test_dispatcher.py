@@ -7,6 +7,7 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallReassigned, Cal
 from ems.contracts.types import (Call, CallSource, CarStatus, Direction, DoorState, Mode)
 from ems.core.app import build
 from ems.dispatch.model import Pax, replay
+from ems.dispatch.engine import EtdEngine
 from ems.dispatch.service import Dispatcher
 
 
@@ -85,6 +86,31 @@ def test_nfr_w1_eco_keeps_lower_wear_cars_active():
     ctx.clock.run_until(6)
     assert {"A", "B"} <= ctx.services["dispatcher"].standby
     assert not ({"C", "D"} & ctx.services["dispatcher"].standby)
+
+
+def test_nfr_w1_eco_rotates_idle_cars_after_distance_gap():
+    ctx = build(seed=1)
+    usage = ctx.services["usage"]
+    usage.period.update(A=100, B=100, C=0, D=0)
+    ctx.clock.run_until(6)
+    dispatcher = ctx.services["dispatcher"]
+    assert "A" in dispatcher.standby and "C" not in dispatcher.standby
+    usage.period.update(A=0, C=100)
+    ctx.clock.run_until(910)
+    assert "C" in dispatcher.standby and "A" not in dispatcher.standby
+
+
+def test_nfr_w1_dispatch_respects_cost_and_pickup_bounds():
+    class Book:
+        def wear_distance(self, car_id):
+            return {"A": 100, "B": 0, "C": 0}[car_id]
+
+    engine = EtdEngine(Book())
+    estimates = {"A": (100, 20), "B": (114, 25), "C": (130, 20)}
+    engine.evaluate = lambda call, car, mode: estimates[car.car_id]
+    assert engine.choose_car(call("wear", 1, 8), [status(car=c) for c in "ABC"], Mode.BALANCED) == "B"
+    estimates["B"] = (114, 26)
+    assert engine.choose_car(call("wear", 1, 8), [status(car=c) for c in "ABC"], Mode.BALANCED) == "A"
 
 
 def test_fault_reassigns_waiting_calls_and_keeps_clock_fr04():

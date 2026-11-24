@@ -1,0 +1,29 @@
+name: NFR-W1 monthly wear validation
+
+on:
+  push:
+    branches: [part2/wear-balance-58]
+    paths: [.github/workflows/wear-month.yml]
+  workflow_dispatch:
+
+jobs:
+  month:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Simulate one calendar month (seed 1)
+        run: python -m ems.sim.long_run --months 1 --seed 1 | tee month.log
+      - name: Save evidence even when the NFR fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfr-w1-month-seed1
+          path: |
+            runs/long_30d_seed1_*.json
+            month.log
+          if-no-files-found: warn
