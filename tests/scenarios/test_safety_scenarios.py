@@ -28,7 +28,7 @@ SAFETY_CRITERIA = {
 @pytest.mark.parametrize("sid", SAFETY_CRITERIA)
 def test_safety_subcriteria_on_real_scenarios(sid, seed):
     result = run_scenario(sid, seed, metrics_only=True)
-    if sid in ("SIM-08", "SIM-14", "SIM-15"):
+    if sid in ("SIM-08", "SIM-13", "SIM-14", "SIM-15"):
         assert result["ready"] is True and result["passed"] is True, result["criteria"]
         if sid == "SIM-08":
             assert len(result["runs"]) == 2 and len(result["criteria"]) == 18

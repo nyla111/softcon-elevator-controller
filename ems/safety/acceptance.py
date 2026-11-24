@@ -151,23 +151,14 @@ def check_sim_08(results, contexts) -> Criteria:
     return check_paired_sim_08(results, contexts)
 
 
-def check_sim_13(result: RunResult, ctx) -> Criteria:
-    overloads = ctx.bus.of_type(safety_events.OverloadDetected)
-    messages = ctx.bus.of_type(safety_events.PanelMessage)
-    prompt = all(any(m.target == f"car:{o.car_id}" and o.t <= m.t <= o.t + 1
-                         and "step" in m.text_en.lower() for m in messages) for o in overloads)
-    bulky = [e for e in ctx.bus.of_type(safety_events.CameraEvent) if e.kind == "bulky_item"]
-    reports = ctx.services.get("reports")
-    incidents = getattr(reports, "incidents", {})
-    flagged = len(bulky) == 2 and all(e.event_id in incidents for e in bulky)
-    return [
-        ("at least three overload bursts exercised", len(overloads) >= 3,
-         f"{len(overloads)} overloads"),
-        ("step-out message within 1 s", bool(overloads) and prompt,
-         "Part 2 owns overload messages and next-car selection"),
-        _reassignment_check(ctx, overloads),
-        ("both bulky items flagged by Monitor", flagged, f"{len(bulky)} bulky events"),
-    ]
+def setup_sim_13(ctx):
+    from .scenario_overload import setup_sim_13 as setup
+    return setup(ctx)
+
+
+def check_sim_13(result, ctx):
+    from .scenario_overload import check_sim_13 as check
+    return check(result, ctx)
 
 
 def check_sim_15(result: RunResult, ctx) -> Criteria:

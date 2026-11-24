@@ -19,7 +19,7 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
     # (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
     assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-08", "SIM-09",
-                     "SIM-10", "SIM-11", "SIM-12", "SIM-14", "SIM-15", "SIM-16", "SIM-17", "SIM-18", "SIM-19"]
+                     "SIM-10", "SIM-11", "SIM-12", "SIM-13", "SIM-14", "SIM-15", "SIM-16", "SIM-17", "SIM-18", "SIM-19"]
     for s in SCENARIOS.values():
         if not s.ready:
             if s.owner_part == 4:
@@ -49,9 +49,7 @@ def test_registry_loads_part4_only_when_a_part4_scenario_executes():
         assert module not in sys.modules
         for scenario in SCENARIOS.values():
             describe(scenario)
-        for sid in ("SIM-13",):
-            result = run_scenario(sid, 1)
-            assert result["ready"] is False and result["passed"] is None
+        assert all(s.ready for s in SCENARIOS.values() if s.owner_part == 4)
         assert module not in sys.modules
         # Executing another owner's scenario must not load Safety acceptance either.
         for sid in ("SIM-09", "SIM-13"):
@@ -61,7 +59,7 @@ def test_registry_loads_part4_only_when_a_part4_scenario_executes():
         assert module not in sys.modules
         result = run_scenario("SIM-13", 1, metrics_only=True)
         assert module in sys.modules
-        assert result["ready"] is False and result["passed"] is None
+        assert result["ready"] is True and result["passed"] is False
         assert result["criteria"]
     ''')
     subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
