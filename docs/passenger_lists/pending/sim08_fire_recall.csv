@@ -1,6 +1,0 @@
-t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
-0,1,15,card-L15-001,false,false,sim08-onboard,,,,evacuated,5,SIM-08 FR-50 authorized rider boards before alarm. Current run_list uses a nearest-car stand-in while Dispatch is a stub
-14,,,,,,,fire_alarm,,,no_alert:entrapment,,FR-50 alarm interrupts occupied car in travel. Inspect recall to L1 and open doors in event log
-15,1,5,card-L5-001,false,false,sim08-during-fire,,,,waiting,,FR-50 request during active alarm must have no assignment or boarding. Waiting is evaluated at run end
-60,,,,,,,fire_clear,,,no_alert:entrapment,,FR-55 fire_clear clears alarm and resets controllers. CSV has no controller-attestation or FM-confirmation action. Blocked by https://github.com/nyla111/softcon-elevator-controller/issues/26
-65,1,5,card-L5-001,false,false,sim08-after-clear,,,,waiting,,FR-55 clear/reset alone must keep ordinary dispatch blocked until controller and safety attestations plus authorized FM confirmation. Successful post-FM recovery remains unverified and blocked by issue #26
