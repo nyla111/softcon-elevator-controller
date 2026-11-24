@@ -1,6 +1,6 @@
 t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
 0,1,20,,,,ordinary-first,,,,delivered,60,BR-10 ordinary call made first
-0,1,23,card-L23-046,,true,vip-second,,,,delivered,60,BR-10 VIP ranks above ordinary
+0,1,23,card-L23-046,,true,vip-second,,,,delivered,60,BR-10 VIP ranks above ordinary (00:00 Eco: no exclusive car outside Rush; FR-73 queue priority)
 0,1,17,card-L17-008,true,,accessible-third,,,,delivered,60,BR-10 accessible ranks above VIP
 1,1,24,,,,ordinary-last,,,,delivered,60,BR-10 ordinary call made last
 5,1,6,,,,low-ordinary,,,,delivered,60,BR-10 the order applies per group: low-rise call not delayed

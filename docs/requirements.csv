@@ -62,6 +62,7 @@ part,id,title
 5,FR-70,VIP role grants and quotas
 5,FR-71,VIP car selection (empty within 30 s else fastest)
 5,FR-72,VIP caps: 1 car per group; 6 per hour; ceiling check
+5,FR-73,VIP outside Rush: no exclusive car; queue priority over ordinary calls
 5,FR-76,Priority order medical > accessible > VIP > others
 5,FR-80,House-rule item limits shown on panels
 5,FR-81,Goods-move request in tenant portal; FM approval

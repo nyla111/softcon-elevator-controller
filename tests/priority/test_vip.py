@@ -1,4 +1,6 @@
 """FR-70 / FR-71 / FR-72 VIP exclusive trips, with protocol doubles (conftest.py)."""
+import pytest
+
 from ems.contracts.events import (CallAssigned, CallCancelled, CallReassigned, CallRequested, ControllerFault, ControllerFaultCleared,
                                   DoorsOpened, EmsServerDown, EmsServerUp, FireAlarm,
                                   PassengerAlighted, PassengerBoarded, PriorityTripEnded,
@@ -6,6 +8,13 @@ from ems.contracts.events import (CallAssigned, CallCancelled, CallReassigned, C
 from ems.contracts.types import CallPriority, CarState
 
 from .conftest import EMPLOYEE, FM
+
+
+@pytest.fixture(autouse=True)
+def _rush(env):
+    """These tests run the exclusive trip itself, which starts only in Rush (FR-71, #65).
+    The behaviour outside Rush is covered in test_vip_rush_only.py."""
+    env.rush()
 
 
 def _vip_requests(env, car):

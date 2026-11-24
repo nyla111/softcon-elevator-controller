@@ -1,4 +1,5 @@
 """FR-105: the guard uses the plug-in's answer unless it fails, is invalid or is too slow."""
+import gc
 import time
 
 import pytest
@@ -125,6 +126,54 @@ def test_engine_slower_than_one_second_uses_fallback():
     assert guard.timeout_s == 1.0
     assert guard.choose_car(Slow(1.1), call(), cars, Mode.BALANCED) == ("A", True)
     assert len(alerts(ctx, "dispatch_fallback")) == 1
+
+
+class Garbage:
+    """Makes far more cyclic garbage than one automatic collection threshold."""
+    def __init__(self):
+        self.gc_enabled_inside = None
+        self.running = False
+
+    def choose_car(self, call, cars, mode):
+        self.running = True
+        self.gc_enabled_inside = gc.isenabled()
+        for _ in range(50_000):
+            a, b = [], []
+            a.append(b)
+            b.append(a)
+        self.running = False
+        return "B"
+
+
+def test_no_automatic_gc_pass_inside_the_timed_engine_call():
+    # #101: a full collection of the whole process (2.7 M objects after a 24 h run) took up to
+    # 1.58 s on CI and was blamed on the engine. The guard pauses automatic GC while it times.
+    ctx, guard, cars = setup()
+    runs = []
+    engine = Garbage()
+    def count(phase, info):                    # only passes while the engine is computing
+        if phase == "start" and engine.running:
+            runs.append(info["generation"])
+    gc.callbacks.append(count)
+    try:
+        assert guard.choose_car(engine, call(), cars, Mode.BALANCED) == ("B", False)
+    finally:
+        gc.callbacks.remove(count)
+    assert engine.gc_enabled_inside is False and runs == []
+    assert gc.isenabled()                       # resumed after the call (garbage collected then)
+
+
+def test_gc_is_resumed_when_the_engine_raises():
+    ctx, guard, cars = setup()
+    assert guard.choose_car(Crashing(), call(), cars, Mode.BALANCED) == ("A", True)
+    assert gc.isenabled()
+
+
+def test_slow_engine_still_falls_back_with_gc_paused():
+    ctx, _, cars = setup()
+    guard = DispatchGuard(ctx, timeout_s=0.01)
+    assert guard.choose_car(Slow(0.05), call(), cars, Mode.BALANCED) == ("A", True)
+    assert guard.compute_s[-1] >= 0.05 and gc.isenabled()
 
 
 def test_no_usable_car_returns_none_with_fallback_flag():

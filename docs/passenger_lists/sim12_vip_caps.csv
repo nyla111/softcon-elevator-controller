@@ -1,3 +1,4 @@
+# start=07:00
 t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
 0,1,16,card-L16-001,,,vip-1,,,,delivered,60,SIM-12 FR-71 first VIP call of the high-rise group gets an exclusive car
 10,1,18,card-L18-031,,,vip-2,,,,delivered,60,FR-72 one exclusive car per group: vip-1 still travelling so this one is served as an ordinary call

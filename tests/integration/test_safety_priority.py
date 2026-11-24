@@ -11,7 +11,7 @@ import pytest
 from ems import priority
 from ems.contracts import events as E
 from ems.contracts.interfaces import PriorityService
-from ems.contracts.types import Call, CallPriority, CallSource, Role
+from ems.contracts.types import Call, CallPriority, CallSource, Mode, Role
 from ems.contracts.types import CarState as S
 from ems.core.app import build
 from ems.priority.standins import PriorityAwareNearestCar
@@ -19,6 +19,21 @@ from ems.safety.acceptance import _fire_goods_check
 from ems.sim.building import BuildingSpec
 
 SECURITY, FM, TECH, ADMIN = ("staff-security-1", "staff-fm-1", "staff-technician-1", "staff-admin-T01")
+
+
+class RushModeDispatcher:
+    """Part 2 is not built in these tests (contract stub, always Balanced). VIP exclusive trips
+    start only in Rush (FR-71, #65), so the stub is wrapped to report Rush; the rest is the
+    stub's."""
+
+    def __init__(self, stub) -> None:
+        self.stub = stub
+
+    def current_mode(self, group):
+        return Mode.RUSH
+
+    def __getattr__(self, name):
+        return getattr(self.stub, name)
 
 
 class KnownPriorityDefect(AssertionError):
@@ -41,6 +56,7 @@ def environment():
         ctx = build(parts=["sim", "safety"], services={"building": building} if building else None)
         # Explicit test adapter while real Access is absent. Staff roles come from merged ACS.
         ctx.services["access"] = SimpleNamespace(permission=ctx.services["acs"].lookup)
+        ctx.services["dispatcher"] = RushModeDispatcher(ctx.services["dispatcher"])
         priority.register(ctx)
         return ctx, ctx.services["priority"], ctx.services["car_states"], ctx.services["controllers"]
     return make

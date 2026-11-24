@@ -286,7 +286,7 @@ def scenario_run(scenario_id: str, seed: int = 1, metrics_only: bool = False) ->
     return scenarios.run_scenario(scenario_id, seed, metrics_only=metrics_only)
 
 
-for page in ("dashboard", "panel", "building", "runner"):
+for page in ("dashboard", "panel", "building", "runner", "history"):
     app.mount(f"/{page}", StaticFiles(directory=STATIC / page, html=True), name=page)
 
 
