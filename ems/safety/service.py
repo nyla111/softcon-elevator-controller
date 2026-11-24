@@ -9,6 +9,7 @@ from ems.contracts import config
 from ems.contracts import events as ev
 from ems.contracts.types import CarId, CarState, CarStatus, GroupId, Role
 
+from .fault_review import FaultReviews
 from .states import StateTable
 
 
@@ -16,6 +17,7 @@ class SafetyService:
     def __init__(self, ctx) -> None:
         self.ctx = ctx
         self.table = StateTable(ctx)
+        self.fault_reviews = FaultReviews()
         self.fire = False
         self.firefighters: set[CarId] = set()
         self.mains_lost = False
@@ -32,6 +34,8 @@ class SafetyService:
         self.fault_alerted: set[CarId] = set()
         self.recovery_log: list[tuple[float, str]] = []
         self._signal_times: dict[tuple[str, CarId | None], float] = {}
+        # Scalar snapshots: bus payloads/adapter status objects may be mutable.
+        self.telemetry: dict[CarId, tuple[float, int, float, int]] = {}
 
     def subscribe(self) -> None:
         for event, handler in {
@@ -91,8 +95,18 @@ class SafetyService:
         return not status.disconnected and status.fault_code is None
 
     def _alert(self, severity: str, kind: str, message: str, car_id=None) -> None:
+        floor = None
+        if car_id is not None:
+            sample = self.telemetry.get(car_id)
+            if sample is None:
+                context = "floor=unknown; load=unknown; passengers=unknown; telemetry_t=unknown"
+            else:
+                t, floor, load, passengers = sample
+                context = (f"last reported floor={floor}; load={load:g}%; passengers={passengers}; "
+                           f"telemetry_t={t:g}s; age={self.ctx.clock.now() - t:g}s")
+            message = f"{message}; car={car_id}; {context}"
         self.ctx.bus.publish(ev.AlertRaised(self.ctx.clock.now(), severity, kind,
-                                           ["security", "fm", "contractor"], message, car_id))
+                                           ["security", "fm", "contractor"], message, car_id, floor))
 
     def _display(self, en: str, vi: str) -> None:
         for car in self.table.cars():
@@ -202,7 +216,9 @@ class SafetyService:
             self._alert("critical", "entrapment", "POSSIBLE ENTRAPMENT — rescue not confirmed", car)
 
     def _rescue_deadline(self, epoch: int) -> None:
-        if epoch != self.power_epoch or not self.mains_lost or self.generator_ready:
+        # Restored power/readiness is not per-car rescue proof (FR-110). Only a
+        # newer outage supersedes this timer; current reports decide which cars alert.
+        if epoch != self.power_epoch:
             return
         for car in self.table.cars():
             if car not in self.rescued:
@@ -288,6 +304,12 @@ class SafetyService:
         changed = self.table.set(car, CarState.FAULTED, owner, active)
         self.normal.discard(car)
         if active and changed:
+            if owner == "safety:fault" and self.fault_reviews.started(car, self.ctx.clock.now()):
+                self.ctx.bus.publish(ev.AlertRaised(
+                    self.ctx.clock.now(), "info", "fault_review", ["fm"],
+                    f"Car {car}: three independent mechanical faults in 30 days; FM review required",
+                    car,
+                ))
             self.ctx.get("dispatcher").reassign_calls_of(car, owner)
             # FR-30 mechanical fault notifications belong to Part 5 Maintenance.
             if owner == "safety:disconnected":
@@ -320,6 +342,11 @@ class SafetyService:
 
     def on_status(self, event: ev.CarStatusUpdated) -> None:
         s = event.status
+        previous = self.telemetry.get(s.car_id)
+        if (s.car_id in self.table.cars() and not s.disconnected
+                and 0 <= event.t <= self.ctx.clock.now()
+                and (previous is None or event.t >= previous[0])):
+            self.telemetry[s.car_id] = (event.t, s.floor, s.load_pct, s.passengers)
         fault_current = self._accept_signal("fault", event, s.car_id) if s.fault_code else False
         if fault_current:
             self._fault_hold(s.car_id, "safety:fault", True)
