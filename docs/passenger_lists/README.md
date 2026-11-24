@@ -40,6 +40,9 @@ not successful acceptance. `run_list` uses the registered real dispatcher when
 available; the nearest-car stand-in is installed only for `StubDispatcher`.
 It starts at midnight, runs through the last row, then allows up to 1800 additional
 seconds for outstanding passengers. SIM-15 therefore uses t=25200 for 07:00 up-peak.
+A list may set its start time with a first line `# start=HH:MM`. The VIP lists
+`sim12_vip_caps.csv` and `sim18_medical_over_vip.csv` use `# start=07:00`, because VIP
+exclusive trips start only in Rush (FR-71, #65).
 
 Validate all active lists and relevant safety behavior:
 

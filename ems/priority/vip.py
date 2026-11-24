@@ -1,8 +1,15 @@
-"""VIP exclusive trips (FR-70, FR-71, FR-72). Mixed into PriorityService.
+"""VIP exclusive trips (FR-70, FR-71, FR-72, FR-73). Mixed into PriorityService.
 
 Part 2 calls claim_call(call) for a VIP call before it chooses a car (PriorityService protocol,
 contracts/interfaces.py). A car id back: Part 5 runs an exclusive trip on it and Part 2 publishes
 CallAssigned without register_stop. None: Part 2 dispatches the call normally.
+
+Exclusive trips start only while the call's group is in Rush (FR-71, issue #65). Outside Rush
+the answer is None with reason "not_rush": the call keeps CallPriority.VIP and Part 2 serves it
+as a normal call, ahead of ordinary calls in its queue order (FR-73 via order(), BR-10). The
+decision is made once per call, so a call refused outside Rush is not promoted when Rush
+starts. A trip already started when the group leaves Rush runs to its normal end (FR-15 /
+BR-02: a mode change never cancels a trip; new rules apply to new decisions).
 """
 from __future__ import annotations
 
@@ -10,7 +17,7 @@ from typing import Optional
 
 from ems.contracts import config
 from ems.contracts.events import PassengerBoarded
-from ems.contracts.types import Call, CallPriority, CarId, CredentialId, Role
+from ems.contracts.types import Call, CallPriority, CarId, CredentialId, Mode, Role
 
 from . import policy
 from .model import EXCLUSIVE, HOUR_S, Outcome, Trip, VipGrant
@@ -49,10 +56,11 @@ class VipMixin:
         return sum(1 for t in self.vip_starts if at - HOUR_S < t <= at)
 
     def claim_call(self, call: Call) -> Optional[CarId]:
-        """One decision per call id. A car id is returned only while that exclusive trip is
-        still running on it: once the trip has ended (emergency, fault, re-assignment, ...) or
-        during an emergency the answer is None (dispatch normally); a cancelled trip is never
-        started again for the same call."""
+        """One decision per call id, taken in the call group's mode at that moment (exclusive
+        only in Rush). A car id is returned only while that exclusive trip is still running on
+        it: once the trip has ended (emergency, fault, re-assignment, ...) or during an
+        emergency the answer is None (dispatch normally); a cancelled trip is never started
+        again for the same call."""
         if call.priority is not CallPriority.VIP:
             return None
         if call.call_id in self.claims:
@@ -72,6 +80,8 @@ class VipMixin:
         why = self.blocked_reason()
         if why:
             return Outcome(False, why)
+        if self.ctx.get("dispatcher").current_mode(call.group) is not Mode.RUSH:
+            return Outcome(False, "not_rush")                         # FR-71 / FR-73
         if call.destination is None:
             return Outcome(False, "no_destination")
         grant = self.vip_grants.get(call.credential_id) if call.credential_id else None

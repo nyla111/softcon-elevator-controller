@@ -56,6 +56,47 @@ every pick-up and arrival time. Prediction error measured at up-peak: about 1.5 
 
 For a new call each candidate car is replayed twice, without and with the call. The difference is
 the cost of giving the call to that car; the cheapest car wins (ties: lower car id).
+## NFR-W1 wear policy and real-traffic validation
+
+The engine computes the normal mode-dependent ETD cost for every eligible car first. It then
+considers cars whose ETD cost is within **15** of the best car (**5** in Eco) **and** whose predicted pickup is
+at most **5 seconds** later. Among these candidates it assigns the least-used car by the Part 5
+six-month distance counter. Both bounds preserve wait-time priority; wear cannot select a car
+with an arbitrarily long pickup. In Eco, an idle active car is exchanged with a less-used
+standby car when their distance gap reaches **20 floors**, no more often than every **900 seconds**,
+only when all active cars are idle, no calls are open, and the two cars are within **10 floors**.
+Busy cars are never put into standby by this exchange.
+
+Measured with `python -m ems.sim.long_run --days 1 --seed 1` on the same simulated weekday
+(2026-12-01, 25,220 passengers) before and after this change:
+
+| Policy | LOW imbalance | HIGH imbalance | Average wait |
+|---|---:|---:|---:|
+| Wear preference disabled | 30.55% | 39.65% | 22.95 s |
+| Previous 5-cost shortlist; no Eco rotation | 30.81% | 37.65% | 22.8 s |
+| Final 15-cost (5 in Eco), 5-second shortlist; nearby Eco rotation | 0.50% | 0.89% | 22.4 s |
+
+An initial 15-cost Eco allowance triggered an unwanted step-up in SIM-04. Eco's cost allowance
+was restored to 5 and rotation restricted to quiet, nearby exchanges. This is a **one-day
+measurement**, not proof of the
+monthly <2% or six-month <=5% targets.
+The fast SIM-19 scenario seeds equal historical distances and checks counter behavior; it is
+not real-traffic acceptance. Run `EMS_LONG=1 pytest tests/scenarios/test_sim_19_wear.py -q`
+for the real 24-hour check. Use `python -m ems.sim.long_run --months 1 --seed 1` and then
+`--months 6` for the calendar-window evidence. The 24-hour run still has a maximum wait of
+196 s, so the existing maximum-wait gap remains open.
+
+An additional seven-day run on seed 1 (2026-12-01 through 2026-12-07) measured LOW
+**0.097%** and HIGH **0.247%** imbalance. Both are below 2% at that point in the month;
+the full monthly and six-month windows are still being measured. Weekday average waits
+were 22.4–23.1 s; the weekend days averaged 8.3–13.2 s.
+
+`.github/workflows/wear-month.yml` runs the full seed-1 month on GitHub Actions when
+the workflow is first pushed to `part2/wear-balance-58`. Its `nfr-w1-month-seed1` artifact
+keeps the JSON manifest and console log even if the balance threshold fails. After the
+workflow reaches the default branch it can also be started manually.
+
+For a new call each candidate car is replayed with and without it. Cost:
 
 ```
 w_wait * f(new wait) + w_ride * new ride

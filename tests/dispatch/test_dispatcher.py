@@ -7,6 +7,7 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallReassigned, Cal
 from ems.contracts.types import (Call, CallSource, CarStatus, Direction, DoorState, Mode)
 from ems.core.app import build
 from ems.dispatch.model import Pax, replay
+from ems.dispatch.engine import EtdEngine
 from ems.dispatch.service import Dispatcher
 
 
@@ -85,6 +86,31 @@ def test_nfr_w1_eco_keeps_lower_wear_cars_active():
     ctx.clock.run_until(6)
     assert {"A", "B"} <= ctx.services["dispatcher"].standby
     assert not ({"C", "D"} & ctx.services["dispatcher"].standby)
+
+
+def test_nfr_w1_eco_rotates_idle_cars_after_distance_gap():
+    ctx = build(seed=1)
+    usage = ctx.services["usage"]
+    usage.period.update(A=100, B=100, C=0, D=0)
+    ctx.clock.run_until(6)
+    dispatcher = ctx.services["dispatcher"]
+    assert "A" in dispatcher.standby and "C" not in dispatcher.standby
+    usage.period.update(A=0, C=100)
+    ctx.clock.run_until(910)
+    assert "C" in dispatcher.standby and "A" not in dispatcher.standby
+
+
+def test_nfr_w1_dispatch_respects_cost_and_pickup_bounds():
+    class Book:
+        def wear_distance(self, car_id):
+            return {"A": 100, "B": 0, "C": 0}[car_id]
+
+    engine = EtdEngine(Book())
+    estimates = {"A": (100, 20), "B": (114, 25), "C": (130, 20)}
+    engine.evaluate = lambda call, car, mode: estimates[car.car_id]
+    assert engine.choose_car(call("wear", 1, 8), [status(car=c) for c in "ABC"], Mode.BALANCED) == "B"
+    estimates["B"] = (114, 26)
+    assert engine.choose_car(call("wear", 1, 8), [status(car=c) for c in "ABC"], Mode.BALANCED) == "A"
 
 
 def test_fault_reassigns_waiting_calls_and_keeps_clock_fr04():
@@ -175,3 +201,33 @@ def test_no_new_hall_call_for_a_car_loaded_80_percent_fr05():
         return ctx.bus.of_type(CallAssigned)[0].car_id
     assert first_car(18) != "C"                 # 18 of 21 persons = 86% >= 80%
     assert first_car(16) == "C"                 # 76%: C takes the call
+def test_overload_reassigns_a_vip_call_left_behind_on_its_claimed_car_fr100():
+    # #32 / SIM-13 seed 1: Part 5 claimed a full car for a VIP; the car overloaded at the
+    # VIP's floor and the call stayed on it (234 s wait). It is re-assigned like any other.
+    ctx = build(seed=1)
+    d = ctx.services["dispatcher"]
+    ctx.bus.publish(CallRequested(0.0, call("v1", 1, 9)))
+    car = ctx.bus.of_type(CallAssigned)[0].car_id
+    rec = d.calls["v1"]                        # as if Part 5 had claimed the car
+    d.waiting[car].discard("v1")
+    rec.state = "vip"
+    d.exclusive.add(car)
+    ctx.bus.publish(OverloadDetected(1.0, car, 1, 105.0))
+    ctx.clock.run_until(5.0)
+    (ev,) = ctx.bus.of_type(CallReassigned)
+    assert ev.call_id == "v1" and ev.from_car == car and ev.to_car != car
+    assert ev.reason == "overload" and rec.call.created_at == 0.0
+
+
+def test_dispatcher_looks_after_an_unboarded_vip_call_when_the_trip_ends():
+    from ems.contracts.events import PriorityTripEnded
+    ctx = build(seed=1)
+    d = ctx.services["dispatcher"]
+    ctx.bus.publish(CallRequested(0.0, call("v1", 6, 1)))
+    car = ctx.bus.of_type(CallAssigned)[0].car_id
+    rec = d.calls["v1"]
+    d.waiting[car].discard("v1")
+    rec.state = "vip"
+    ctx.bus.publish(PriorityTripEnded(2.0, "vip", car, True))
+    assert rec.state == "assigned" and "v1" in d.waiting[car]
+    assert d.pending_calls("LOW") == [rec.call]          # visible to Part 5 / FR-04 again
