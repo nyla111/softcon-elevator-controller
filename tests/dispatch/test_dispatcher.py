@@ -161,3 +161,17 @@ def test_eco_steps_up_on_queue_fr14():
                for a in ctx.bus.of_type(AlertRaised))
     # stays in Balanced until the next scheduled change (07:00 Rush next morning)
     assert d.modes.overrides["LOW"].until == datetime(2026, 11, 17, 7, 0)
+
+
+def test_no_new_hall_call_for_a_car_loaded_80_percent_fr05():
+    # A real list cannot show FR-05 with idle cars around: the engine spreads a lobby group over
+    # the free cars (17 people -> 4-5 per car). Set the load directly instead.
+    def first_car(riders):
+        ctx = build(seed=1)
+        sim = ctx.services["controllers"]
+        sim.cars["C"].floor = 9                 # C is the obvious choice for a call at 9
+        sim.cars["C"].riders = [object()] * riders
+        ctx.bus.publish(CallRequested(0.0, call("c1", 9, 1)))
+        return ctx.bus.of_type(CallAssigned)[0].car_id
+    assert first_car(18) != "C"                 # 18 of 21 persons = 86% >= 80%
+    assert first_car(16) == "C"                 # 76%: C takes the call
