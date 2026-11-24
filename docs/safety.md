@@ -23,7 +23,7 @@ car during a building emergency or locked recovery. Dispatch must consult this a
 
 | Input | Safety behaviour |
 |---|---|
-| Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
+| Fire alarm, including lost fire I/O | Latch Fire Recall on all cars, invalidate interrupted exclusive holds, ask Dispatch to reassign waiting calls, show bilingual stair messages. I/O loss also sends one `fire_io_loss` notification per recovery episode, including when a panel alarm came first. Priority owns trip/goods cancellation and `GoodsMoveEnded`. |
 | Firefighter service | Keep normal service and recovery blocked while active; controllers retain physical authority. |
 | Mains loss | Latch Emergency Power, request waiting-call reassignment, show power messages. Fire Recall still wins. `GeneratorReady` does not reopen EMS dispatch. |
 | Missing/stuck rescue report | One critical POSSIBLE ENTRAPMENT alert per affected car by 60 s, even after generator readiness or mains restoration. |
@@ -33,12 +33,24 @@ car during a building emergency or locked recovery. Dispatch must consult this a
 Timing uses the simulated clock. Older physical assertions/clears are rejected; equal
 timestamps follow bus order because contracts have no episode/sequence identifier.
 
+The fire-I/O notification is emitted after fire holds are established. Clear/reset alone
+does not reset its deduplication: only successful FR-55 FM recovery ends the episode.
+`tests/safety/test_fire_io_alert.py` checks actual inbox delivery, repeated/stale signals,
+panel-first loss, recovery and every attempted controller command (NFR-SF3, #81).
+
 FR-110 rescue evidence is per car and power episode. Generator readiness and mains
 restoration do not prove rescue. At the 60 s deadline, every car without a current
 `rescued_at_floor` report alerts, including unknown occupancy; a `stuck` report alerts
 immediately. A newer outage supersedes the old timer and resets alert deduplication.
 Late rescue reports do not erase notifications already delivered. Regression evidence:
-`tests/safety/test_rescue_deadline.py` (#46); required notification context remains #80.
+`tests/safety/test_rescue_deadline.py` (#46).
+
+Car-specific notifications include the last timestamped, connected controller report's
+floor, load, passenger estimate and telemetry time/age in delivered message text, plus
+the structured floor when known (FR-53/110, #80). Cached values are scalar snapshots;
+older/future reports and disconnected payloads cannot overwrite them. With no report,
+context is explicitly unknown; no adapter timestamp or occupancy is invented. See
+`tests/safety/test_alert_context.py` for notifier-inbox evidence.
 
 ## Recovery gate
 
@@ -57,6 +69,14 @@ FM confirmation are connected. These internal methods are not authenticated UI e
 
 ## Integration dependencies and incomplete acceptance
 
+FR-113 is implemented by the mechanical-fault hold owner: the third independent episode
+in a trailing 30-day window sends the FM a review notice. The exact 30-day boundary is
+included. Duplicate assertions/statuses and link loss do not count; a matching fault
+clear is required before another episode. Further episodes while already at/above three
+do not spam notices; the threshold may notify again after old episodes age out. P5 keeps
+FR-30 per-episode alerts. See `tests/safety/test_fault_review.py`; the window convention
+and cross-owner integration remain subject to owner review in #88.
+
 Part 5 is merged and exercised directly in `tests/integration/test_safety_priority.py`.
 Seven strict xfails track [issue #18](https://github.com/nyla111/softcon-elevator-controller/issues/18):
 PR16-01 owner transfer (2), PR16-02 isolated VIP preemption (2), PR16-03 cached emergency
@@ -70,8 +90,12 @@ claim (2), PR16-04 fire recovery without a service group (1). These require Part
 | Part 3 Access | Pre-acceptance action ID, kind and exemption classification plus proven duplicate correlation and waiting/boarded status; optional lockdown suspend/resume. |
 | FR-52 generator operation | Approved capacity/allocation, per-car enable acknowledgement and parking completion, readiness withdrawal/failure, and episode-correlated rescue reports. Limited operation/sequential parking is unimplemented; the simulator currently resumes all physical cars on `GeneratorReady`. |
 
-`call_policy.py` independently enforces five ordinary actions per rolling 60 s, rejecting
-the sixth, with exit/assistance/fire exemptions. Duplicate removal requires same-action
+`call_policy.py` independently allows five ordinary actions per rolling 60 s; the sixth
+starts a fixed 60 s block. Denied repeats do not extend it. `evaluate()` returns an
+immutable decision with bilingual refusal text and retry time; `allow()` remains a
+boolean wrapper. The third episode per simulated calendar day invokes the security-log
+owner's callback once. Midnight resets daily counts, not an active block. Exit/assistance/
+fire actions remain exempt and consume no quota. Duplicate removal requires same-action
 proof, waiting status, no boarding and no uncertainty. These policies await Access admission
 integration; Safety does not filter already accepted `CallRequested` events.
 
@@ -91,3 +115,13 @@ pytest tests/scenarios tests/sim/test_scenarios_registry.py -q
 pytest -q
 ruff check --select E9,F63,F7,F82 .
 ```
+
+## SIM-14 complete failed-generator acceptance
+The registry now enforces the complete seven-criterion real-service SIM-14 checker.
+It selects a genuinely occupied silent-rescue car, delivers current-context entrapment
+by60s, records every attempted command and assignment through FM recovery, retains
+waiting clocks, exercises early refusal/120s stable mains/clear-normal reports, excludes
+a faulted car and proves post-confirm delivery. Seeds1-10 pass individually, with raw
+traces and companion active CSV evidence. See tests/safety/test_sim14_journey.py and
+docs/passenger_lists/issue33_evidence.md. These are branch results pending review/CI/merge;
+FR52 successful-generator limited operation is a separate outstanding requirement.

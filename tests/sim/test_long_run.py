@@ -1,9 +1,10 @@
 """CR-01 / NFR-W1 support in Part 1: long runs and the per-month wear rows."""
 from datetime import datetime
+from types import SimpleNamespace
 
 from ems.contracts import config
 from ems.core.app import build
-from ems.sim.long_run import run_long, wear_rows
+from ems.sim.long_run import _trim_part1, run_long, wear_rows
 from ems.sim.traffic import schedule_segments
 
 SATURDAY = datetime(2026, 11, 21)
@@ -34,6 +35,16 @@ def test_wear_rows_cover_each_month_and_the_period_per_group():
 
 def test_no_rows_without_a_usage_report():
     assert wear_rows({}, {}) == []
+
+
+def test_long_run_prunes_only_old_finished_dispatch_records():
+    def record(state, t):
+        return SimpleNamespace(state=state, call=SimpleNamespace(created_at=t))
+    dispatcher = SimpleNamespace(calls={"old_done": record("done", 50),
+                                        "old_open": record("assigned", 50),
+                                        "recent_done": record("done", 150)})
+    _trim_part1(SimpleNamespace(services={"dispatcher": dispatcher}), 100)
+    assert set(dispatcher.calls) == {"old_open", "recent_done"}
 
 
 def test_weekends_follow_the_weekend_schedule():

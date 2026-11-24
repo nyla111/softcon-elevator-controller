@@ -34,21 +34,20 @@ from ems.contracts.types import (Call, CallId, CallPriority, CarId, CarState, Ca
 from . import policy
 from .auth import AccessAuthorizer, Actor, Authorizer
 from .medical import MedicalMixin
-from .model import Hold, Outcome, Trip, VipGrant
+from .model import Hold, Outcome, PendingMedical, Trip, VipGrant
 from .vip import VipMixin
-from .overload import OverloadMixin
 
 __all__ = ["PriorityService", "Outcome", "subscribe"]
 
 
-class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
+class PriorityService(VipMixin, MedicalMixin):
     def __init__(self, ctx, authorizer: Optional[Authorizer] = None) -> None:
         self.ctx = ctx
         self.authorizer: Authorizer = authorizer or AccessAuthorizer(ctx)
         self.holds: dict[CarId, Hold] = {}
         self.trips: dict[str, Trip] = {}               # active priority trips
         self.finished: list[Trip] = []
-        self.overloaded_pickups = {}
+        self.pending_medical: dict[str, PendingMedical] = {}
         self.vip_starts: list[float] = []              # successful exclusive VIP starts (FR-72)
         self.vip_grants: dict[CredentialId, VipGrant] = {}
         self.claims: dict[CallId, Optional[CarId]] = {}
@@ -342,6 +341,9 @@ class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
         call = self._calls.pop(ev.call_id, None)
         if call is not None and call.destination is not None:
             self.riders.setdefault(ev.car_id, {})[ev.call_id] = call.destination
+            for pending in self.pending_medical.values():
+                if pending.car_id == ev.car_id:
+                    pending.remaining[ev.call_id] = call.destination
         trip = self.trip_of_call(ev.call_id)
         if trip is not None:
             self._vip_boarded(trip, ev)
@@ -349,6 +351,9 @@ class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
     def on_alighted(self, ev: PassengerAlighted) -> None:
         self._accessible.pop(ev.call_id, None)
         self.riders.get(ev.car_id, {}).pop(ev.call_id, None)
+        # Delivery is already logged by the controller. Activate before ending a VIP
+        # hold so a medical handover cannot expose a transient group-service gap.
+        self._medical_rider_alighted(ev)
         trip = self.trip_of_call(ev.call_id)
         if trip is not None:
             done = ev.floor == trip.destination
@@ -385,6 +390,7 @@ class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
     # ================================================================ faults, emergencies
     def on_car_lost(self, ev) -> None:
         """ControllerFault / HeartbeatLost: the car cannot run a priority trip any more."""
+        self._cancel_pending_medical("car_lost", ev.car_id)
         trip = self.trip_of_car(ev.car_id)
         if trip is None:
             return
@@ -426,6 +432,7 @@ class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
     def _emergency_stop(self, why: str) -> None:
         """Fire recall / power loss: every priority trip and goods move ends now, states are
         released, NO controller command is sent (owed commands wait for recovery)."""
+        self._cancel_pending_medical(why)
         for trip in list(self.trips.values()):
             self.end_trip(trip, True, f"emergency:{why}", commands=False)
         if self.goods is not None:
@@ -441,9 +448,6 @@ class PriorityService(VipMixin, MedicalMixin, OverloadMixin):
 
 def subscribe(ctx, service: PriorityService) -> None:
     bus = ctx.bus
-    from ems.contracts.events import CarStatusUpdated, OverloadDetected
-    bus.subscribe(OverloadDetected, service.on_overload)
-    bus.subscribe(CarStatusUpdated, service.on_overload_status)
     for event, handler in [
             (CallRequested, service.on_call_requested), (CallAssigned, service.on_assigned),
             (CallReassigned, service.on_reassigned), (CallCancelled, service.on_call_cancelled),

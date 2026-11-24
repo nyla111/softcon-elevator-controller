@@ -267,21 +267,14 @@ class Dispatcher(AssignMixin, PauseMixin, CeilingMixin, PolicyMixin):
                                             ev.requested_by == BY):
             self.reassign_calls_of(ev.car_id, f"state_{ev.new.name.lower()}")
 
+    def on_priority_ended(self, ev: PriorityTripEnded) -> None:
+        """The exclusive hold is over. A VIP who has not boarded keeps the same car (Part 5),
+        but the dispatcher looks after the call again from now on (FR-04, FR-100, retries)."""
+        self.exclusive.discard(ev.car_id)
+        self._take_back_priority_calls(ev.car_id)
+
     def on_priority_started(self, ev: PriorityTripStarted) -> None:
         self.exclusive.add(ev.car_id)
-
-    def on_priority_ended(self, ev: PriorityTripEnded) -> None:
-        self.exclusive.discard(ev.car_id)
-        if ev.kind != "vip" or not ev.cancelled:
-            return
-        # VIP pickups are not in the ordinary waiting index. When Priority ends an
-        # unboarded trip (e.g. overload/no boarding), restore queue ownership so it
-        # can actually leave that car. A boarded record is 'riding', never 'vip'.
-        for rec in list(self.calls.values()):
-            if rec.state == "vip" and rec.car == ev.car_id:
-                rec.state, rec.avoid = "assigned", ev.car_id
-                self.waiting.setdefault(ev.car_id, set()).add(rec.call.call_id)
-                self._dispatch(rec, exclude={ev.car_id}, reason="priority_cancelled")
 
     # ================================================================ periodic work
 
