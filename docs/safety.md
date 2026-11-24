@@ -75,41 +75,33 @@ included. Duplicate assertions/statuses and link loss do not count; a matching f
 clear is required before another episode. Further episodes while already at/above three
 do not spam notices; the threshold may notify again after old episodes age out. P5 keeps
 FR-30 per-episode alerts. See `tests/safety/test_fault_review.py`; the window convention
-and cross-owner integration remain subject to owner review in #88.
+is retained by integrated #91. This does not approve the separate FR-52 contract in #88.
 
 Part 5 is merged and exercised directly in `tests/integration/test_safety_priority.py`.
-Seven strict xfails track [issue #18](https://github.com/nyla111/softcon-elevator-controller/issues/18):
-PR16-01 owner transfer (2), PR16-02 isolated VIP preemption (2), PR16-03 cached emergency
-claim (2), PR16-04 fire recovery without a service group (1). These require Part 5 fixes.
+Historical regressions associated with [issue #18](https://github.com/nyla111/softcon-elevator-controller/issues/18)
+remain inspectable in those tests. Use final CI's actual pass/xfail/xpass results and
+the issue's current status; the historical count is not a current blocker inventory.
 
-| Owner / requirement | Still needed |
+| Owner / requirement | Current integration / remaining obligation |
 |---|---|
-| Part 1 controller recovery | Explicit normal/reset-complete and safety-input-clear telemetry, correlated to the current emergency; ordinary `CarStatus` cannot prove these. |
-| Part 6 FM recovery | Authenticated FM confirmation for the current episode, rejected on stale/replayed confirmation; connect trusted adapters before exposing recovery. |
-| Part 2 Dispatch | Real waiting-call retention/reassignment excluding boarded riders; overload step-out/next-car messages within 1 s; guard all commands. |
-| Part 3 Access | Pre-acceptance action ID, kind and exemption classification plus proven duplicate correlation and waiting/boarded status; optional lockdown suspend/resume. |
-| FR-52 generator operation | Approved capacity/allocation, per-car enable acknowledgement and parking completion, readiness withdrawal/failure, and episode-correlated rescue reports. Limited operation/sequential parking is unimplemented; the simulator currently resumes all physical cars on `GeneratorReady`. |
+| P1/P6 FR-55 | Controller normal/clear reports, explicit authenticated FM confirmation and post-confirm service are integrated (#48/#49/#94/#108). |
+| P2 / P5 / P6 | Waiting-call identity and healthy reassignment, overload bilingual/voice/next-car deadlines, camera review and crowd-only distinction are integrated; #99 keeps current main's overload implementation. |
+| P3 Access | #96/#100 enforce policy before acceptance, real exemptions, exact replay tokens, owner cancellation and proven door-cycle no-show. Uncertain calls stay. Lockdown retains configured floors through fire/recovery (#92). |
+| FR-52 generator operation | BLOCKED: approved commissioning count/orders and Q2-Q7 readiness, revision, permission, acknowledgement, withdrawal and orchestration decisions are absent (#46/#88). The parking primitive is not limited-operation acceptance. |
 
-`call_policy.py` independently allows five ordinary actions per rolling 60 s; the sixth
-starts a fixed 60 s block. Denied repeats do not extend it. `evaluate()` returns an
-immutable decision with bilingual refusal text and retry time; `allow()` remains a
-boolean wrapper. The third episode per simulated calendar day invokes the security-log
-owner's callback once. Midnight resets daily counts, not an active block. Exit/assistance/
-fire actions remain exempt and consume no quota. Duplicate removal requires same-action
-proof, waiting status, no boarding and no uncertainty. These policies await Access admission
-integration; Safety does not filter already accepted `CallRequested` events.
+`call_policy.py` permits five ordinary actions in60s; the sixth starts a fixed60s
+block. Denied repeats do not extend it. Access displays the bilingual decision before
+publishing a call. The third episode per calendar day writes the credential only in
+the security log and sends one anonymous security notice. Midnight resets the daily
+count, not an active block. Exit/accessibility/alarm/medical/fire remain exempt.
+Exact owner-issued action tokens prove replays; estimates or uncertain occupancy do
+not prove duplicates. Safety never filters accepted CallRequested events.
 
-`acceptance.py` loads only when a Part 4 scenario executes. This SIM-08 branch requires
-both the original peak run and an occupied-VIP quiet companion (DECISIONS D-09).
-Every run uses real Access, Dispatch, Priority, controllers and notification services.
-The combined checker requires all18 criteria, including actual lobby-alighting events
-for every rider onboard at the alarm, zero EMS commands before valid FM recovery and
-no automatic restart of the interrupted VIP. A lobby-bound rider's `evacuated` boolean
-is false by definition because its destination was reached; the actual alighting event
-is the evacuation evidence. The lockdown configuration persists through the draft P3
-interface #92. This branch's readiness is not acceptance on main; all10 paired seeds,
-CI, P3 owner agreement and required review remain gates. Other Safety scenarios retain
-their existing branch-local partial status; separate PRs contain their acceptance work.
+SIM-08/13/14/15/17 are ready with complete checkers. Every mandatory seed1-10 is
+enforced in CI, including both full SIM-08 workloads. Passing a selected subcriterion
+or an empty shortened run cannot establish acceptance. See [current acceptance
+matrix](part4_acceptance.md) for integrated PRs, issue closure gates and remaining
+FR-52 and wider scenario limitations. Full final main CI remains the release gate.
 
 ## Run
 
@@ -128,5 +120,5 @@ by60s, records every attempted command and assignment through FM recovery, retai
 waiting clocks, exercises early refusal/120s stable mains/clear-normal reports, excludes
 a faulted car and proves post-confirm delivery. Seeds1-10 pass individually, with raw
 traces and companion active CSV evidence. See tests/safety/test_sim14_journey.py and
-docs/passenger_lists/issue33_evidence.md. These are branch results pending review/CI/merge;
+docs/passenger_lists/issue33_evidence.md. The implementation is on main through #94; final integrated CI remains the gate;
 FR52 successful-generator limited operation is a separate outstanding requirement.
