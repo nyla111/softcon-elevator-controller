@@ -55,6 +55,15 @@ actions are authorised from `access.permission(card).roles`; no credential id in
 * **Passenger lists.** `sim12_vip_caps.csv` and `sim18_medical_over_vip.csv` start at 07:00
   (`# start=07:00`, Rush) so they keep showing exclusive trips; `br10_priority_order.csv` runs
   at 00:00 (Eco), where its VIP is served as a normal call ahead of ordinary calls.
+* **Effect on the Balanced / Eco scenarios** (background traffic is 1% VIP; seeds 1-10, same
+  environment, main vs this change). SIM-12 and SIM-18 run in Rush and are unchanged (identical
+  event digests). SIM-03 (Balanced) full pass 3/10 -> 6/10; SIM-04 (Eco) 8/10 -> 8/10 (same
+  failing seeds 3 and 10). SIM-03 seed 1 now fails "no wait over 90 s" (one ordinary call,
+  92.0 s; passed on main with 85.6 s) while seeds 2, 6, 8 and 10 now pass. In that 92 s window
+  there is no exclusive trip and no VIP call in the group: the call was assigned once to a car
+  that had just loaded seven lobby riders and was not re-assigned, i.e. the "none over" gap
+  documented in `docs/dispatch.md` (proposed D-07), reached on a trajectory that changed 26
+  minutes earlier when a VIP call no longer took a car.
 
 ## For the other parts
 * **Part 2:** for a VIP call call `claim_call(call)` before choosing a car; a car id means publish
