@@ -1,7 +1,7 @@
 """FR-42: Security operators can lock or unlock selected floors"""
 
 from ..contracts.config import LOBBY
-from ..contracts.types import Role
+from ..contracts.types import CarState, Role
 
 
 class Lockdown:
@@ -64,6 +64,14 @@ class Lockdown:
 
     def can_visit_floor(self, floor, permission):
         """Check lockdown only; normal ACS permissions are checked elsewhere."""
+        # FR-50: preserve configured locks, suspend only their effective enforcement.
+        # Shared supervisory states retain FIRE_RECALL until valid FR-55 recovery,
+        # so clear/reset or a stale FireAlarm event cannot reopen/restore this gate.
+        building = self.ctx.services.get("building")
+        if building is not None and any(
+                self.ctx.get("car_states").state(car) is CarState.FIRE_RECALL
+                for group in building.groups for car in group.cars):
+            return True
         # STEP 1: Always allow travel to the Lobby
         if floor == LOBBY:
             return True

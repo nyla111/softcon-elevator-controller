@@ -34,6 +34,12 @@ def test_unknown_or_unsafe_run_id_is_404(tmp_path):
     assert client.get("/api/runs/nope").status_code == 404
 
 
+def test_saved_run_history_page_is_available():
+    page = TestClient(app).get("/history/")
+    assert page.status_code == 200
+    assert "Compare saved runs" in page.text
+
+
 def test_live_run_starts_in_the_mode_that_fits_its_profile():
     client = TestClient(app)
     expected = {"up_peak": "rush", "lunch": "rush", "evening": "rush", "balanced": "balanced",

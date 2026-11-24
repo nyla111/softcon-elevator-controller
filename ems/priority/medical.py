@@ -1,15 +1,15 @@
 """Medical priority (FR-127) and send-to-lobby (FR-128). Mixed into PriorityService.
 
-Both are security actions. The car goes express to the target floor and keeps its doors open
-there (the hold is sent on arrival). Riders stay on board with their own destinations. Security
-ends the trip with finish_trip().
+Both are security actions. Medical waits for existing riders' proven destination delivery
+before reassigning an occupied car. The medical car then goes express and holds its doors
+at the target. Security ends the trip with finish_trip().
 """
 from __future__ import annotations
 
 from ems.contracts.types import CarId, CredentialId, DoorState, Floor, GroupId, Role, floor_label
 
 from . import policy
-from .model import EXCLUSIVE, Outcome, Trip
+from .model import EXCLUSIVE, Outcome, PendingMedical, Trip
 
 
 class MedicalMixin:
@@ -37,7 +37,8 @@ class MedicalMixin:
                        f"{floor_label(destination)} ({out.reason})", floor=origin)
         return out
 
-    def _start_medical(self, origin: Floor, destination: Floor) -> Outcome:
+    def _start_medical(self, origin: Floor, destination: Floor, *,
+                       reserved_car=None, request_id=None) -> Outcome:
         why = self.blocked_reason()
         if why:
             return Outcome(False, why)
@@ -50,8 +51,23 @@ class MedicalMixin:
                         if any(self._calls.get(c) is not None and self._calls[c].origin == origin
                                for c in self.pending_calls_of(s.car_id))}
         for s in policy.medical_candidates(statuses, origin, waiting_here):
+            if reserved_car is not None and s.car_id != reserved_car:
+                continue
+            if any(p.car_id == s.car_id for p in self.pending_medical.values()):
+                continue
             group = self.group_of_car(s.car_id)
-            trip_id = self.next_id("med")
+            trip_id = request_id or self.next_id("med")
+            if s.passengers > 0:
+                riders = dict(self.riders.get(s.car_id, {}))
+                if len(riders) < s.passengers:
+                    continue  # Cannot invent destination delivery for unknown occupants.
+                self.pending_medical[trip_id] = PendingMedical(
+                    trip_id, s.car_id, origin, destination, riders,
+                )
+                self.alert("info", "medical_waiting_delivery", ["security"],
+                           f"Medical request waits for existing riders in car {s.car_id} "
+                           "to reach their destinations", s.car_id, origin)
+                return Outcome(True, "awaiting_rider_delivery", trip_id, s.car_id)
             vip = self.trip_of_car(s.car_id)
             there = s.position == origin and s.doors is DoorState.OPEN
             if vip is not None:                        # the VIP car itself: hand the hold over
@@ -78,13 +94,41 @@ class MedicalMixin:
             return Outcome(True, "ok", trip_id, s.car_id)
         return Outcome(False, "no_eligible_car")
 
+    def _medical_rider_alighted(self, event) -> None:
+        for ref, pending in list(self.pending_medical.items()):
+            if pending.car_id != event.car_id or event.call_id not in pending.remaining:
+                continue
+            destination = pending.remaining.pop(event.call_id)
+            if event.floor != destination:
+                self.pending_medical.pop(ref)
+                self.alert("critical", "medical_delivery_unconfirmed", ["security"],
+                           "Existing rider did not reach the recorded destination; medical "
+                           "reassignment cancelled", event.car_id)
+            elif not pending.remaining and self.status(event.car_id).passengers == 0:
+                self.pending_medical.pop(ref)
+                outcome = self._start_medical(pending.origin, pending.destination,
+                                              reserved_car=pending.car_id, request_id=ref)
+                if not outcome.ok:
+                    self.alert("critical", "medical_no_car", ["security"],
+                               f"Pending medical car could not start ({outcome.reason})",
+                               pending.car_id, pending.origin)
+
+    def _cancel_pending_medical(self, reason, car_id=None) -> None:
+        for ref, pending in list(self.pending_medical.items()):
+            if car_id is None or pending.car_id == car_id:
+                self.pending_medical.pop(ref)
+                self.alert("critical", "medical_request_cancelled", ["security"],
+                           f"Pending medical request cancelled ({reason})", pending.car_id)
+
     def medical_depart(self, credential_id: CredentialId, trip_id: str) -> Outcome:
         """Security confirms the patient is in the car: express to the destination."""
         actor, err = self.authorize(credential_id, "medical.depart", Role.SECURITY)
         if err:
             return err
         trip = self.trips.get(trip_id)
-        if trip is None or trip.kind != "medical":
+        if trip_id in self.pending_medical:
+            out = Outcome(False, "awaiting_rider_delivery")
+        elif trip is None or trip.kind != "medical":
             out = Outcome(False, "unknown_trip")
         elif trip.phase != "at_origin":
             out = Outcome(False, "not_at_origin")
@@ -149,6 +193,11 @@ class MedicalMixin:
         actor, err = self.authorize(credential_id, "trip.finish", Role.SECURITY)
         if err:
             return err
+        pending = self.pending_medical.pop(trip_id, None)
+        if pending is not None:
+            out = Outcome(True, "cancelled", trip_id, pending.car_id)
+            self.record("trip.finish", actor, out.ok, out.reason, trip_id)
+            return out
         trip = self.trips.get(trip_id)
         if trip is None or trip.kind == "vip":
             out = Outcome(False, "unknown_trip")

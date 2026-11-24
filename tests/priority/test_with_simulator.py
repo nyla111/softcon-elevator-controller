@@ -3,7 +3,7 @@ Part 2/3/4 contract stubs + Part 5 stand-ins (ems/priority/standins.py). This is
 with the simulator only, not with Part 2/3/4 (still stubs at the base commit)."""
 from ems.contracts.events import (CallAssigned, HeartbeatLost, PassengerArrived,
                                   PriorityTripEnded, PriorityTripStarted)
-from ems.contracts.types import CarState, Role
+from ems.contracts.types import CarState, Mode, Role
 from ems.core.app import build
 from ems.priority.standins import (VipReplacementPopulation, install_scenario_standins,
                                    integration_gaps)
@@ -66,6 +66,7 @@ def test_up_peak_run_is_deterministic_with_part5_and_leaves_nothing_held():
 def test_heartbeat_loss_ends_a_vip_trip_and_the_car_is_reopened_later():
     ctx = build(seed=1, start=None)
     install_scenario_standins(ctx)
+    ctx.services["dispatcher"].set_manual_mode(Mode.RUSH)    # FR-12: VIP exclusivity needs Rush
     sim, p = ctx.services["controllers"], ctx.services["priority"]
     TrafficGenerator.fixed(ctx, PROFILES["up_peak"], 0.0, 900.0).start()
     trip = None
@@ -102,6 +103,7 @@ def test_vip_call_is_not_lost_when_its_car_is_taken_for_medical_before_boarding(
     for ever on a car that had no stop for them."""
     ctx = build(seed=1)
     install_scenario_standins(ctx)
+    ctx.services["dispatcher"].set_manual_mode(Mode.RUSH)    # FR-12: VIP exclusivity needs Rush
     sim, p = ctx.services["controllers"], ctx.services["priority"]
     for c in ("F", "G", "H", "S"):
         sim.inject_fault(c, "F-X")

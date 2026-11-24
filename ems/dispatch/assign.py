@@ -187,7 +187,10 @@ class AssignMixin:
 
     def on_overload(self, ev: OverloadDetected) -> None:
         """Step-out message naming the next car now; re-assign the calls left at that floor
-        once the boarding in progress is over (the controller boards first come first)."""
+        once the boarding in progress is over (the controller boards first come first).
+        A VIP call Part 5 claimed on this car is a hall call waiting at that floor too: it is
+        taken back and re-assigned like the others (a full car cannot serve it, #32 / SIM-13)."""
+        self._take_back_priority_calls(ev.car_id, floor=ev.floor)
         here = [self.calls[c] for c in self.waiting.get(ev.car_id, set())
                 if self.calls[c].call.origin == ev.floor]
         nxt = None
@@ -210,6 +213,17 @@ class AssignMixin:
         delay = (riders_out + len(here)) * config.SIM["s_per_passenger"] + 0.5
         car, floor = ev.car_id, ev.floor
         self.ctx.clock.call_later(delay, lambda: self._reassign_left_behind(car, floor))
+
+    def _take_back_priority_calls(self, car_id: CarId, floor: Optional[int] = None) -> None:
+        """VIP calls claimed by Part 5 on this car that are still waiting (optionally only at
+        one floor) become ordinary assigned calls of that car again, so FR-04, FR-100 and the
+        retry loop apply to them. Their stop stays registered; the wait clock is unchanged."""
+        for rec in sorted((r for r in self.calls.values()
+                           if r.state == "vip" and r.car == car_id
+                           and (floor is None or r.call.origin == floor)),
+                          key=lambda r: (r.call.created_at, r.call.call_id)):
+            rec.state = "assigned"
+            self.waiting.setdefault(car_id, set()).add(rec.call.call_id)
 
     def _reassign_left_behind(self, car_id: CarId, floor: int) -> None:
         for cid in sorted(self.waiting.get(car_id, set())):

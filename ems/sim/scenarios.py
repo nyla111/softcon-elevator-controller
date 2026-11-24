@@ -41,7 +41,7 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarS
 
 from .baseline import install_dispatch_standin
 from .building import BUILDINGS
-from .faults import (Fault, camera_event, ems_server_crash, fire_alarm, link_loss, mains_loss,
+from .faults import (Fault, camera_event, ems_server_crash, fire_alarm, link_loss,
                      measured, overload_burst, plugin_crash)
 from .harness import CLEAR_S, MEASURE_S, WARMUP_S, RunResult, run
 from .traffic import PROFILES, SRS_ORIGINAL_PEAK_RATE, with_rate
@@ -283,11 +283,11 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
         srs_criteria='Car marked Disconnected in 3 s; fallback rule assigns all calls', verifies='FR-104, FR-105'),
     _todo("SIM-17", 'Conditional: duplicate/uncertain calls and 20 card actions', 4, "balanced", 'Only proven duplicates/cancelled calls removed; uncertain calls retained; sixth ordinary action starts limit; exits and assistance exempt', 'FR-120, FR-121, FR-125, BR-07'),
     Scenario("SIM-18", 'Medical priority starts during an occupied VIP trip', 5, "up_peak", setup=_part5("setup_sim_18"), check=_part5("check_sim_18"), ready=True, srs_criteria='VIP exclusivity yields; already-boarded riders are safely delivered; a healthy available car performs medical trip above VIP/accessible', verifies='FR-127, BR-10', notes='Medical priority starts after the VIP has boarded.'),
-    Scenario("SIM-19", 'Compressed monthly and six-month wear balance', 2, "balanced",
+    Scenario("SIM-19", 'Compressed wear-counter diagnostic', 2, "balanced",
              check=_part2("check_sim_19"), ready=True,
              srs_criteria='Per-group distance imbalance <2% monthly and <=5% per six-month counter period; wait targets remain higher priority',
              verifies='NFR-W1, NFR-P3',
-             notes='Each run seeds the equal-distance history, then executes a measured final traffic slice.',
+             notes='Fast counter diagnostic only; real 24h acceptance is tests/scenarios/test_sim_19_wear.py with EMS_LONG=1, and monthly evidence comes from ems.sim.long_run.',
              runs=[
                  RunSetup("compressed month", "balanced", 10.0, warmup_s=0.0,
                           measure_s=600.0, clear_s=600.0,
@@ -317,9 +317,13 @@ SCENARIOS["SIM-13"].runs[0].faults = [
 ] + [camera_event("bulky_item", "A", measured(21)),
      camera_event("bulky_item", "A", measured(23)),
      camera_event("repeated_overload", "A", measured(24), people_count=20)]
-SCENARIOS["SIM-14"].runs[0].faults = [
-    mains_loss(measured(20), 300, generator_failed=True, failed_rescue_cars=("A",))]
+SCENARIOS["SIM-14"].runs[0].setup = _part4("setup_sim_14")
+SCENARIOS["SIM-14"].runs[0].faults = []  # Setup chooses a real occupied silent-rescue car.
+SCENARIOS["SIM-14"].ready = True
+SCENARIOS["SIM-14"].waiting_for = None
 SCENARIOS["SIM-15"].runs[0].setup = _part4("_setup_safety_brake")
+SCENARIOS["SIM-15"].ready = True
+SCENARIOS["SIM-15"].waiting_for = None
 
 
 def get(scenario_id: str) -> Scenario:

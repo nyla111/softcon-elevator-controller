@@ -1,0 +1,13 @@
+# start=07:00
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note,params,within_s
+0,1,15,card-L15-001,false,false,sim14-onboard,,,,delivered,5,SIM-14 FR-110/111/55: actual silent-rescue rider stays onboard until mains restoration; companion Python asserts recovery windows,,
+14,,,,,,,mains_loss,A,,alert:entrapment,,SIM-14 FR-110 #33 #55: require failed generator and one missing rescue report for occupied car by t=74,generator_failed=true;failed_rescue_cars=A,60
+14,,,,,,,check,A,,no_alert:entrapment,,SIM-14 FR-110: no premature missing-report alert; exact 60 s deadline in companion test,,59.999
+15,1,5,card-L5-001,false,false,sim14-during-outage,,,,delivered,300,SIM-14 FR-110 FR-111 FR-55 #33 #55: retain waiting request,,
+74.00000000000001,,,,,,,check,,,no_alert:entrapment,,SIM-14 FR-110 #33 #55: next representable time after t=74,,
+140,,,,,,,mains_restore,,,no_alert:entrapment,,SIM-14 FR-111 FR-55 #33 #55: start stable-mains interval,,
+141,,,,,,,fm_confirm,,,no_alert:entrapment,,SIM-14 FR-111 FR-55 #33 #55: early FM confirmation must be refused and not cached,,
+259,,,,,,,fm_confirm,,,no_alert:entrapment,,SIM-14 FR-111 FR-55 #33 #55: still only 119 s stable mains,,
+260,,,,,,,check,,,no_alert:entrapment,,SIM-14 FR-111 FR-55 #33 #55: 120 s stable mains alone must not resume dispatch without a new valid FM confirmation,,
+261,,,,,,,fm_confirm,,,no_alert:entrapment,,SIM-14 FR-111 FR-55 #33 #55: valid FM confirmation requires controller-normal and clear-safety reports,,
+262,1,5,card-L5-001,false,false,sim14-after-confirm,,,,delivered,60,SIM-14 FR-111/55: post-confirmation passenger completes after valid FM recovery,,

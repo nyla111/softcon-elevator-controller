@@ -78,3 +78,19 @@ SIM-08 retains its existing pending fixture and historical #26 notes from #44.
 FR-55 is now wired by merged #48/#49, but extending or promoting that fixture was
 outside the remaining SIM-14/SIM-15 change. No scenario-registry readiness flag was
 changed. Keep #33 open until all requested acceptance is demonstrated.
+
+## SIM-14 implementation evidence — 23 November 2026
+The previous pending outcome failures above are historical. The active sim14_power_loss.csv
+now uses generator_failed=true and failed_rescue_cars=A, with #start=07:00 and bounded
+per-car60s checks. Original delivered expectations remain unchanged. Companion tests in
+tests/safety/test_sim14_journey.py prove occupancy, no premature alighting, exact74s
+notification/context, no attempted EMS command or assignment before261s, original waiting
+clocks, refusals at141/259s and valid FM confirmation at261s.
+
+The full registry setup selects an actually occupied silent-rescue car from real telemetry,
+keeps B physically faulted, captures trapped occupancy just before restoration, rejects early
+FM confirmation, observes the120s boundary, and admits post-confirm traffic. All seven
+criteria plus clearance pass on EACH seed1-10;20 fixture/registry tests pass. Redacted raw
+traces are retained under .tmp/part4-sim14-evidence (10 JSON files); XML is
+.tmp/part4-sim14-complete.xml. Registry readiness now enforces the complete checker.
+Review, CI and merge remain required. This failed-generator scenario does not prove FR52.
