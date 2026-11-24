@@ -18,7 +18,7 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
     # Part 5: SIM-06, 11, 12, 18 (ems/priority/acceptance); Part 2: SIM-01..05, 10
     # (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
-    assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-09",
+    assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-08", "SIM-09",
                      "SIM-10", "SIM-11", "SIM-12", "SIM-14", "SIM-15", "SIM-16", "SIM-18", "SIM-19"]
     for s in SCENARIOS.values():
         if not s.ready:
@@ -49,17 +49,17 @@ def test_registry_loads_part4_only_when_a_part4_scenario_executes():
         assert module not in sys.modules
         for scenario in SCENARIOS.values():
             describe(scenario)
-        for sid in ("SIM-08", "SIM-13", "SIM-17"):
+        for sid in ("SIM-13", "SIM-17"):
             result = run_scenario(sid, 1)
             assert result["ready"] is False and result["passed"] is None
         assert module not in sys.modules
         # Executing another owner's scenario must not load Safety acceptance either.
-        for sid in ("SIM-09", "SIM-08"):
+        for sid in ("SIM-09", "SIM-13"):
             for setup in SCENARIOS[sid].runs:
                 setup.warmup_s = setup.measure_s = setup.clear_s = 0
         run_scenario("SIM-09", 1)
         assert module not in sys.modules
-        result = run_scenario("SIM-08", 1, metrics_only=True)
+        result = run_scenario("SIM-13", 1, metrics_only=True)
         assert module in sys.modules
         assert result["ready"] is False and result["passed"] is None
         assert result["criteria"]
@@ -96,7 +96,7 @@ SETUP = {
     "SIM-04": [("eco_quiet", "fixed"), ("eco_quiet", "fixed"), ("up_peak", "fixed")],
     "SIM-05": [("weekday", "weekday")],
     "SIM-06": [("up_peak", "fixed")], "SIM-07": [("up_peak", "fixed")],
-    "SIM-08": [("up_peak", "fixed")], "SIM-09": [("up_peak", "fixed")],
+    "SIM-08": [("up_peak", "fixed"), ("eco_quiet", "fixed")], "SIM-09": [("up_peak", "fixed")],
     "SIM-10": [("balanced", "fixed")], "SIM-11": [("up_peak", "fixed")], "SIM-12": [("up_peak", "fixed")],
     "SIM-13": [("up_peak", "fixed")], "SIM-14": [("up_peak", "fixed")],
     "SIM-15": [("up_peak", "fixed")], "SIM-16": [("up_peak", "fixed")],
@@ -140,7 +140,8 @@ def test_sim_04_pair_and_surge():
 def test_sim_05_is_the_24h_schedule_and_sim_08_alarm_is_at_the_rush_transition():
     (wk,) = SCENARIOS["SIM-05"].runs
     assert wk.mode == "weekday" and wk.measure_s == 86400.0 and wk.warmup_s == 0.0
-    (r,) = SCENARIOS["SIM-08"].runs
+    r, companion = SCENARIOS["SIM-08"].runs
+    assert companion.profile_name == "eco_quiet" and companion.faults == r.faults
     alarm = [f for f in r.faults if f.kind == "fire_alarm"]
     assert len(alarm) == 1 and r.start_hhmm == "16:30"
     hh, mm = map(int, r.start_hhmm.split(":"))
@@ -160,5 +161,5 @@ START = {"SIM-01": "07:00", "SIM-03": "13:30", "SIM-05": "00:00", "SIM-06": "07:
 
 def test_every_run_has_a_start_time_of_day():
     for sid, hhmm in START.items():
-        assert [r.start_hhmm for r in SCENARIOS[sid].runs] == [hhmm], sid
+        assert [r.start_hhmm for r in SCENARIOS[sid].runs] == [hhmm] * len(SCENARIOS[sid].runs), sid
     assert [r.start_hhmm for r in SCENARIOS["SIM-02"].runs] == ["11:30", "17:00"]
