@@ -161,3 +161,35 @@ def test_eco_steps_up_on_queue_fr14():
                for a in ctx.bus.of_type(AlertRaised))
     # stays in Balanced until the next scheduled change (07:00 Rush next morning)
     assert d.modes.overrides["LOW"].until == datetime(2026, 11, 17, 7, 0)
+
+
+def test_overload_reassigns_a_vip_call_left_behind_on_its_claimed_car_fr100():
+    # #32 / SIM-13 seed 1: Part 5 claimed a full car for a VIP; the car overloaded at the
+    # VIP's floor and the call stayed on it (234 s wait). It is re-assigned like any other.
+    ctx = build(seed=1)
+    d = ctx.services["dispatcher"]
+    ctx.bus.publish(CallRequested(0.0, call("v1", 1, 9)))
+    car = ctx.bus.of_type(CallAssigned)[0].car_id
+    rec = d.calls["v1"]                        # as if Part 5 had claimed the car
+    d.waiting[car].discard("v1")
+    rec.state = "vip"
+    d.exclusive.add(car)
+    ctx.bus.publish(OverloadDetected(1.0, car, 1, 105.0))
+    ctx.clock.run_until(5.0)
+    (ev,) = ctx.bus.of_type(CallReassigned)
+    assert ev.call_id == "v1" and ev.from_car == car and ev.to_car != car
+    assert ev.reason == "overload" and rec.call.created_at == 0.0
+
+
+def test_dispatcher_looks_after_an_unboarded_vip_call_when_the_trip_ends():
+    from ems.contracts.events import PriorityTripEnded
+    ctx = build(seed=1)
+    d = ctx.services["dispatcher"]
+    ctx.bus.publish(CallRequested(0.0, call("v1", 6, 1)))
+    car = ctx.bus.of_type(CallAssigned)[0].car_id
+    rec = d.calls["v1"]
+    d.waiting[car].discard("v1")
+    rec.state = "vip"
+    ctx.bus.publish(PriorityTripEnded(2.0, "vip", car, True))
+    assert rec.state == "assigned" and "v1" in d.waiting[car]
+    assert d.pending_calls("LOW") == [rec.call]          # visible to Part 5 / FR-04 again
