@@ -17,6 +17,7 @@ class SafetyService:
         self.ctx = ctx
         self.table = StateTable(ctx)
         self.fire = False
+        self.fire_io_alerted = False
         self.firefighters: set[CarId] = set()
         self.mains_lost = False
         self.generator_ready = False
@@ -128,11 +129,17 @@ class SafetyService:
             self.ctx.get("dispatcher").reassign_calls_of(car, owner)
 
     def on_fire(self, event: ev.FireAlarm) -> None:
-        if not self._accept_signal("fire", event) or self.fire:
+        if not self._accept_signal("fire", event):
             return
-        self.fire = True  # includes io_signal_lost; never command controller recall
-        self._begin_emergency(CarState.FIRE_RECALL, "safety:fire")
-        self._display("FIRE RECALL — use the stairs", "BÁO CHÁY — sử dụng cầu thang bộ")
+        if not self.fire:
+            self.fire = True  # includes io_signal_lost; never command controller recall
+            self._begin_emergency(CarState.FIRE_RECALL, "safety:fire")
+            self._display("FIRE RECALL — use the stairs", "BÁO CHÁY — sử dụng cầu thang bộ")
+        # Signal loss still needs notification if a panel alarm already latched fire.
+        # Latch every car first, before synchronous notification consumers can run.
+        if event.source == "io_signal_lost" and not self.fire_io_alerted:
+            self.fire_io_alerted = True
+            self._alert("high", "fire_io_loss", "Fire alarm I/O signal lost; fail-safe recall active")
 
     def on_fire_cleared(self, event: ev.FireAlarmCleared) -> None:
         if not self._accept_signal("fire", event):
@@ -279,6 +286,7 @@ class SafetyService:
         if role is not Role.FM or not self.recovery_eligible():
             return False  # early confirmation is never saved for automatic recovery later
         self.recovery_required = False
+        self.fire_io_alerted = False
         for car in self.table.cars():
             self.table.set(car, CarState.FIRE_RECALL, "safety:fire", False)
             self.table.set(car, CarState.EMERGENCY_POWER, "safety:power", False)
