@@ -189,8 +189,11 @@ Both independently require actual lobby evacuation, VIP/goods cancellation witho
 automatic restart, no EMS commands during fire/recovery, isolated-car exclusion,
 retained lockdown configuration and explicit FM recovery followed by real service.
 Both must pass; this does not lower default traffic or waive any safety assertion.
-The genuine VIP is submitted22s before fire in the peak run to keep the real no-show
+The genuine VIP is submitted10s before fire in the peak run to keep the real no-show
 window active; the quiet companion uses29s to allow actual boarding. Each workload's
 lead time is fixed across all seeds. No timer, selection rule or controller is bypassed.
-P3's effective lockdown integration remains an owner-review draft (#92).
+P3's effective lockdown integration is on main through #92. Integration on 25 November
+found that the old22s lead allowed a legitimate no-show before fire at seed8 with the
+current dispatcher. The complete seed8 journey passes with10s; all original assertions
+remain enforced in CI. The quiet companion remains29s.
 This test-design decision does not approve any FR-52 commissioning value or contract.

@@ -1,5 +1,17 @@
 # SIM-08 branch acceptance evidence
 
+## 25 November integration correction
+
+Latest-main integration reproduced a legitimate peak VIP no-show before the alarm at
+seed8 with the historical22s lead. A fixed10s peak lead keeps the request inside a full
+door cycle; the occupied companion remains29s. The complete peak seed8 test now passes,
+including all nine criteria and passenger clearance, without changing production code,
+traffic rate or assertions. Raw evidence: `.tmp/final-fire-seed8`.
+The JSON and results below are historical branch evidence, not results for this new
+timing. The integrated full CI must verify all seeds before acceptance is signed off.
+
+## Historical branch evidence
+
 23 November 2026; audited main2885a9e, stacked on P3 draft #92.
 The task owner approved the pairing in DECISIONS D-09. This is branch evidence,
 not acceptance on main and not P3 owner/interface approval.

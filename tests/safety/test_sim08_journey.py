@@ -33,5 +33,7 @@ def test_full_fire_acceptance_each_seed(seed, occupied_companion):
         path = Path(directory) / f"sim08-{'occupied' if occupied_companion else 'peak'}-seed{seed}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, default=str), encoding="utf-8")
-    assert criteria and all(passed for _, passed, _ in criteria), criteria
+    assert criteria and all(passed for _, passed, _ in criteria), [
+        criterion for criterion in criteria if not criterion[1]
+    ]
     assert result.metrics["calls_not_cleared"] == 0

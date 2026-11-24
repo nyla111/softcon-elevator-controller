@@ -9,7 +9,7 @@ CLEAR = ALARM + 300
 CONFIRM = CLEAR + 7
 
 
-def setup_sim_08(ctx, *, vip_lead_s=22):
+def setup_sim_08(ctx, *, vip_lead_s=10):
     p, states, sim = ctx.get("priority"), ctx.get("car_states"), ctx.get("controllers")
     log = ctx.services.setdefault("fire_acceptance", {"attempts": []})
     sim.inject_fault("B", "scenario:isolation")
@@ -71,8 +71,9 @@ def setup_sim_08(ctx, *, vip_lead_s=22):
         log["attempts"].append((ctx.clock.now(), states.confirm_recovery(Role.FM)))
 
     ctx.clock.call_at(ALARM - 30, prepare_vip)
-    # Submit inside the real pickup/no-show window so this exercises fire
-    # cancellation rather than a legitimate earlier no-show cancellation.
+    # Keep peak requests inside a complete pickup/no-show door cycle, even
+    # when the current dispatcher immediately chooses a car at the lobby.
+    # The occupied companion separately allows time for actual boarding.
     ctx.clock.call_at(ALARM - vip_lead_s, attempt_vip)
     ctx.clock.call_at(ALARM - 0.001, before_alarm)
     ctx.clock.call_at(ALARM + 1, inspect_fire)
