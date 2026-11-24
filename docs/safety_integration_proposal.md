@@ -1,6 +1,11 @@
 # Safety integration decisions for owner review
 
-Status: PROPOSED, not an approved contract or changed SRS. Main baseline 2885a9e.
+Status updated 25 November 2026: FR-52 below remains PROPOSED and unapproved.
+No commissioned count or ordered car IDs have been supplied. No power runtime is
+enabled by this document. Historical baseline:2885a9e; integrated runtime:f4fb40a.
+Admission #96/#100, lockdown #92, medical #93 and FR-113 #91 are now on main.
+Their proposal text below is design history; see part4_acceptance.md and actual code
+for integrated status. A merge is not evidence of FR-52 owner/commissioning approval.
 Owners: P1/tech lead nyla111, P2 NguyenCongNam1405, P3 baovy511,
 P4 baobinh-asatsugi, P5 Mancupfire. Related #46, #61, #82, #83, #84.
 No default commissioned capacity, acknowledgement, or permission is inferred.
@@ -125,7 +130,7 @@ threshold with runtime tests. Review the window/interface in that PR before merg
 
 ## SIM-08 evidence pairing
 
-The task owner explicitly approved two mandatory full real-service runs per seed1–10:
+The task owner explicitly approved two mandatory full real-service runs per seed1â€“10:
 the default35/min up-peak Rush-transition/fire scenario, and a controlled quiet companion
 requiring an actual occupied VIP at the alarm. The default may have an active VIP waiting
 for pickup while ordinary riders are onboard. Both runs independently require goods

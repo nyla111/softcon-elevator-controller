@@ -25,7 +25,7 @@ This combination does not identify the alerted car or inspect command windows.
 Run a single list from the repository root (installed development environment):
 
 ```sh
-python - docs/passenger_lists/pending/sim14_power_loss.csv <<'PY'
+python - docs/passenger_lists/sim14_power_loss.csv <<'PY'
 import sys
 from ems.sim.scripted import load, run_list
 ctx, checks = run_list(load(sys.argv[1]), seed=1)
@@ -35,8 +35,8 @@ raise SystemExit(0 if all(check.ok for check in checks) else 1)
 PY
 ```
 
-Repeat with `pending/sim15_brake_fault.csv`. Pending failures are expected evidence,
-not successful acceptance. `run_list` uses the registered real dispatcher when
+Repeat with `sim15_brake_fault.csv`. Both lists are active; pending files, if any,
+are historical/blocked evidence rather than acceptance. `run_list` uses the registered real dispatcher when
 available; the nearest-car stand-in is installed only for `StubDispatcher`.
 It starts at midnight, runs through the last row, then allows up to 1800 additional
 seconds for outstanding passengers. SIM-15 therefore uses t=25200 for 07:00 up-peak.
@@ -59,24 +59,19 @@ expectations pass; verify the intended fault and all acceptance conditions first
 
 ## Issue #33 coverage audit
 
-Audit base: `bf5c50987397acc41393bcd7262549664c845e04` (refreshed main).
-No SIM-14/SIM-15 CSVs existed. Existing scenario-registry setups and Safety unit
-tests are separate from passenger-list coverage; registry readiness was not changed.
+Integrated runtime audit: `f4fb40a` (25 November 2026). All four requested safety
+lists are active at the top level and selected by CI. Historical pending-fixture
+limitations in issue33_evidence.md are superseded by its integration update.
 
-| Scenario | File | Status | Remaining acceptance |
-|---|---|---|---|
-| SIM-08 | `sim08_fire_recall.csv` | This branch exercises actual controller reset, explicit FM confirmation and post-confirmation delivery | Complete paired registry tests additionally enforce command windows, VIP/goods cancellation, lockdown and all onboard lobby alighting; all10 paired seeds are required, not just CSV row outcomes. |
-| SIM-14 | `sim14_power_loss.csv` | Full fixture + registry checks pass seeds1-10 on the acceptance branch | Actual failed generator/silent occupied car, exact60s context delivery, no attempted commands/assignments before FM,120s stability, early-refusal and isolated-car exclusion; review/CI/merge pending. |
-| SIM-15 | `sim15_brake_fault.csv` | Full fixture/registry checks pass seeds1-10 on acceptance branch | Explicit occupied moving brake, nonempty original waiting set, healthy reassignment and exact command/alert windows; owner review and CI pending. |
-| SIM-16 | `sim16_link_loss.csv` | Active, preserved | Existing FR-104 coverage; no duplicate. |
+| Scenario | Active file | Required companion evidence |
+|---|---|---|
+| SIM-08 | `sim08_fire_recall.csv` | #108: both full workloads/seeds1-10; actual VIP/goods cancellation, all onboard lobby alighting, zero attempted EMS commands, lockdown retention and explicit FM recovery |
+| SIM-14 | `sim14_power_loss.csv` | #94: failed generator, silent occupied A rescue, exact60s received alert/context, zero attempts before FM,120s stable mains, original waiting clocks and early-confirmation rejection |
+| SIM-15 | `sim15_brake_fault.csv` | #95: explicit occupied between-floor brake, nonempty waiting set, healthy reassignment, original clocks, no boarded reassignment, exact command and alert windows |
+| SIM-16 | `sim16_link_loss.csv` | Existing FR-104 link-loss coverage preserved |
 
-[#26](https://github.com/nyla111/softcon-elevator-controller/issues/26) is closed.
-Merged [#48](https://github.com/nyla111/softcon-elevator-controller/pull/48) wires
-controller-normal/safety-clear reports and `fm_confirm`; merged #49 adds dashboard
-actions. FR-55 support is no longer the reason for blocking the new lists.
-[#46](https://github.com/nyla111/softcon-elevator-controller/issues/46) concerns
-generator integration and does not supply the missing CSV event controls.
-No Part 1, Part 2, Part 6, or shared-contract implementation belongs in this change.
-
-See [issue33 evidence](issue33_evidence.md) for actual results and acceptance gaps.
-Issue #33 must remain open while those gaps remain.
+FR-55 controller reports and authenticated FM actions are implemented (#48/#49).
+Issue #55 supplied the necessary event controls; do not recreate them. Failed-generator
+SIM-14 does not establish successful limited-generator FR-52 (#46).
+See [issue33 evidence](issue33_evidence.md) and [acceptance matrix](../part4_acceptance.md).
+Close #33 only after final main CI verifies the lists and complete companion assertions.
