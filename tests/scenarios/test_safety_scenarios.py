@@ -41,12 +41,11 @@ def test_safety_subcriteria_on_real_scenarios(sid, seed):
     # are real, so no negative check is needed.
 
 
-def test_sim_17_is_blocked_without_fabricating_panel_behavior():
+def test_sim_17_full_checker_rejects_absent_runtime_evidence():
     scenario = SCENARIOS["SIM-17"]
-    assert not scenario.ready
-    criteria = scenario.check(None, None)
-    assert len(criteria) == 1 and not criteria[0][1] and "BLOCKED" in criteria[0][2]
-    assert run_scenario("SIM-17", 1)["passed"] is None
+    assert scenario.ready
+    criteria = scenario.check(None, build())
+    assert criteria and not all(passed for _, passed, _ in criteria)
 
 
 def test_reassignment_check_excludes_boarded_riders_and_requires_real_waiting_reassignment():

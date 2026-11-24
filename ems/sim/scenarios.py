@@ -417,3 +417,7 @@ def run_scenario(scenario_id: str, seed: int, out_dir=None, metrics_only: bool =
 def run_all_seeds(scenario_id: str, seeds=range(1, 11), out_dir=None) -> list[dict]:
     """Every seed on its own. The scenario passes only if every seed passes (no averaging)."""
     return [run_scenario(scenario_id, seed, out_dir) for seed in seeds]
+
+SCENARIOS["SIM-17"].runs[0].setup = _part4("setup_sim_17")
+SCENARIOS["SIM-17"].ready = True
+SCENARIOS["SIM-17"].waiting_for = None
