@@ -11,9 +11,10 @@ Employees can make several trips in one run.
 Basements (D-08), with basements=True (live runs and long runs): some "up" trips start in the
 basement and some "down" trips end there (PARKING_SHARE at the B2 car park, DOCK_SHARE at the
 B1 loading dock). The Appendix B scenario profiles keep their lobby-only mix (basements=False).
-Low-rise cars serve B2/B1, high-rise cars do not, so a basement trip to or from a high-rise
-floor is two rides with a change at the lobby: the second ride starts TRANSFER_WALK_S after
-the first one ends.
+Both passenger groups serve B2/B1 (D-10), so a basement trip is one ride in the group of its
+tenant floor. A building where only some groups serve the basement (SIM-10's zoned layout)
+still makes the trip two rides with a change at the lobby: the second ride starts
+TRANSFER_WALK_S after the first one ends.
 """
 from __future__ import annotations
 
@@ -171,12 +172,13 @@ class TrafficGenerator:
         return self._basement_group()
 
     def _publish(self, origin, destination, person, credential) -> None:
-        """One ride. A basement trip to or from a floor the basement group does not serve rides
-        between the basement and the lobby first and changes there (second ride: _on_alighted)."""
+        """One ride. A basement trip whose tenant floor's group does not serve that basement
+        rides between the basement and the lobby first and changes there (_on_alighted)."""
         self.count += 1
         pid = f"P{self.count:06d}"
-        if min(origin, destination) < LOBBY and \
-                self._group_of(origin, destination) != self._basement_group():
+        basement = min(origin, destination)
+        if basement < LOBBY and self._group_of(origin, destination) not in \
+                self.population.building.parking_floors.get(basement, ()):
             self._transfers[pid] = ((LOBBY, destination), person, credential)
             destination = LOBBY
         self.ctx.bus.publish(PassengerArrived(

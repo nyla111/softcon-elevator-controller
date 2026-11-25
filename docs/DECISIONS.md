@@ -15,6 +15,7 @@ course staff.
 | D-06 | Architecture: one Python app, event bus, simulated clock | Decided 2026-11-10 |
 | D-07 | Wait ceilings as percentiles instead of "none over" | Decided 2026-11-18 |
 | D-08 | Low-rise cars serve the B1/B2 car park, open to every employee card | Decided 2026-11-20 |
+| D-10 | High-rise cars also serve B1/B2: no change at the lobby for basement trips | Decided 2026-11-25 |
 
 ---
 
@@ -161,8 +162,8 @@ their tenant floors, so employees who park in the basement cannot ride a passeng
 
 **Decision:** the low-rise group (A-D) also serves B2 and B1. The SRS defines no separate
 parking permission, so every employee card and tenant admin card may go to B1 and B2.
-Visitor passes still cover only the host floor. High-rise passengers change at the lobby
-(no direct B1/B2 to L16-L30 trip), as for any trip between groups.
+Visitor passes still cover only the host floor. High-rise passengers changed at the lobby
+(no direct B1/B2 to L16-L30 trip); superseded by D-10, where high-rise cars serve B1/B2 too.
 
 **Evidence:** `docs/passenger_lists/parking_b1_b2.csv` (checked in CI).
 
@@ -197,3 +198,25 @@ found that the old22s lead allowed a legitimate no-show before fire at seed8 wit
 current dispatcher. The complete seed8 journey passes with10s; all original assertions
 remain enforced in CI. The quiet companion remains29s.
 This test-design decision does not approve any FR-52 commissioning value or contract.
+
+## D-10 High-rise cars also serve the car park
+
+**Before (D-08):** only the low-rise group (A-D) and the service car stopped at B2 and B1. A
+worker who parks in B2 and works on L16-L30 rode to the lobby, walked 20 s and called a
+high-rise car: two rides, two waits.
+
+**Decision:** the high-rise group (E-H) also serves B2 and B1. A basement trip now rides
+straight to its floor in that floor's group. Access rules are unchanged by this decision
+(B1/B2 access as implemented for #25).
+
+**Why (passenger-centric):** about a third of the high-rise workforce starts and ends the day
+in the car park. The extra travel for a high-rise car is two floors below a lobby it already
+serves, while the passenger saves a second wait, a walk and a second ride. Wear balance
+(NFR-W1) is measured within each group, so the longer high-rise trips do not unbalance it.
+
+**Effect (seed 1, up-peak 35/min with basement traffic, one hour plus clearing):** rides
+3,592 -> 3,141 (no second ride for basement trips), average wait per ride 25.4 s -> 26.3 s,
+p95 64 s -> 72 s, maximum 175 s -> 138 s, average ride 81 s -> 93 s (basement to L16-L30 is now
+one longer ride). A basement to high-rise worker no longer pays a second wait and the 20 s
+walk. The Appendix B scenario profiles keep their lobby-only mix, so their criteria and
+results are unchanged.

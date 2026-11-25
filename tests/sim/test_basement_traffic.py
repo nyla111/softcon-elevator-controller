@@ -1,4 +1,4 @@
-"""D-08 traffic model: basement trips and the change at the lobby (Part 1)."""
+"""D-08 / D-10 traffic model: basement trips ride straight to their floor (Part 1)."""
 from collections import Counter
 
 from ems.contracts import config
@@ -19,9 +19,9 @@ def _run(profile, seconds, basements=True, seed=3):
     return ctx, gen
 
 
-def test_low_rise_cars_serve_the_basements():
+def test_both_passenger_groups_serve_the_basements():
     assert {-2, -1} <= set(config.GROUPS["LOW"]["floors"])
-    assert not {-2, -1} & set(config.GROUPS["HIGH"]["floors"])
+    assert {-2, -1} <= set(config.GROUPS["HIGH"]["floors"])
 
 
 def test_basement_share_of_up_trips_and_the_change_at_the_lobby():
@@ -31,25 +31,22 @@ def test_basement_share_of_up_trips_and_the_change_at_the_lobby():
     up_starts = origins[-2] + origins[-1] + origins[config.LOBBY] - gen.transfers
     assert 0.25 < origins[-2] / up_starts < 0.35
     assert origins[-1] > 0
-    # basement rides only go to the lobby or to a low-rise floor, on the low-rise group
-    for a in arrivals:
-        if a.origin < config.LOBBY:
-            assert a.group == "LOW" and (a.destination == config.LOBBY
-                                        or a.destination in config.LOW_FLOORS)
-    # every basement -> high-rise trip changes at the lobby and continues on a high-rise car
-    to_lobby = [a for a in arrivals if a.origin < config.LOBBY and a.destination == config.LOBBY]
-    assert gen.transfers == len(to_lobby) > 0
+    # D-10: a basement ride goes straight to its floor, in that floor's group: no change at L1
+    from_basement = [a for a in arrivals if a.origin < config.LOBBY]
+    assert {a.group for a in from_basement} == {"LOW", "HIGH"}
+    for a in from_basement:
+        assert a.destination in config.GROUPS[a.group]["floors"] and a.destination != config.LOBBY
+    assert gen.transfers == 0
     sim = ctx.services["controllers"]
     assert all(p.state is PassengerState.DONE for p in sim.passengers.values())
 
 
-def test_down_trips_to_the_car_park_change_at_the_lobby():
+def test_down_trips_to_the_car_park_ride_straight_down():
     ctx, gen = _run("evening", 1800.0)
     arrivals = ctx.bus.of_type(PassengerArrived)
     to_basement = [a for a in arrivals if a.destination < config.LOBBY]
-    assert to_basement and all(a.group == "LOW" for a in to_basement)
-    from_high = [a for a in arrivals if a.group == "HIGH" and a.destination == config.LOBBY]
-    assert gen.transfers > 0 and gen.transfers <= len(from_high)
+    assert {a.group for a in to_basement} == {"LOW", "HIGH"}
+    assert all(a.origin > config.LOBBY for a in to_basement) and gen.transfers == 0
 
 
 def test_appendix_b_profiles_stay_lobby_only_by_default():

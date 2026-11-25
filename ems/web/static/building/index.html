@@ -125,7 +125,7 @@ const NS = "http://www.w3.org/2000/svg";
 const ROW = 20, TOP = 26, ROWS = 32, CAR_W = 54;
 const GROUP_X = { A:160, B:226, C:292, D:358, E:432, F:498, G:564, H:630, S:704 };
 const LOW_FLOORS = [-2, -1, 1,...Array.from({length:14},(_,i)=>i+2)];   // D-08: B2, B1, L1..L15
-const HIGH_FLOORS = [1,...Array.from({length:15},(_,i)=>i+16)];
+const HIGH_FLOORS = [-2, -1, 1,...Array.from({length:15},(_,i)=>i+16)];   // D-10: B2, B1, L1, L16..L30
 const STOP_PICKUP = "#38d9f5", STOP_DROPOFF = "#ffc233";   // stop ticks left of each shaft
 const STATE_COLOR = { GROUP_SERVICE:"#2f9e5b", STANDBY:"#3b7bd6", FIRE_RECALL:"#d63b3b",
   EMERGENCY_POWER:"#e88a1a", FAULTED:"#8a2be2", MAINTENANCE:"#7a8497",
@@ -336,7 +336,7 @@ document.getElementById("cAddTrip").onclick = () => {
     caseRows.push({ t: r.t, event: "medical", origin: r.origin, destination: r.destination, car: "" });
     renderCase(); return;
   }
-  const zone = f => f === 1 ? null : (f <= 15 ? "low-rise (B2-L15)" : "high-rise (L16-L30)");
+  const zone = f => f <= 1 ? null : (f <= 15 ? "low-rise (L2-L15)" : "high-rise (L16-L30)");   // B1/B2/L1: both
   if (zone(r.origin) && zone(r.destination) && zone(r.origin) !== zone(r.destination)) {
     alert("A trip stays in one group. Add two trips with a change at L1, e.g. " +
           floorName(r.origin) + " > L1, then L1 > " + floorName(r.destination) + " a bit later.");

@@ -6,3 +6,5 @@ t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,
 40,12,-2,card-L12-002,,,PK_5,,,,delivered,90,Employee rides from the home floor down to B2
 50,1,-1,staff-admin-T01,,,PK_6,,,,delivered,90,Tenant admin card also reaches the car park
 60,1,-1,visitor:12,,,PK_7,,,,delivered,90,Valid visitor pass can access B1 under the updated basement access policy
+70,-2,20,card-L20-001,,,PK_8,,,,delivered,90,D-10: high-rise worker rides from B2 straight to L20 without changing at the lobby
+80,25,-2,card-L25-001,,,PK_9,,,,delivered,120,D-10: high-rise worker rides from L25 straight down to B2
