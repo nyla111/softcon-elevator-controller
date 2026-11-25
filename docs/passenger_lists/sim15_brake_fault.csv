@@ -1,8 +1,8 @@
 # start=07:00
 t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note,params,within_s
-0,,,,,,,car_fault,D,13,,,SIM-15 FR-04/112: real temporary controller faults establish waiting pickup on A; alternatives clear before brake,code=scenario:setup,
-0,,,,,,,car_fault,C,13,,,SIM-15 FR-04/112: real temporary controller faults establish waiting pickup on A; alternatives clear before brake,code=scenario:setup,
-0,,,,,,,car_fault,B,13,,,SIM-15 FR-04/112: real temporary controller faults establish waiting pickup on A; alternatives clear before brake,code=scenario:setup,
+0,,,,,,,car_fault,D,13,no_alert:entrapment,,SIM-15 FR-04/112: empty at-floor setup fault must not report entrapment; alternatives clear before brake,code=scenario:setup,13
+0,,,,,,,car_fault,C,13,no_alert:entrapment,,SIM-15 FR-04/112: empty at-floor setup fault must not report entrapment; alternatives clear before brake,code=scenario:setup,13
+0,,,,,,,car_fault,B,13,no_alert:entrapment,,SIM-15 FR-04/112: empty at-floor setup fault must not report entrapment; alternatives clear before brake,code=scenario:setup,13
 0,1,15,card-L15-001,false,false,sim15-onboard,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: 07:00 up-peak rider must be onboard A between floors before fault,,
 10,14,1,card-L14-001,false,false,sim15-already-waiting,,,,delivered,60,SIM-15 FR-112 NFR-R4 #33 #55: request is waiting before the fault,,
 14,,,,,,,car_fault,A,120,alert:entrapment,,SIM-15 FR-112 NFR-R4: actual occupied moving A; explicit brake and per-car alert within10s,code=brake;between_floors=true,10

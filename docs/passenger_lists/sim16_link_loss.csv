@@ -1,7 +1,7 @@
 t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
 0,,,,,,,link_loss,A,120,alert:disconnected,,FR-104 controller A goes silent for 2 min
-5,1,4,,,,low-1,,,,delivered,90,calls go to the other low-rise cars
-10,1,7,,,,low-2,,,,delivered,90,
-15,1,11,,,,low-3,,,,delivered,90,
-20,1,20,,,,high-1,,,,delivered,90,high-rise group is not affected
-200,1,6,,,,after-link,,,,delivered,90,car A back in service
+5,1,4,,,,low-1,,,,delivered,90,FR-104/04 calls go to the other low-rise cars during link loss
+10,1,7,,,,low-2,,,,delivered,90,FR-104/04 retain and deliver the waiting call through a connected car
+15,1,11,,,,low-3,,,,delivered,90,FR-104/04 disconnected A remains excluded while healthy cars serve calls
+20,1,20,,,,high-1,,,,delivered,90,FR-104 high-rise group is not affected by low-rise link loss
+200,1,6,,,,after-link,,,,delivered,90,FR-104 service continues after car A reconnects
