@@ -73,3 +73,31 @@ def test_live_run_of_a_list_starts_at_its_start_time():
     assert ctx.clock.now_dt().strftime("%H:%M") == "07:00"
     ctx = live.start_live(script=loads("t,origin,destination\n0,1,5\n"))
     assert ctx.clock.now_dt().strftime("%H:%M") == "00:00"
+
+
+def test_maintenance_on_and_off_from_the_live_controls():
+    from ems.contracts.types import CarState
+    ctx = live.start_live("balanced", seed=1)           # 10:00, Balanced: no FM approval needed
+    states = ctx.get("car_states")
+    assert live.apply_fault(ctx, "maintenance_on", "B") == "maintenance on car B"
+    assert states.state("B") is CarState.MAINTENANCE
+    assert live.apply_fault(ctx, "maintenance_off", "B") == "maintenance off car B"
+    assert states.state("B") is not CarState.MAINTENANCE
+    with pytest.raises(ValueError):
+        live.apply_fault(ctx, "maintenance_off", "B")    # not in maintenance
+
+
+def test_second_car_out_in_rush_waits_for_the_fm():
+    ctx = live.start_live("up_peak", seed=1)            # 07:30, Rush
+    live.apply_fault(ctx, "maintenance_on", "A")
+    assert "waiting for FM approval" in live.apply_fault(ctx, "maintenance_on", "C")
+
+
+def test_medical_and_maintenance_rows_in_a_test_case():
+    trips = loads("t,origin,destination,card,accessible,vip,event,car\n"
+                  "0,1,5,,,,,\n10,20,1,,,,medical,\n20,,,,,,maintenance_on,B\n")
+    assert [t.event for t in trips] == [None, "medical", "maintenance_on"]
+    ctx = live.start_live(script=trips)
+    ctx.clock.run_until(ctx.clock.now() + 30)
+    from ems.contracts.types import CarState
+    assert ctx.get("car_states").state("B") is CarState.MAINTENANCE

@@ -84,6 +84,7 @@
         <div class="row"><input id="cCard" placeholder="card id (empty: an employee of that floor)"></div>
         <div class="row"><label><input id="cAcc" type="checkbox"> accessible</label>
           <label><input id="cVip" type="checkbox"> VIP</label>
+          <label title="FR-127: security sends a car express to the patient, then to the destination"><input id="cMed" type="checkbox"> medical</label>
           <button id="cAddTrip">Add trip</button></div>
         <div class="row">t <input id="cEvT" class="n" type="number" value="30" min="0">
           <select id="cEvent"></select> car <select id="cCar"></select>
@@ -108,6 +109,7 @@
         <button data-k="plugin_crash">Plug-in crash (5 min)</button><button data-k="plugin_restore">Plug-in restore</button>
         <button data-k="ems_crash">EMS server crash</button>
         <button data-k="overload_burst">Overload burst</button><button data-k="bulky_item">Bulky item</button>
+        <button data-k="maintenance_on">Maintenance on</button><button data-k="maintenance_off">Maintenance off</button>
       </div>
       <h3>Active faults</h3><div id="activeFaults"><div style="color:var(--dim)">none</div></div>
     </div>
@@ -293,9 +295,10 @@ document.getElementById("play").onclick = () => setPlaying(!playing);
 // ---- build a test case by hand: rows become a passenger list (ems/sim/scripted.py)
 const CASE_EVENTS = ["fire_alarm", "fire_clear", "mains_loss", "mains_restore", "car_fault",
   "clear_fault", "link_loss", "link_restore", "acs_outage", "acs_restore", "plugin_crash",
-  "plugin_restore", "ems_crash", "overload_burst", "bulky_item", "fm_confirm"];
+  "plugin_restore", "ems_crash", "overload_burst", "bulky_item", "maintenance_on",
+  "maintenance_off", "fm_confirm", "medical_depart", "medical_finish"];
 const CAR_EVENTS = ["car_fault", "clear_fault", "link_loss", "link_restore", "overload_burst",
-  "bulky_item"];
+  "bulky_item", "maintenance_on", "maintenance_off"];
 const caseRows = [];
 const floorName = f => f < 1 ? "B" + (-f) : "L" + f;
 function fillSelect(id, values, label) {
@@ -313,7 +316,8 @@ function renderCase() {
   caseRows.sort((a, b) => a.t - b.t).forEach((r, i) => {
     const d = document.createElement("div"), x = document.createElement("button");
     d.textContent = r.event
-      ? `${r.t}s ${r.event}${r.car ? " " + r.car : ""}`
+      ? `${r.t}s ${r.event}${r.car ? " " + r.car : ""}` +
+        (r.event === "medical" ? ` ${floorName(r.origin)}>${floorName(r.destination)}` : "")
       : `${r.t}s ${floorName(r.origin)}>${floorName(r.destination)} ${r.card || ""}` +
         `${r.accessible ? " acc" : ""}${r.vip ? " vip" : ""}`;
     x.textContent = "x"; x.onclick = () => { caseRows.splice(i, 1); renderCase(); };
@@ -328,6 +332,10 @@ document.getElementById("cAddTrip").onclick = () => {
     accessible: document.getElementById("cAcc").checked,
     vip: document.getElementById("cVip").checked };
   if (r.origin === r.destination) { alert("From and to are the same floor."); return; }
+  if (document.getElementById("cMed").checked) {   // a medical request, made by security
+    caseRows.push({ t: r.t, event: "medical", origin: r.origin, destination: r.destination, car: "" });
+    renderCase(); return;
+  }
   const zone = f => f === 1 ? null : (f <= 15 ? "low-rise (B2-L15)" : "high-rise (L16-L30)");
   if (zone(r.origin) && zone(r.destination) && zone(r.origin) !== zone(r.destination)) {
     alert("A trip stays in one group. Add two trips with a change at L1, e.g. " +
@@ -345,12 +353,12 @@ document.getElementById("cAddEvent").onclick = () => {
 function caseCsv() {
   const lines = ["t,origin,destination,card,accessible,vip,event,car"];
   for (const r of caseRows) lines.push(r.event
-    ? `${r.t},,,,,,${r.event},${r.car}`
+    ? `${r.t},${r.origin ?? ""},${r.destination ?? ""},,,,${r.event},${r.car}`
     : `${r.t},${r.origin},${r.destination},${r.card},${r.accessible ? "true" : ""},${r.vip ? "true" : ""},,`);
   return lines.join("\n");
 }
 document.getElementById("cRun").onclick = async () => {
-  if (!caseRows.some(r => !r.event)) { alert("Add at least one trip."); return; }
+  if (!caseRows.some(r => !r.event || r.event === "medical")) { alert("Add at least one trip."); return; }
   try {
     await post("/api/live/start", { profile: "up_peak", seed: Number(document.getElementById("seed").value || 1),
                                     script: caseCsv() });
@@ -381,8 +389,8 @@ document.querySelectorAll(".spd").forEach(b => b.onclick = () => {
   document.querySelectorAll(".spd").forEach(x => x.classList.toggle("on", x === b));
 });
 document.querySelectorAll("#faultBtns button").forEach(b => b.onclick = async () => {
-  try { await post("/api/live/fault", { kind: b.dataset.k, car_id: document.getElementById("car").value }); }
-  catch (e) { console.error(e); }
+  try { note((await post("/api/live/fault", { kind: b.dataset.k, car_id: document.getElementById("car").value })).injected); }
+  catch (e) { note(e.message); }
 });
 document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName === "BODY") { e.preventDefault(); setPlaying(!playing); } });
 

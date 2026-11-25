@@ -31,7 +31,9 @@ FAULT_KINDS = {
     "car_fault": True, "clear_fault": True, "link_loss": True, "acs_outage": False,
     "ems_crash": False, "plugin_crash": False, "overload_burst": True, "bulky_item": True,
     "link_restore": True, "acs_restore": False, "plugin_restore": False,
+    "maintenance_on": True, "maintenance_off": True,
 }
+TECHNICIAN = "staff-technician-1"      # FR-32: maintenance is entered by a technician credential
 DEFAULT_DURATION_S = {"link_loss": 300.0, "acs_outage": 900.0, "plugin_crash": 300.0}
 # Optional fault parameters (passenger lists: the params column), with their defaults.
 FAULT_PARAMS = {
@@ -95,6 +97,8 @@ def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
         ctx.services["acs"].set_down(False)
     elif kind == "plugin_restore":
         ctx.services["dispatch_guard"].set_crashed(False)
+    elif kind in ("maintenance_on", "maintenance_off"):
+        return _maintenance(ctx, kind, car_id)
     else:
         fault = {
             "fire_alarm": lambda: F.fire_alarm(now),
@@ -113,6 +117,23 @@ def apply_fault(ctx: Context, kind: str, car_id: str | None = None,
         F.schedule_fault(ctx, fault)
         ctx.clock.run_until(now)          # fire it right away
     return f"{kind}" + (f" car {car_id}" if car_id else "") + (f" for {dur:.0f} s" if dur else "")
+
+
+def _maintenance(ctx: Context, kind: str, car_id: str) -> str:
+    """FR-32/33 through Part 5: take a car out of service for maintenance, or bring it back.
+    In Rush a second car out of the same group waits for the FM (dashboard)."""
+    maintenance = ctx.services["priority"].maintenance
+    if kind == "maintenance_on":
+        out = maintenance.request_maintenance(TECHNICIAN, car_id)
+        if out.ok:
+            return f"maintenance on car {car_id}"
+        if out.reason == "approval_required":
+            return f"maintenance on car {car_id}: waiting for FM approval on the dashboard"
+    else:
+        out = maintenance.exit_maintenance(TECHNICIAN, car_id)
+        if out.ok:
+            return f"maintenance off car {car_id}"
+    raise ValueError(f"{kind} car {car_id} refused: {out.reason}")
 
 
 def check_fault_params(kind: str, params: dict | None) -> dict:
