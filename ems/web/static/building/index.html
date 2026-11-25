@@ -124,6 +124,7 @@ const ROW = 20, TOP = 26, ROWS = 32, CAR_W = 54;
 const GROUP_X = { A:160, B:226, C:292, D:358, E:432, F:498, G:564, H:630, S:704 };
 const LOW_FLOORS = [-2, -1, 1,...Array.from({length:14},(_,i)=>i+2)];   // D-08: B2, B1, L1..L15
 const HIGH_FLOORS = [1,...Array.from({length:15},(_,i)=>i+16)];
+const STOP_PICKUP = "#38d9f5", STOP_DROPOFF = "#ffc233";   // stop ticks left of each shaft
 const STATE_COLOR = { GROUP_SERVICE:"#2f9e5b", STANDBY:"#3b7bd6", FIRE_RECALL:"#d63b3b",
   EMERGENCY_POWER:"#e88a1a", FAULTED:"#8a2be2", MAINTENANCE:"#7a8497",
   INDEPENDENT_SERVICE:"#1ba5a5", VIP_EXCLUSIVE:"#c9a227" };
@@ -152,6 +153,10 @@ function buildTower() {
     el("text", { x:6, y:y + 15, "font-size":14, "font-weight":700 }, svg, label(f));
   }
   el("text", { x:50, y:10, "font-size":10, fill:"#8f98a6" }, svg, "waiting");
+  [[STOP_PICKUP, "pick-up", 370], [STOP_DROPOFF, "drop-off", 440]].forEach(([fill, name, x]) => {
+    el("rect", { x, y:3, width:5, height:6, fill }, svg);
+    el("text", { x:x + 8, y:10, "font-size":10, fill:"#8f98a6" }, svg, name);
+  });
   el("text", { x:50, y:TOP - 3, "font-size":10, fill:"#8f98a6" }, svg, "LOW");
   el("text", { x:92, y:TOP - 3, "font-size":10, fill:"#8f98a6" }, svg, "HIGH");
   waitCells.LOW = {}; waitCells.HIGH = {};
@@ -229,9 +234,11 @@ function render(s) {
     v.bar.setAttribute("fill", c.load_pct >= 80 ? "#ff5d5d" : "#fff");
     v.text.setAttribute("y", y + 14);
     v.text.textContent = c.car_id + " " + Math.round(c.load_pct) + "%" + (bad ? " !" : "");
-    v.stops.replaceChildren();                         // pending stops: yellow ticks at the left
-    for (const f of c.pending_stops)
-      el("rect", { x:x - 7, y:yOfIdx(idxOf(f)) + 7, width:5, height:6, fill:"#ffc233" }, v.stops);
+    v.stops.replaceChildren();                         // pending stops, left of the shaft
+    for (const f of c.pickup_stops)
+      el("rect", { x:x - 7, y:yOfIdx(idxOf(f)) + 3, width:5, height:6, fill:STOP_PICKUP }, v.stops);
+    for (const f of c.dropoff_stops)
+      el("rect", { x:x - 7, y:yOfIdx(idxOf(f)) + 11, width:5, height:6, fill:STOP_DROPOFF }, v.stops);
   }
   const af = document.getElementById("activeFaults");
   af.innerHTML = s.active_faults.length ? "" : '<div style="color:var(--dim)">none</div>';
