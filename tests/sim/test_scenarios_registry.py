@@ -18,7 +18,7 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
     # Part 5: SIM-06, 11, 12, 18 (ems/priority/acceptance); Part 2: SIM-01..05, 10
     # (ems/dispatch/acceptance)
     ready = [s.id for s in SCENARIOS.values() if s.ready]
-    assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-08", "SIM-09",
+    assert ready == ["SIM-01", "SIM-02", "SIM-03", "SIM-04", "SIM-05", "SIM-06", "SIM-07", "SIM-08", "SIM-09",
                      "SIM-10", "SIM-11", "SIM-12", "SIM-13", "SIM-14", "SIM-15", "SIM-16", "SIM-17", "SIM-18", "SIM-19"]
     for s in SCENARIOS.values():
         if not s.ready:
@@ -30,10 +30,13 @@ def test_ready_scenarios_have_complete_acceptance_integrations():
             assert s.check is not None and s.waiting_for is None
 
 
-def test_not_ready_scenario_reports_what_it_waits_for():
+def test_ready_sim07_reports_acceptance_results():
     r = run_scenario("SIM-07", 1)
-    assert r["ready"] is False and r["passed"] is None and r["criteria"] == []
-    assert r["message"] == "not ready: waiting for Part 3 check"
+
+    assert r["ready"] is True
+    assert r["passed"] is True
+    assert len(r["criteria"]) == 7
+    assert all(item["passed"] for item in r["criteria"])
 
 
 def test_registry_loads_part4_only_when_a_part4_scenario_executes():

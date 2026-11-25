@@ -41,8 +41,10 @@ from ems.contracts.events import (AlertRaised, CallAssigned, CallRequested, CarS
 
 from .baseline import install_dispatch_standin
 from .building import BUILDINGS
-from .faults import (Fault, camera_event, ems_server_crash, fire_alarm, link_loss,
-                     measured, plugin_crash)
+from .faults import (
+    Fault, acs_outage, camera_event, ems_server_crash,
+    fire_alarm, link_loss, measured, plugin_crash
+)
 from .harness import CLEAR_S, MEASURE_S, WARMUP_S, RunResult, run
 from .traffic import PROFILES, SRS_ORIGINAL_PEAK_RATE, with_rate
 
@@ -203,6 +205,18 @@ DESIGN_SHORT_REASON = "60 measured minutes took longer than about 5 min of wall 
 DESIGN_WORKLOAD = {"lookups_per_min": 400.0, "camera_per_day": 2000.0,
                    "dashboard_users": 50, "dashboard_requests": 5}
 
+
+def _part3(name: str) -> Callable:
+    """Load Part 3 acceptance code only when needed."""
+    def call(*args):
+        from importlib import import_module
+        module = import_module("ems.access.acceptance")
+        return getattr(module, name)(*args)
+
+    call.__name__ = name
+    return call
+
+
 def _part4(name: str) -> Callable:
     """Load Safety setup / checks only when a Part 4 scenario executes them."""
     def call(*args):
@@ -260,7 +274,39 @@ SCENARIOS: dict[str, Scenario] = {s.id: s for s in [
     _ready2("SIM-05", 'Full weekday on the default schedule', "weekday", 'Each mode meets targets; no one stranded at mode changes', 'FR-11, FR-15', runs=[RunSetup("weekday 24 h", "weekday", mode="weekday", warmup_s=0.0,
                                   measure_s=86400.0)]),
     Scenario("SIM-06", 'Car fault at up-peak, then a second removal requested', 5, "up_peak", setup=_part5("setup_sim_06"), check=_part5("check_sim_06"), ready=True, srs_criteria='Waiting calls retained/reassigned; faulted car not moved; second removal needs FM approval; degraded waits logged', verifies='FR-04, FR-33'),
-    _todo("SIM-07", 'ACS outage for 15 minutes at up-peak', 3, "up_peak", 'Fresh cached permissions used, stale/missing cache restricted to public floors; security alerted; outage waits reported separately', 'FR-49, NFR-SE5, NFR-SE6', notes='ACS outage lasts 15 min (not 5), starting 20 min into the measured window.'),
+
+    Scenario(
+        id="SIM-07",
+        title="ACS outage for 15 minutes at up-peak",
+        owner_part=3,
+        profile="up_peak",
+
+        faults=[
+            acs_outage(
+                measured(20),
+                15 * 60,
+            )
+        ],
+
+        srs_criteria=(
+            "Fresh cached permissions used, "
+            "stale/missing cache restricted to public floors; "
+            "security alerted; "
+            "outage waits reported separately"
+        ),
+
+        verifies="FR-49, NFR-SE5, NFR-SE6",
+
+        notes=(
+            "ACS outage lasts 15 minutes, "
+            "starting 20 minutes into the measured window."
+        ),
+        setup=_part3("setup_sim_07"),
+        check=_part3("check_sim_07"),
+        ready=True,
+        waiting_for=None,
+    ),
+
     _todo("SIM-08", 'Fire alarm at Rush transition with active goods move; optional lockdown variant', 4, "up_peak", 'No controller command after alarm; goods move cancelled; healthy-car recovery requires FM confirmation; isolated cars remain excluded', 'FR-50, FR-55, NFR-SF1', notes='Goods move is enabled before the alarm; the fire alarm is raised at a Rush transition.', runs=[RunSetup("alarm at 17:00 Rush transition", "up_peak", start_hhmm="16:30",
                                    faults=[fire_alarm(measured(20))])]),
     Scenario("SIM-09", 'EMS server failure at up-peak', 1, "up_peak", faults=[

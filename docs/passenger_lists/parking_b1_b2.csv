@@ -5,4 +5,4 @@ t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,
 30,-2,1,card-L12-001,,,PK_4,,,,delivered,90,Employee rides from B2 up to the lobby
 40,12,-2,card-L12-002,,,PK_5,,,,delivered,90,Employee rides from the home floor down to B2
 50,1,-1,staff-admin-T01,,,PK_6,,,,delivered,90,Tenant admin card also reaches the car park
-60,1,-1,visitor:12,,,PK_7,,,,refused,,A visitor pass covers only the host floor and is refused at B1
+60,1,-1,visitor:12,,,PK_7,,,,delivered,90,Valid visitor pass can access B1 under the updated basement access policy
