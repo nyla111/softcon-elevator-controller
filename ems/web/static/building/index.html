@@ -71,7 +71,7 @@
       </div>
       <div class="row"><label title="CSV or JSON: t, origin, destination, card, accessible, vip, passenger_id. Replaces the random traffic.">passenger list
         <input id="script" type="file" accept=".csv,.json"></label></div>
-      <div class="row controls"><button id="start" class="primary" title="Start a new run with these settings. The previous run and its dashboard figures are replaced (save it first).">New run</button>
+      <div class="row controls"><button id="start" class="primary" title="Start a new run with these settings. The previous run is saved to the run history automatically, then replaced.">New run</button>
         <button id="play">Pause</button>
         <button id="reset" title="Empty building, no traffic">Reset</button>
         <button id="save" title="Save this run's figures to the run history">Save run</button></div>
@@ -279,10 +279,11 @@ async function startLive(profile, rate, seed) {
   const file = document.getElementById("script").files[0];       // fixed list instead of random
   const script = file ? await file.text() : null;
   try {
-    await post("/api/live/start", { profile, rate: rate === "" || rate == null ? null : Number(rate),
-                                    seed: Number(seed), script });
+    const r = await post("/api/live/start", { profile, rate: rate === "" || rate == null ? null : Number(rate),
+                                              seed: Number(seed), script });
+    note(r.autosaved ? "Previous run auto-saved: " + r.autosaved : "");
   } catch (e) { alert(e.message); return; }
-  note(""); setPlaying(true);
+  setPlaying(true);
 }
 document.getElementById("start").onclick = () => startLive(
   document.getElementById("profile").value, document.getElementById("rate").value,
@@ -363,9 +364,11 @@ document.getElementById("cCsv").onclick = () => {
 };
 document.getElementById("cClear").onclick = () => { caseRows.length = 0; renderCase(); };
 document.getElementById("reset").onclick = async () => {
-  try { await post("/api/reset?seed=" + Number(document.getElementById("seed").value || 1)); }
+  let r;
+  try { r = await post("/api/reset?seed=" + Number(document.getElementById("seed").value || 1)); }
   catch (e) { alert(e.message); return; }
-  setPlaying(false); note("Reset: empty building, no traffic.");
+  setPlaying(false);
+  note("Reset: empty building, no traffic." + (r.autosaved ? " Previous run auto-saved: " + r.autosaved : ""));
 };
 document.getElementById("save").onclick = async () => {
   const name = prompt("Name for this run (optional):", "");
