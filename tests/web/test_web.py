@@ -94,17 +94,35 @@ def test_fire_alarm_then_reset_through_the_api(client):
 
 def test_scenario_list(client):
     rows = client.get("/api/scenarios").json()
-    assert [r["id"] for r in rows] == [f"SIM-{i:02d}" for i in range(1, 20)]
-    assert [r["id"] for r in rows if r["ready"]] == ["SIM-01", "SIM-02", "SIM-03", "SIM-04",
-                                                     "SIM-05", "SIM-06", "SIM-08", "SIM-09", "SIM-10",
-                                                     "SIM-11", "SIM-12", "SIM-13", "SIM-14", "SIM-15", "SIM-16", "SIM-17", "SIM-18",
-                                                     "SIM-19"]
-    assert next(r for r in rows if r["id"] == "SIM-07")["waiting_for"] == "Part 3 check"
+
+    assert [r["id"] for r in rows] == [
+        f"SIM-{i:02d}" for i in range(1, 20)
+    ]
+
+    # All 19 scenarios are now ready.
+    assert [r["id"] for r in rows if r["ready"]] == [
+        f"SIM-{i:02d}" for i in range(1, 20)
+    ]
+
+    # SIM-07 no longer waits for Part 3 acceptance.
+    sim07 = next(r for r in rows if r["id"] == "SIM-07")
+    assert sim07["ready"] is True
+    assert sim07["waiting_for"] is None
 
 
-def test_run_not_ready_and_unknown_scenario(client):
+def test_run_ready_and_unknown_scenario(client):
+    # SIM-07 is now implemented.
     r = client.post("/api/scenarios/SIM-07/run?seed=1").json()
-    assert r["ready"] is False and r["message"] == "not ready: waiting for Part 3 check"
+
+    assert r["ready"] is True
+    assert r["passed"] is True
+    assert r["seed"] == 1
+
+    # Check all SIM-07 acceptance criteria.
+    assert len(r["criteria"]) == 7
+    assert all(c["passed"] for c in r["criteria"])
+
+    # Unknown scenarios must still return 404.
     assert client.post("/api/scenarios/SIM-99/run").status_code == 404
 
 

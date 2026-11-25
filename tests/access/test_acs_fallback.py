@@ -47,7 +47,8 @@ def test_online_lookup_returns_live_permission_not_cache():
     ctx, access, _ = setup()
     permission = access.permission("card-123")
     assert permission.valid is True
-    assert permission.allowed_floors == frozenset({5, 7})
+    assert permission.allowed_floors == frozenset({5, 7, -1, -2})
+    assert permission.from_cache is False
     assert permission.from_cache is False
     assert ctx.bus.of_type(AlertRaised) == []
 

@@ -21,6 +21,11 @@ from .public_floors import PublicFloors
 
 from .refused_panel import RefusedPanel
 
+from dataclasses import replace
+
+# Issue #25: B1 and B2 are accessible to all valid cards.
+BASEMENT_FLOORS = frozenset({-1, -2})
+
 
 class FloorAccess:
     def __init__(self, ctx):
@@ -37,17 +42,32 @@ class FloorAccess:
         )
 
     def permission(self, credential_id: str) -> Permission:
-        """Ask ACS for credential permissions."""
+        """Get ACS permissions and grant B1/B2 access to valid cards."""
+
         try:
+            # Step 1: Get permission from ACS or its cache.
             permission = self.acs_fallback.permission(
                 credential_id
             )
 
-            return self.courier_access.restrict_permission(
+            # Step 2: Apply existing courier restrictions.
+            permission = self.courier_access.restrict_permission(
                 permission
             )
+
+            # Step 3: Give every valid card access to B1 and B2.
+            if permission.valid:
+                permission = replace(
+                    permission,
+                    allowed_floors=frozenset(
+                        set(permission.allowed_floors)
+                        | BASEMENT_FLOORS
+                    ),
+                )
+
+            return permission
+
         except TimeoutError:
-            # Basic fallback. Cache will be added later.
             return Permission(
                 credential_id=credential_id,
                 allowed_floors=frozenset(),

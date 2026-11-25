@@ -93,7 +93,7 @@ def send_passenger(
     ctx.bus.publish(event)
 
 
-def test_courier_can_only_access_lobby_and_loading_dock():
+def test_courier_can_access_lobby_and_both_basements():
     # ACS allows L1, B1 and L18.
     # CourierAccess must remove L18.
 
@@ -102,8 +102,9 @@ def test_courier_can_only_access_lobby_and_loading_dock():
     permission = access.permission("courier-1")
 
     assert permission.allowed_floors == frozenset({
-        LOBBY, LOADING_DOCK
+        LOBBY, LOADING_DOCK, -2
     })
+    assert 18 not in permission.allowed_floors
 
 
 def test_courier_cannot_go_to_office_floor():
