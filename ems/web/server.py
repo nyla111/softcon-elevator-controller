@@ -130,6 +130,9 @@ def _build_state(ctx) -> dict:
             "state": ctx.get("car_states").state(s.car_id).name,
             "capacity": car.capacity,
             "link_lost": car.link_lost,
+            "pickup_stops": sorted({f for f, key in car.stops if not key.endswith(":dest")}),
+            "dropoff_stops": sorted({f for f, key in car.stops if key.endswith(":dest")}
+                                    | ({car.express_floor} if car.express_floor is not None else set())),
         })
     guard = ctx.services.get("dispatch_guard")
     alerts = _alerts(ctx)
