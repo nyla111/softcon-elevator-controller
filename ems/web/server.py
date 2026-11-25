@@ -294,6 +294,19 @@ def run_get(run_id: str) -> dict:
         raise HTTPException(404, f"unknown run {run_id}")
 
 
+@app.get("/api/long-runs")
+def long_run_list() -> list[dict]:
+    return run_record.list_long_runs()
+
+
+@app.get("/api/long-runs/{run_id}")
+def long_run_get(run_id: str) -> dict:
+    try:
+        return run_record.load_long_run(run_id)
+    except FileNotFoundError:
+        raise HTTPException(404, f"unknown long run {run_id}")
+
+
 # ---------------------------------------------------------------- scenarios
 @app.get("/api/scenarios")
 def scenario_list() -> list[dict]:
