@@ -49,3 +49,19 @@ def test_live_run_starts_in_the_mode_that_fits_its_profile():
         client.post("/api/advance", params={"seconds": 2})
         modes = client.get("/api/state").json()["modes"]
         assert modes["LOW"] == mode and modes["HIGH"] == mode, (profile, modes)
+
+
+def test_new_run_and_reset_autosave_the_previous_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_record, "LIVE_RUNS_DIR", tmp_path)
+    client = TestClient(app)
+    client.post("/api/live/start", json={"profile": "balanced", "seed": 3})
+    client.post("/api/advance", params={"seconds": 300})
+    first = client.post("/api/live/start", json={"profile": "eco", "seed": 4}).json()
+    assert first["autosaved"] and "auto-balanced-seed-3" in first["autosaved"]
+    assert client.post("/api/reset").json()["autosaved"] is None          # under one minute
+    client.post("/api/live/start", json={"profile": "eco", "seed": 5})
+    client.post("/api/advance", params={"seconds": 120})
+    client.post("/api/runs/save", json={"name": "manual"})
+    assert client.post("/api/reset").json()["autosaved"] is None          # already saved as is
+    assert len(run_record.list_runs(tmp_path)) == 2
+

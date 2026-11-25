@@ -41,6 +41,7 @@ app.state.lock = threading.RLock()
 app.state.build_lock = threading.Lock()     # one snapshot build at a time
 app.state.snapshot = None                   # ((ctx, t, events), pre-serialised JSON)
 app.state.live = None                     # {"profile", "rate", "seed"} after /api/live/start
+app.state.saved_at = None                 # (context id, sim time) of the last save
 bind_monitor_context(lambda: app.state.ctx)
 app.include_router(monitor_router)
 app.include_router(access_router)
@@ -198,12 +199,28 @@ def advance(seconds: float = 1.0) -> dict:
         return {"t": ctx.clock.now()}
 
 
+def _autosave() -> Optional[str]:
+    """Save the live run before it is replaced, unless it is empty or already saved as is.
+    Call with app.state.lock held. Returns the run id, or None when nothing was saved."""
+    ctx = app.state.ctx
+    recorder = ctx.services.get("run_record")
+    if recorder is None or app.state.live is None or not recorder.series:
+        return None                       # no live run, or under one simulated minute
+    if app.state.saved_at == (id(ctx), ctx.clock.now()):
+        return None
+    live_meta = app.state.live
+    path = recorder.save(f"auto {live_meta.get('profile', 'run')} seed {live_meta.get('seed', 1)}")
+    app.state.saved_at = (id(ctx), ctx.clock.now())
+    return path.stem
+
+
 @app.post("/api/reset")
 def reset(seed: int = 1) -> dict:
     with app.state.lock:
+        autosaved = _autosave()
         app.state.ctx = build(seed=seed)
         app.state.live = None
-    return {"seed": seed}
+    return {"seed": seed, "autosaved": autosaved}
 
 
 class LiveStart(BaseModel):
@@ -230,9 +247,10 @@ def live_start(body: LiveStart) -> dict:
     if trips is not None:
         started.update(profile="scripted", rate=None, trips=len(trips))
     with app.state.lock:
+        autosaved = _autosave()
         app.state.ctx = ctx
         app.state.live = started
-    return {"started": started}
+    return {"started": started, "autosaved": autosaved}
 
 
 @app.post("/api/live/fault")
@@ -259,6 +277,7 @@ def run_save(body: RunSave) -> dict:
         if recorder is None:
             raise HTTPException(409, "no live run to save: start a run first")
         path = recorder.save(body.name)
+        app.state.saved_at = (id(app.state.ctx), app.state.ctx.clock.now())
     return {"run_id": path.stem}
 
 
