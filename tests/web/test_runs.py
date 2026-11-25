@@ -65,3 +65,21 @@ def test_new_run_and_reset_autosave_the_previous_run(tmp_path, monkeypatch):
     assert client.post("/api/reset").json()["autosaved"] is None          # already saved as is
     assert len(run_record.list_runs(tmp_path)) == 2
 
+
+
+def test_long_runs_are_listed_and_loaded(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_record, "RUNS_DIR", tmp_path)
+    manifest = {"run": "long", "seed": 1, "days": 30, "start": "2026-12-01", "git_commit": "abcdef1234",
+                "wall_s": 2700.0, "imbalance": [
+                    {"group": "LOW", "window": "2026-12", "floors": {"A": 100, "B": 99},
+                     "imbalance": 0.01, "limit": 0.02, "ok": True},
+                    {"group": "LOW", "window": "period", "floors": {"A": 100, "B": 99},
+                     "imbalance": 0.01, "limit": 0.05, "ok": True}]}
+    (tmp_path / "long_30d_seed1_abcdef12.json").write_text(__import__("json").dumps(manifest))
+    client = TestClient(app)
+    rows = client.get("/api/long-runs").json()
+    assert rows[0]["run_id"] == "long_30d_seed1_abcdef12"
+    assert rows[0]["period"]["LOW"] == {"imbalance": 0.01, "limit": 0.05, "ok": True}
+    assert client.get("/api/long-runs/long_30d_seed1_abcdef12").json()["days"] == 30
+    assert client.get("/api/long-runs/nope").status_code == 404
+    assert "Wear long runs" in client.get("/history/").text

@@ -24,4 +24,7 @@
     <h3>Operating modes and incidents</h3><div id="events" class="scroll"></div>
     <h3>Waiting trend</h3><p class="muted">Rolling five-minute average wait, sampled once per simulated minute.</p><svg id="trend" viewBox="0 0 900 220" role="img" aria-label="Rolling wait time by run"></svg><p id="legend" class="legend"></p>
   </section>
-</main><script src="/history/app.js"></script></body></html>
+  <section id="long-runs"><h2>Wear long runs (NFR-W1)</h2>
+    <p class="muted">Batch runs from <code>python -m ems.sim.long_run --days N</code> or <code>--months N</code>, read from <code>runs/long_*.json</code>. Imbalance = (max − min) / max floors within a group; limits are 2% per month and 5% over the period.</p>
+    <div id="long-status" role="status">Loading long runs…</div><div id="long-list" class="scroll"></div><div id="long-detail" class="scroll"></div></section>
+</main><script src="/history/app.js"></script><script src="/history/long_runs.js"></script></body></html>

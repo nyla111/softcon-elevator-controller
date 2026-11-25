@@ -236,3 +236,33 @@ def load_run(run_id: str, out_dir: Optional[Path] = None) -> dict:
     if not path.is_file():
         raise FileNotFoundError(run_id)
     return json.loads(path.read_text())
+
+
+def list_long_runs(out_dir: Optional[Path] = None) -> list[dict]:
+    """Wear long runs written by `python -m ems.sim.long_run` (runs/long_*.json), newest
+    first: run id, length, seed, commit, wall time and the whole-period imbalance per group."""
+    out_dir = out_dir or RUNS_DIR
+    rows = []
+    for path in sorted(out_dir.glob("long_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        period = {r["group"]: {"imbalance": r["imbalance"], "limit": r["limit"], "ok": r["ok"]}
+                  for r in data.get("imbalance", []) if r.get("window") == "period"}
+        rows.append({"run_id": path.stem, "days": data.get("days"), "seed": data.get("seed"),
+                     "start": data.get("start"), "git_commit": (data.get("git_commit") or "")[:8],
+                     "wall_s": data.get("wall_s"), "period": period,
+                     "saved": datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="minutes")})
+    return rows
+
+
+def load_long_run(run_id: str, out_dir: Optional[Path] = None) -> dict:
+    """One long-run manifest. Raises FileNotFoundError for an unknown or unsafe id."""
+    out_dir = out_dir or RUNS_DIR
+    if not run_id.startswith("long_") or _SAFE.search(run_id):
+        raise FileNotFoundError(run_id)
+    path = out_dir / f"{run_id}.json"
+    if not path.is_file():
+        raise FileNotFoundError(run_id)
+    return json.loads(path.read_text())
