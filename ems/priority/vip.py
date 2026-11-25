@@ -102,6 +102,9 @@ class VipMixin:
         reasons = []
         busy = {s.car_id for s in statuses if self.pending_calls_of(s.car_id)}
         for s in policy.vip_candidates(statuses, call.origin, busy):
+            if any(c in self._accessible for c in self.pending_calls_of(s.car_id)):
+                reasons.append("accessible_waiting")                   # BR-10: accessible > VIP
+                continue
             breach = bool(dispatcher.would_breach_ceiling_without(s.car_id))
             self.ceiling_checks.append((self.now(), s.car_id, breach))
             if breach:                                                # FR-72 ceiling check

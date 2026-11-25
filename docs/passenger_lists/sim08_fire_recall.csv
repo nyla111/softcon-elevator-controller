@@ -1,0 +1,9 @@
+# start=16:30
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,15,card-L15-001,false,false,sim08-onboard,,,,evacuated,5,SIM-08 FR-50 genuine authorized rider boards before fire; full paired scenario additionally proves VIP and goods
+14,,,,,,,fire_alarm,,,no_alert:entrapment,,FR-50 occupied car must recall and evacuate without EMS movement commands; companion trace asserts command window
+15,1,5,card-L5-001,false,false,sim08-during-fire,,,,delivered,100,FR-50/55 retain original request and deliver only after explicit FM confirmation; companion checker asserts no assignment during fire
+60,,,,,,,fire_clear,,,no_alert:entrapment,,FR-55 physical alarm clear and controller reset alone cannot resume dispatch
+61,,,,,,,check,,,no_alert:entrapment,,FR-55 companion scenario checks refused early FM and controller-normal reports
+62,,,,,,,fm_confirm,,,no_alert:entrapment,,FR-55 valid FM confirmation after actual safety-clear and controller-normal reports
+65,1,5,card-L5-001,false,false,sim08-after-confirm,,,,delivered,60,FR-55 real post-confirmation service; #26 wiring exists and is not reopened

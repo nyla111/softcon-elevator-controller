@@ -1,3 +1,6 @@
+> Historical audit below: its pending/blocked statements describe earlier commits.
+> The 25 November integration update at the end supersedes those statuses.
+
 # Issue #33 validation evidence
 
 Base: main `bf5c50987397acc41393bcd7262549664c845e04`.
@@ -79,7 +82,7 @@ FR-55 is now wired by merged #48/#49, but extending or promoting that fixture wa
 outside the remaining SIM-14/SIM-15 change. No scenario-registry readiness flag was
 changed. Keep #33 open until all requested acceptance is demonstrated.
 
-## SIM-14 implementation evidence — 23 November 2026
+## SIM-14 implementation evidence â€” 23 November 2026
 The previous pending outcome failures above are historical. The active sim14_power_loss.csv
 now uses generator_failed=true and failed_rescue_cars=A, with #start=07:00 and bounded
 per-car60s checks. Original delivered expectations remain unchanged. Companion tests in
@@ -94,3 +97,22 @@ criteria plus clearance pass on EACH seed1-10;20 fixture/registry tests pass. Re
 traces are retained under .tmp/part4-sim14-evidence (10 JSON files); XML is
 .tmp/part4-sim14-complete.xml. Registry readiness now enforces the complete checker.
 Review, CI and merge remain required. This failed-generator scenario does not prove FR52.
+
+## Integrated acceptance update — 25 November 2026
+
+Runtime baseline:f4fb40a. #94/#95/#108 have promoted SIM-14/15/08 to active CSVs
+and complete registry checkers; SIM-16 remains active. The final main CI executes all
+active lists and mandatory full seed1-10 journeys, including both SIM-08 workloads.
+`test_sim14_journey.py` checks the occupied silent rescue and exact60s received context,
+zero attempted commands/assignments, waiting clocks and explicit120s/FM boundary.
+`test_sim15_journey.py` and registry tests check actual occupied between-floor brake,
+nonempty waiting reassignment, no boarded reassignment and exact alert/command windows.
+`test_sim08_journey.py` checks all onboard lobby alighting, active VIP/goods cancellation,
+lockdown retention, isolated cars, zero attempts and real post-FM service.
+
+The old peak22s VIP lead legitimately expired before seed8's alarm on current main.
+#108 now uses fixed10s peak /29s occupied-companion timing; the full failing seed8
+journey passed locally with raw trace in `.tmp/final-fire-seed8`. Existing traffic and
+all safety assertions remain. Historical JSON/digests are not relabelled as new results.
+Final integrated CI and its exact SHA/run URL must accompany closure of #33.
+FR-52 successful-generator acceptance remains blocked independently in #46/#88.

@@ -110,6 +110,9 @@ class GroupQR:
             return False
 
         # STEP 4: Send one Call with party_size to Dispatch.
+        actions = getattr(self.floor_access, "actions", None)
+        if actions is not None and not actions.admit(qr_token, panel_id, origin, destination, permission):
+            return False
         self.next_call_id += 1
         call = Call(
             call_id=f"group-qr-{self.next_call_id}",

@@ -63,10 +63,13 @@ def _reassignment_check(ctx, incidents):
 
 
 def _setup_safety_fire(ctx):
-    install_dispatch_standin(ctx)
-    states = ctx.services["car_states"]
-    states.request("B", CarState.MAINTENANCE, "scenario:maintenance")
-    states.request("C", CarState.INDEPENDENT_SERVICE, "scenario:independent")
+    from .scenario_fire import setup_sim_08
+    return setup_sim_08(ctx)
+
+
+def _setup_occupied_safety_fire(ctx):
+    from .scenario_fire import setup_occupied_sim_08
+    return setup_occupied_sim_08(ctx)
 
 
 def _setup_safety_brake(ctx):
@@ -143,48 +146,19 @@ def _fire_goods_check(ctx, alarm) -> tuple[str, bool, str]:
             if active else "BLOCKED: no active goods move exercised by this scenario setup")
 
 
-def check_sim_08(result: RunResult, ctx) -> Criteria:
-    alarms = ctx.bus.of_type(safety_events.FireAlarm)
-    clears = ctx.bus.of_type(safety_events.FireAlarmCleared)
-    states = ctx.services["car_states"]
-    sim = ctx.services["controllers"]
-    recovery = states.recovery_log
-    start = alarms[0].t if alarms else float("inf")
-    end = recovery[0][0] if recovery else ctx.clock.now() + 1
-    commands = [c for c in sim.command_log if start <= c[0] < end]
-    return [
-        ("fire at 17:00 Rush transition", bool(alarms) and start == measured(20)
-         and result.start.endswith("16:30:00"), f"alarm t={start}"),
-        ("zero EMS controller commands throughout fire handling", bool(alarms) and not commands,
-         f"{len(commands)} attempted (including refused)"),
-        ("healthy recovery requires explicit FM confirmation", bool(clears) and bool(recovery)
-         and end >= clears[-1].t, "FM UI/controller-normal integration absent" if not recovery
-         else f"confirmed at {end}"),
-        ("isolated cars remain excluded", states.state("B") is not CarState.GROUP_SERVICE
-         and states.state("C") is not CarState.GROUP_SERVICE
-         and not ({"B", "C"} & set(states.dispatchable("LOW"))), "Maintenance B; Independent C"),
-        (_fire_goods_check(ctx, alarms[0]) if alarms else
-         ("active goods move cancelled without automatic restart", False, "no fire exercised")),
-    ]
+def check_sim_08(results, contexts) -> Criteria:
+    from .scenario_fire import check_paired_sim_08
+    return check_paired_sim_08(results, contexts)
 
 
-def check_sim_13(result: RunResult, ctx) -> Criteria:
-    overloads = ctx.bus.of_type(safety_events.OverloadDetected)
-    messages = ctx.bus.of_type(safety_events.PanelMessage)
-    prompt = all(any(m.target == f"car:{o.car_id}" and o.t <= m.t <= o.t + 1
-                         and "step" in m.text_en.lower() for m in messages) for o in overloads)
-    bulky = [e for e in ctx.bus.of_type(safety_events.CameraEvent) if e.kind == "bulky_item"]
-    reports = ctx.services.get("reports")
-    incidents = getattr(reports, "incidents", {})
-    flagged = len(bulky) == 2 and all(e.event_id in incidents for e in bulky)
-    return [
-        ("at least three overload bursts exercised", len(overloads) >= 3,
-         f"{len(overloads)} overloads"),
-        ("step-out message within 1 s", bool(overloads) and prompt,
-         "Part 2 owns overload messages and next-car selection"),
-        _reassignment_check(ctx, overloads),
-        ("both bulky items flagged by Monitor", flagged, f"{len(bulky)} bulky events"),
-    ]
+def setup_sim_13(ctx):
+    from .scenario_overload import setup_sim_13 as setup
+    return setup(ctx)
+
+
+def check_sim_13(result, ctx):
+    from .scenario_overload import check_sim_13 as check
+    return check(result, ctx)
 
 
 def check_sim_15(result: RunResult, ctx) -> Criteria:
@@ -238,9 +212,11 @@ def check_sim_15(result: RunResult, ctx) -> Criteria:
     ]
 
 
-def check_sim_17(result: RunResult, ctx) -> Criteria:
-    # CallRequested is post-acceptance and has no action id / exemption / duplicate proof.
-    # Local policy unit tests are not evidence that real panels enforce this scenario.
-    return [("proven duplicates, uncertain retention, sixth-action limit and exemptions", False,
-             ("BLOCKED: Access action admission and duplicate-proof contract absent; "
-              "ems.safety.call_policy is independently tested but not connected"))]
+def setup_sim_17(ctx):
+    from .scenario_admission import setup_sim_17 as setup
+    return setup(ctx)
+
+
+def check_sim_17(result, ctx):
+    from .scenario_admission import check_sim_17 as check
+    return check(result, ctx)
