@@ -70,8 +70,35 @@ limitations in issue33_evidence.md are superseded by its integration update.
 | SIM-15 | `sim15_brake_fault.csv` | #95: explicit occupied between-floor brake, nonempty waiting set, healthy reassignment, original clocks, no boarded reassignment, exact command and alert windows |
 | SIM-16 | `sim16_link_loss.csv` | Existing FR-104 link-loss coverage preserved |
 
-FR-55 controller reports and authenticated FM actions are implemented (#48/#49).
-Issue #55 supplied the necessary event controls; do not recreate them. Failed-generator
-SIM-14 does not establish successful limited-generator FR-52 (#46).
-See [issue33 evidence](issue33_evidence.md) and [acceptance matrix](../part4_acceptance.md).
-Close #33 only after final main CI verifies the lists and complete companion assertions.
+[#26](https://github.com/nyla111/softcon-elevator-controller/issues/26) is closed.
+Merged [#48](https://github.com/nyla111/softcon-elevator-controller/pull/48) wires
+controller-normal/safety-clear reports and `fm_confirm`; merged #49 adds dashboard
+actions. FR-55 support is no longer the reason for blocking the new lists.
+[#46](https://github.com/nyla111/softcon-elevator-controller/issues/46) concerns
+generator integration and does not supply the missing CSV event controls.
+No Part 1, Part 2, Part 6, or shared-contract implementation belongs in this change.
+
+See [issue33 evidence](issue33_evidence.md) for actual results and acceptance gaps.
+Issue #33 must remain open while those gaps remain.
+
+## Part 2 lists: dispatch and modes (#32)
+
+Each list starts at the time of day of its mode (`# start=HH:MM`), so the schedule (FR-11)
+puts the dispatcher in that mode. `max_wait_s` is the mode's wait ceiling (Rush 60 s,
+Balanced 90 s, Eco 120 s). Results below are seed 1 on main.
+
+| File | Shows | Notes |
+|---|---|---|
+| `sim01_up_peak_sample.csv` | SIM-01, FR-01/02/10: Rush morning peak, lobby up calls and one down call | waits 3-14 s |
+| `sim02_lunch.csv`, `sim02_evening.csv` | SIM-02, FR-10: Rush two-way lunch peak and evening down-peak | waits 4-40 s |
+| `sim03_balanced_sample.csv` | SIM-03, FR-10: Balanced office hours | waits 3-15 s |
+| `sim04_eco_sample.csv` | SIM-04, FR-10: Eco at night, two cars per group in service | waits 3-36 s |
+| `fr04_car_fault_reassign.csv` | FR-04: car A faults while two calls wait for it; both move to C with their wait clock | not vacuous: A was assigned before the fault |
+| `fr100_overload.csv` | FR-100: phantom overload on A at the lobby; ov-1 is re-assigned A -> B | the step-out message is checked in `tests/dispatch` |
+| `fr15_mode_change.csv` | FR-15, BR-02, FR-11: calls made in Eco just before 07:00 finish after the change to Rush; new calls get the Rush ceiling | |
+
+FR-05 (no new call for a car at 80% load) has no list: with idle cars around, the engine spreads
+a lobby group over them (17 people end up 4-5 per car), so no car reaches 80%. It is covered by
+`tests/dispatch/test_dispatcher.py::test_no_new_hall_call_for_a_car_loaded_80_percent_fr05`.
+Trips in lists start or end at the lobby (inter-floor taps are refused by Access), so the samples
+use lobby trips. The wear-balancing NFR (CR-01) is validated by long runs in #104, not by a list.

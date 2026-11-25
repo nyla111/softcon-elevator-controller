@@ -1,0 +1,8 @@
+# start=21:00
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,7,,,,eco-1,,,,delivered,120,SIM-04 FR-10 Eco ceiling 120 s; two cars per group in service
+30,23,1,,,,eco-2,,,,delivered,120,SIM-04 FR-10 Eco high-rise down call
+60,1,19,,,,eco-3,,,,delivered,120,SIM-04 FR-10 Eco ceiling 120 s
+90,11,1,,,,eco-4,,,,delivered,120,SIM-04 FR-10 Eco ceiling 120 s
+120,1,28,,,,eco-5,,,,delivered,120,SIM-04 FR-10 Eco ceiling 120 s
+180,5,1,,,,eco-6,,,,delivered,120,SIM-04 FR-10 Eco ceiling 120 s

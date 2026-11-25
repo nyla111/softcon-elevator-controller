@@ -21,12 +21,41 @@ Part 1's FR-105 guard (`ctx.services["dispatch_guard"].choose_car`).
 | 4.3 table | parking: Rush -> lobby (up-peak) / spread over the zone (down-peak) / mixed; Balanced -> lobby + busiest recent floors; Eco -> stay where the last trip ended, 2 cars per group in service, the rest in Standby | `policy.py` |
 | Pauses | EMS server down (controllers serve calls), fire (until cleared and `safety_active()` is False, FR-55), mains lost (FR-110): no command sent, calls queue; after fire every waiting call is re-assigned | `pauses.py` |
 
+## How a call is assigned
+
+```mermaid
+flowchart TD
+  A[CallRequested from Part 3] --> B{Dispatch paused?<br/>server down, fire, mains lost}
+  B -- yes --> Q[Pending queue<br/>retried every 1 s]
+  B -- no --> C{VIP call?}
+  C -- yes --> V[Part 5 claim_call]
+  V -- car claimed --> D[CallAssigned]
+  V -- no car --> E
+  C -- no --> E[Candidate cars<br/>group, GROUP_SERVICE, load < 80%,<br/>no fault or lost link]
+  E --> G[dispatch_guard.choose_car<br/>FR-105: 1 s limit]
+  G --> H[EtdEngine.choose_car]
+  H -- answer --> G
+  G -- engine slow / raised / invalid --> N[nearest-car rule + FM alert]
+  G -- car --> R[register_stop with Part 5 door time]
+  N --> R
+  R -- accepted --> D
+  R -- refused --> X[skip that car for 5 s,<br/>try the next one]
+  X --> G
+  E -- no candidate --> Q
+```
+
+The guard measures the engine with real time (`time.perf_counter`); automatic garbage collection
+is paused during the call so a process-wide GC pass is not counted as engine time (#101).
+
 ## The algorithm (ETD, estimated time to destination)
 The dispatcher knows every passenger's destination (destination panels); the controller only learns
 it when the passenger boards. So the dispatcher keeps a book of who rides and who waits for each car,
-and `model.replay()` replays the controller's stop logic (simple collective, Appendix B timings) to
-predict every pick-up and arrival time. Prediction error measured at up-peak: about 1.5 s on average.
+and `model.replay()` replays the controller's stop logic (simple collective, Appendix B timings:
+1.5 s per floor, 2 s open, at least 5 s dwell or 1 s per person, 2 s close, 21 persons) to predict
+every pick-up and arrival time. Prediction error measured at up-peak: about 1.5 s on average.
 
+For a new call each candidate car is replayed twice, without and with the call. The difference is
+the cost of giving the call to that car; the cheapest car wins (ties: lower car id).
 ## NFR-W1 wear policy and real-traffic validation
 
 The engine computes the normal mode-dependent ETD cost for every eligible car first. It then
@@ -74,19 +103,68 @@ w_wait * f(new wait) + w_ride * new ride
 + sum over the car's other passengers of extra wait (f) and extra arrival delay (w_ride)
 + w_run  * extra moving seconds + door cycles      (energy)
 + w_busy * extra seconds the car stays busy        (later passengers wait for it)
-+ penalty for every passenger pushed past 75% of the mode ceiling
-+ hard penalty (Balanced: 100 per s) for every passenger pushed past the ceiling itself
++ 10 per second a passenger is pushed past 75% of the mode ceiling
++ hard penalty per second a passenger is pushed past the ceiling itself (Balanced: 100)
 f(w) = w + w^2 / ceiling                            (long waits weigh more)
 ```
 
-| Mode | w_wait | w_ride | w_run | w_busy |
-|---|---|---|---|---|
-| Rush | 1.0 | 0.25 | 0 | 1.0 |
-| Balanced | 1.0 | 0.5 | 0.2 | 0.5 |
-| Eco | 1.0 | 0.3 | 3.0 | 0 |
+| Term | Why |
+|---|---|
+| `f(w)` quadratic in the wait | Two waits of 20 s are better than 0 s and 40 s: long waits cost more than their length (BR-01). |
+| other passengers' extra delay | The nearest car may already carry people to many floors; one more stop delays all of them. Nearest-car ignores this. |
+| `w_busy` | Every second a car stays busy is a second later back at the lobby for passengers who have not arrived yet. This makes each trip serve few floors (up-peak sectoring). |
+| `w_run` | Moving seconds and door cycles are energy. Only Eco weighs them strongly. |
+| soft and hard ceiling penalties | Keep anyone close to the mode's wait ceiling from being pushed further back. |
+| FR-101 | A car where the call would not fit on the trip, or would push someone else off, is not a candidate. |
 
-Rush up-peak also asks for a door hold of up to 10 s at the lobby when the next car is far away,
-so a car is there to board (the wait clock stops at boarding).
+| Mode | w_wait | w_ride | w_run | w_busy | Hard penalty | Why |
+|---|---|---|---|---|---|---|
+| Rush | 1.0 | 0.25 | 0 | 1.0 | 0 | Waits first. A hard penalty lengthened peak trips and raised the average (measured on SIM-01/02). |
+| Balanced | 1.0 | 0.5 | 0.2 | 0.5 | 100 | Waits and ride time, some energy; the hard penalty brought SIM-03 from 4 to 3 seeds over 90 s. |
+| Eco | 1.0 | 0.3 | 3.0 | 0 | 0 | One second of running costs three seconds of waiting: fewer and shorter runs (SIM-04: 20-27% less run time than Balanced). |
+
+**Lobby door hold (Rush up-peak only).** When most recent calls start at the lobby, a lobby pick-up
+asks the controller for a longer door time (6-10 s) if the next car of the group is far away, so a car
+is there to board. The wait clock stops at boarding, so this lowers waits at the cost of ride time.
+Longer holds (up to 30 s) were tried and made the 35/min peak worse.
+
+**Wear.** After costing, cars within a small cost allowance of the best one are compared by distance
+travelled and the least-worn one wins, so waits keep priority. The CR-01 rework (stronger allowance,
+Eco standby rotation, real 24 h / 7 day / month runs) is in #104 by Mai. Real 24 h weekday runs
+from zero, seed 1:
+
+| Policy | LOW imbalance | HIGH imbalance | Average wait | Source |
+|---|---|---|---|---|
+| Wear term disabled | 30.6% | 39.7% | 22.95 s | #104 |
+| Before CR-01 (near ties only, allowance 5) | 9.3% | 40.0% | | #58 |
+| CR-01 policy | 0.50% | 0.89% | 22.4 s | #104 (7 days: 0.10% / 0.25%) |
+
+The near-tie rule alone did not balance the high-rise group; #104 adds a stronger allowance and
+rotates which cars stay in service during Eco.
+
+## Modes (SRS 4.3)
+
+| | Rush | Balanced | Eco |
+|---|---|---|---|
+| Wait target / ceiling | 25 / 60 s | 30 / 90 s | 45 / 120 s |
+| Idle cars park | lobby (up-peak), spread over the zone (down-peak), mixed (lunch) | one at the lobby, the others at the busiest recent floors | where the last trip ended (no empty runs) |
+| Cars in service | all | all | 2 per group, the rest in Standby |
+
+- **Schedule (FR-11):** weekdays 00:00 Eco, 07:00 Rush, 09:30 Balanced, 11:30 Rush, 13:30
+  Balanced, 17:00 Rush, 18:30 Balanced, 20:00 Eco; weekends and the holiday calendar are Eco.
+  Every change publishes `ModeChanged` once per group.
+- **Manual switch (FR-12):** the FM picks a mode for one group or all groups, until a set time or
+  the next scheduled change (the next time the scheduled mode actually differs). Dashboard:
+  Facility manager actions -> Manual dispatch mode; the change is audit-logged by Part 6.
+- **Eco step-up (FR-14, BR-05):** when a group has more than 10 waiting calls for 30 s, or the
+  5-minute average wait passes 45 s, it switches to Balanced until the next scheduled change and
+  the FM gets an info alert. Under morning-peak traffic this happens within seconds, so Eco
+  Standby is only visible with quiet traffic.
+- **Wait ceiling (FR-13):** a call predicted at 90% of the ceiling raises `WaitCeilingRisk` once;
+  in Eco a Standby car is woken. Calls that do exceed the ceiling are logged with a cause and the FM
+  is alerted at most once per group per 5 minutes.
+- **Mode change (FR-15, BR-02):** never cancels a call or a trip; new rules apply to new decisions
+  (`docs/passenger_lists/fr15_mode_change.csv`).
 
 ## Results (simulator, real Parts 2-5 on main, 35 persons/min peaks, seeds 1-10)
 | Scenario | Nearest-car stand-in | Part 2 | Target |

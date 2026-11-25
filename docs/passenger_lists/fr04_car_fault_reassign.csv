@@ -1,0 +1,6 @@
+# start=13:30
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,12,1,,,,flt-1,,,,delivered,90,FR-04 assigned to car A; A faults before pick-up and the call moves to a healthy car
+0,13,1,,,,flt-2,,,,delivered,90,FR-04 waiting call of the faulted car is re-assigned with its original wait clock
+2,,,,,,,car_fault,A,,alert:fault,,FR-04 controller fault on A while flt-1 and flt-2 still wait for it
+10,1,9,,,,flt-3,,,,delivered,90,FR-02 new calls go to healthy cars while A is out of service

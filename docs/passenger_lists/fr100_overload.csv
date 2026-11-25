@@ -1,0 +1,7 @@
+# start=13:30
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,6,,,,ov-1,,,,delivered,90,FR-100 waits at the lobby for car A
+1,1,8,,,,ov-2,,,,delivered,90,FR-100 waits at the lobby for car A
+0,,,,,,,overload_burst,A,,,,FR-100 phantom overload: at A's next door opening nobody can board for one door cycle
+6,1,10,,,,ov-3,,,,delivered,90,FR-100 car A serves new calls again after the one-cycle step-out
+20,1,12,,,,ov-4,,,,delivered,90,FR-100 later calls are served normally after the step-out

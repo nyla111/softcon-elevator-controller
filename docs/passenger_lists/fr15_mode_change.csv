@@ -1,0 +1,8 @@
+# start=06:58
+t,origin,destination,card,accessible,vip,passenger_id,event,car,duration,expect,max_wait_s,note
+0,1,9,,,,mc-1,,,,delivered,120,FR-15 BR-02 call made in Eco before the 07:00 change to Rush
+40,20,1,,,,mc-2,,,,delivered,120,FR-15 call made in Eco; its trip may finish after the change
+80,1,24,,,,mc-3,,,,delivered,120,FR-15 call made in Eco just before the change
+110,12,1,,,,mc-4,,,,delivered,120,FR-15 call made seconds before the change is not cancelled
+125,1,15,,,,mc-5,,,,delivered,60,FR-11 first call under the 07:00 Rush schedule
+140,1,27,,,,mc-6,,,,delivered,60,FR-11 Rush ceiling 60 s applies to new calls
